@@ -107,8 +107,8 @@ function AuthScreen() {
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4 border border-emerald-500/20">
-            <WalletCards className="w-7 h-7 text-emerald-400" />
+          <div className="mb-4">
+            <img src="/icon.png" alt="Logo GastOS" className="w-22 h-22 rounded-3xl shadow-lg shadow-emerald-400/80" />
           </div>
           <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">GastOS</h1>
           <p className="text-sm text-zinc-500 mt-1">Registro de gastos personal</p>
@@ -138,6 +138,11 @@ function AuthScreen() {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />} {isLogin ? "Entrar" : "Crear cuenta"}
           </button>
         </form>
+      </div>
+      <div className="mt-8 text-center animate-in fade-in duration-700 delay-300">
+        <p className="text-xs text-zinc-600 font-medium tracking-wide">
+          Desarrollado por <span className="text-emerald-500/80">Ajota</span>
+        </p>
       </div>
     </div>
   )

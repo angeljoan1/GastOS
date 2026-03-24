@@ -147,7 +147,7 @@ function AuthScreen() {
 function SettingsModal({ isOpen, onClose, categorias, onCategoriesChange, session }: {
   isOpen: boolean; onClose: () => void; categorias: typeof DEFAULT_CATEGORIAS; onCategoriesChange: (cats: typeof DEFAULT_CATEGORIAS) => void; session: Session
 }) {
-  const [presupuesto, setPresupuesto] = useState<string>(() => session.user.user_metadata?.presupuesto?.toString() || "")
+  const [presupuesto, setPresupuesto] = useState<string>(() => session?.user?.user_metadata?.presupuesto?.toString() || "")
   const [newCatName, setNewCatName] = useState("")
   const [newCatEmoji, setNewCatEmoji] = useState("📌")
   const [editingCats, setEditingCats] = useState(categorias)
@@ -156,7 +156,7 @@ function SettingsModal({ isOpen, onClose, categorias, onCategoriesChange, sessio
   useEffect(() => {
     if (isOpen) {
       setEditingCats(categorias)
-      setPresupuesto(session.user.user_metadata?.presupuesto?.toString() || "")
+      setPresupuesto(session?.user?.user_metadata?.presupuesto?.toString() || "")
     }
   }, [isOpen, categorias, session])
 
@@ -501,18 +501,18 @@ function HistorialTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS })
     if (!error) setMovimientos((prev) => prev.filter((m) => m.id !== id))
   }
 
-async function handleUpdateMovimiento(updatedMov: Movimiento) {
+  async function handleUpdateMovimiento(updatedMov: Movimiento) {
     // 1. Limpiamos la nota. Si está en blanco, le pasamos 'null' a la base de datos.
     const notaFinal = updatedMov.nota?.trim() === "" ? null : updatedMov.nota?.trim();
 
     // 2. Enviamos los datos actualizados a Supabase
     const { error } = await supabase
       .from("movimientos")
-      .update({ 
-        cantidad: updatedMov.cantidad, 
-        categoria: updatedMov.categoria, 
-        nota: notaFinal, 
-        is_recurring: updatedMov.is_recurring 
+      .update({
+        cantidad: updatedMov.cantidad,
+        categoria: updatedMov.categoria,
+        nota: notaFinal,
+        is_recurring: updatedMov.is_recurring
       })
       .eq("id", updatedMov.id);
 
@@ -520,7 +520,7 @@ async function handleUpdateMovimiento(updatedMov: Movimiento) {
     if (error) {
       alert("Error al actualizar el gasto: " + error.message);
     } else {
-      setMovimientos((prev) => 
+      setMovimientos((prev) =>
         prev.map((m) => (m.id === updatedMov.id ? { ...updatedMov, nota: notaFinal || undefined } : m))
       );
     }
@@ -622,7 +622,7 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
   const [selectedDate, setSelectedDate] = useState(new Date())
 
   // AHORA LEEMOS EL PRESUPUESTO DE LA NUBE (METADATOS DEL USUARIO)
-  const presupuesto = session.user.user_metadata?.presupuesto || null
+  const presupuesto = session?.user?.user_metadata?.presupuesto || null
 
   useEffect(() => {
     async function fetchMovimientos() {
@@ -692,9 +692,9 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
                 <Tooltip
                   contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
                   itemStyle={{ color: "#f4f4f5" }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value: any, name: any) => {
                     const cat = getCatConfig(name, categorias);
-                    return [`${value.toFixed(2)}€`, cat.label];
+                    return [`${Number(value).toFixed(2)}€`, cat.label];
                   }}
                 />
               </PieChart>
@@ -720,7 +720,7 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
           <BarChart data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={(v) => `${v}€`} />
-            <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }} itemStyle={{ color: "#f4f4f5" }} formatter={(value: number) => [`${value.toFixed(2)}€`, "Total"]} />
+            <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }} itemStyle={{ color: "#f4f4f5" }} formatter={(value: any) => [`${Number(value).toFixed(2)}€`, "Total"]} />
             <Bar dataKey="total" fill="#10b981" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -736,14 +736,14 @@ function MainApp({ session }: { session: Session }) {
 
   // INICIALIZAMOS CON LAS CATEGORIAS DE LA NUBE (O LAS POR DEFECTO)
   const [categorias, setCategorias] = useState<typeof DEFAULT_CATEGORIAS>(
-    session.user.user_metadata?.categorias_custom || DEFAULT_CATEGORIAS
+    session?.user?.user_metadata?.categorias_custom || DEFAULT_CATEGORIAS
   )
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // Si la sesión se actualiza (ej: al guardar ajustes), actualizamos las categorías en pantalla
   useEffect(() => {
-    if (session.user.user_metadata?.categorias_custom) {
-      setCategorias(session.user.user_metadata.categorias_custom)
+    if (session?.user?.user_metadata?.categorias_custom) {
+      setCategorias(session?.user?.user_metadata.categorias_custom)
     }
   }, [session])
 

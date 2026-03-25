@@ -40,9 +40,10 @@ import {
 } from "recharts"
 
 // ─── Supabase Client ────────────────────────────────────────────────────────
-const supabaseUrl = "https://hwvkfobocmzvlezjviqy.supabase.co"
-const supabaseKey = "sb_publishable_s1ISa8PMnxviz21ADMtyqA_tSSdcuyA"
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 const APP_VERSION = 2;
 
 // ─── Types ───────────────────────────────────────────────────────────────────

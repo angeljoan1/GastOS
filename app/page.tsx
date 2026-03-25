@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import FeedbackWidget from '@/components/FeedbackWidget'
 import { createClient } from "@supabase/supabase-js"
 import {
   Delete,
@@ -82,10 +83,12 @@ function AuthScreen() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLogin, setIsLogin] = useState(true)
+  const [isResettingPassword, setIsResettingPassword] = useState(false) // NUEVO ESTADO
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // Función para Login y Registro
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -93,21 +96,21 @@ function AuthScreen() {
     setLoading(true)
 
     if (!isLogin) {
-    if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden.")
-      setLoading(false)
-      return // Cortamos la ejecución aquí mismo
-    }
+      if (password !== confirmPassword) {
+        setError("Las contraseñas no coinciden.")
+        setLoading(false)
+        return
+      }
 
-    const tieneLetras = /[a-zA-Z]/.test(password)
-    const tieneNumeros = /[0-9]/.test(password)
+      const tieneLetras = /[a-zA-Z]/.test(password)
+      const tieneNumeros = /[0-9]/.test(password)
 
-    if (password.length < 8 || !tieneLetras || !tieneNumeros) {
-      setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
-      setLoading(false)
-      return // Cortamos la ejecución aquí mismo
+      if (password.length < 8 || !tieneLetras || !tieneNumeros) {
+        setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+        setLoading(false)
+        return
+      }
     }
-  }
 
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -118,6 +121,30 @@ function AuthScreen() {
       else setSuccess("Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
     }
 
+    setLoading(false)
+  }
+
+  // NUEVA FUNCIÓN: Enviar correo de recuperación
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email) {
+      setError("Por favor, introduce tu correo electrónico.")
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+
+    if (error) {
+      setError(error.message)
+    } else {
+      setSuccess("Te hemos enviado un enlace para recuperar tu contraseña. Revisa tu bandeja de entrada.")
+    }
     setLoading(false)
   }
 
@@ -132,50 +159,75 @@ function AuthScreen() {
           <p className="text-sm text-zinc-500 mt-1">Registro de gastos personal</p>
         </div>
 
-        <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800">
-          <button onClick={() => { setIsLogin(true); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
-            Iniciar Sesión
-          </button>
-          <button onClick={() => { setIsLogin(false); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${!isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
-            Registrarse
-          </button>
-        </div>
+        {/* Solo mostramos las pestañas si NO estamos recuperando la contraseña */}
+        {!isResettingPassword && (
+          <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800">
+            <button onClick={() => { setIsLogin(true); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
+              Iniciar Sesión
+            </button>
+            <button onClick={() => { setIsLogin(false); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${!isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
+              Registrarse
+            </button>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {/* El formulario cambia su onSubmit dependiendo del modo */}
+        <form onSubmit={isResettingPassword ? handleResetPassword : handleSubmit} className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Correo electrónico</label>
             <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Contraseña</label>
-            <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
-          </div>
-          {!isLogin && (
-            <div className="animate-in fade-in duration-300">
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
-                Confirmar Contraseña
-              </label>
-              <input 
-                type="password" 
-                required 
-                value={confirmPassword} 
-                onChange={(e) => setConfirmPassword(e.target.value)} 
-                placeholder="••••••••" 
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" 
-              />
-            </div>
+
+          {/* Ocultamos las contraseñas si estamos en modo recuperación */}
+          {!isResettingPassword && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Contraseña</label>
+                <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
+              </div>
+
+              {isLogin && (
+                <div className="flex justify-end mt-1">
+                  <button type="button" onClick={() => { setIsResettingPassword(true); setError(null); setSuccess(null); }} className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors">
+                    ¿Has olvidado tu contraseña?
+                  </button>
+                </div>
+              )}
+
+              {!isLogin && (
+                <div className="animate-in fade-in duration-300">
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
+                    Confirmar Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                  />
+                </div>
+              )}
+            </>
           )}
+
           {error && <div className="bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
           {success && <div className="bg-emerald-950/50 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">{success}</div>}
+
+          {/* Botón dinámico */}
           <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2">
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />} {isLogin ? "Entrar" : "Crear cuenta"}
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isResettingPassword ? "Enviar enlace" : (isLogin ? "Entrar" : "Crear cuenta")}
           </button>
+
+          {/* Botón para volver atrás */}
+          {isResettingPassword && (
+            <button type="button" onClick={() => { setIsResettingPassword(false); setError(null); setSuccess(null); }} className="w-full text-sm text-zinc-400 hover:text-zinc-200 mt-2 transition-colors py-2">
+              Volver a Iniciar Sesión
+            </button>
+          )}
         </form>
-      </div>
-      <div className="mt-8 text-center animate-in fade-in duration-700 delay-300">
-        <p className="text-xs text-zinc-600 font-medium tracking-wide">
-          Desarrollado por <span className="text-emerald-500/80">Ajota</span>
-        </p>
       </div>
     </div>
   )
@@ -270,21 +322,36 @@ function SettingsModal({ isOpen, onClose, categorias, onCategoriesChange, sessio
 }
 
 // ─── Edit Movimiento Modal ────────────────────────────────────────────────────
+// ─── Edit Movimiento Modal ────────────────────────────────────────────────────
 function EditMovimientoModal({ isOpen, onClose, movimiento, categorias, onSave }: {
   isOpen: boolean; onClose: () => void; movimiento: Movimiento | null; categorias: typeof DEFAULT_CATEGORIAS; onSave: (updatedMov: Movimiento) => Promise<void>
 }) {
-  const [cantidad, setCantidad] = useState(""); const [categoria, setCategoria] = useState("")
-  const [nota, setNota] = useState(""); const [loading, setLoading] = useState(false)
+  const [cantidad, setCantidad] = useState(""); 
+  const [categoria, setCategoria] = useState("");
+  const [nota, setNota] = useState(""); 
+  const [fecha, setFecha] = useState(""); // NUEVO ESTADO PARA LA FECHA
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (movimiento) { setCantidad(movimiento.cantidad.toString()); setCategoria(movimiento.categoria); setNota(movimiento.nota || "") }
+    if (movimiento) { 
+      setCantidad(movimiento.cantidad.toString()); 
+      setCategoria(movimiento.categoria); 
+      setNota(movimiento.nota || "");
+      
+      // Extraemos solo el "YYYY-MM-DD" de la fecha original para el calendario
+      const d = new Date(movimiento.created_at);
+      const isoDate = d.toISOString().split('T')[0];
+      setFecha(isoDate);
+    }
   }, [movimiento])
 
   const handleSave = async () => {
-    if (!movimiento || !cantidad || !categoria) return
+    if (!movimiento || !cantidad || !categoria || !fecha) return
     setLoading(true)
     try {
-      await onSave({ ...movimiento, cantidad: parseFloat(cantidad), categoria, nota })
+      // Le pasamos la nueva fecha (añadiéndole una hora genérica para que sea un formato válido)
+      const nuevaFecha = new Date(`${fecha}T12:00:00Z`).toISOString();
+      await onSave({ ...movimiento, cantidad: parseFloat(cantidad), categoria, nota, created_at: nuevaFecha })
       onClose()
     } finally { setLoading(false) }
   }
@@ -300,10 +367,18 @@ function EditMovimientoModal({ isOpen, onClose, movimiento, categorias, onSave }
         </div>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-2">Cantidad (€)</label>
-            <input type="number" step="0.01" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" />
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Cantidad (€)</label>
+              <input type="number" step="0.01" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" />
+            </div>
+            {/* NUEVO CAMPO DE FECHA */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Fecha</label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all [color-scheme:dark]" />
+            </div>
           </div>
+          
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">Categoría</label>
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all">
@@ -539,25 +614,30 @@ function HistorialTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS })
     if (!error) setMovimientos((prev) => prev.filter((m) => m.id !== id))
   }
 
-  async function handleUpdateMovimiento(updatedMov: Movimiento) {
-    // 1. Limpiamos la nota. Si está en blanco, le pasamos 'null' a la base de datos.
+async function handleUpdateMovimiento(updatedMov: Movimiento) {
+    // 1. Limpiamos la nota
     const notaFinal = updatedMov.nota?.trim() === "" ? null : updatedMov.nota?.trim();
 
-    // 2. Enviamos los datos actualizados a Supabase
-    const { error } = await supabase
+    // 2. Enviamos a Supabase y le OBLIGAMOS a que nos devuelva la fila actualizada (.select)
+    const { data, error } = await supabase
       .from("movimientos")
       .update({
         cantidad: updatedMov.cantidad,
         categoria: updatedMov.categoria,
         nota: notaFinal,
-        is_recurring: updatedMov.is_recurring
+        is_recurring: updatedMov.is_recurring,
+        created_at: updatedMov.created_at
       })
-      .eq("id", updatedMov.id);
+      .eq("id", updatedMov.id)
+      .select(); // <-- La clave está aquí
 
-    // 3. Si hay error, avisamos. Si no, actualizamos la lista visual.
+    // 3. Comprobamos qué ha pasado realmente
     if (error) {
-      alert("Error al actualizar el gasto: " + error.message);
+      alert("Error de la base de datos: " + error.message);
+    } else if (!data || data.length === 0) {
+      alert("❌ Supabase ha bloqueado la edición silenciosamente. Te falta crear la política 'UPDATE' en tu panel.");
     } else {
+      // Solo actualizamos la pantalla si Supabase nos confirma que lo ha guardado
       setMovimientos((prev) =>
         prev.map((m) => (m.id === updatedMov.id ? { ...updatedMov, nota: notaFinal || undefined } : m))
       );
@@ -653,22 +733,84 @@ function HistorialTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS })
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 const CHART_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#64748b"]
-
 function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATEGORIAS; session: Session }) {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
+  
+  // NUEVOS ESTADOS PARA SUSCRIPCIONES
+  const [pendingSubs, setPendingSubs] = useState<Movimiento[]>([])
+  const [processingSub, setProcessingSub] = useState<string | null>(null)
 
-  // AHORA LEEMOS EL PRESUPUESTO DE LA NUBE (METADATOS DEL USUARIO)
   const presupuesto = session?.user?.user_metadata?.presupuesto || null
 
   useEffect(() => {
     async function fetchMovimientos() {
       const { data } = await supabase.from("movimientos").select("*").order("created_at", { ascending: false })
-      setMovimientos(data ?? []); setLoading(false)
+      if (data) {
+        setMovimientos(data)
+
+        // --- MOTOR DE SUSCRIPCIONES PEREZOSO ---
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+
+        // 1. Buscamos todas las suscripciones (is_recurring = true)
+        const recurringActivas = data.filter(m => m.is_recurring)
+        
+        // 2. Nos quedamos solo con el último pago de cada tipo (por categoría y nota)
+        const mapUltimosPagos = new Map<string, Movimiento>()
+        recurringActivas.forEach(m => {
+          const key = `${m.categoria}-${m.nota || ''}`
+          if (!mapUltimosPagos.has(key)) {
+            mapUltimosPagos.set(key, m) // Como vienen ordenados del más nuevo al más viejo, nos quedamos el primero
+          }
+        })
+
+        // 3. Revisamos si el último pago fue ANTES de este mes
+        const pending: Movimiento[] = []
+        mapUltimosPagos.forEach(sub => {
+          const d = new Date(sub.created_at)
+          const isThisMonth = d.getMonth() === currentMonth && d.getFullYear() === currentYear
+          if (!isThisMonth) {
+            pending.push(sub)
+          }
+        })
+        setPendingSubs(pending)
+      }
+      setLoading(false)
     }
     fetchMovimientos()
   }, [])
+
+  // Función para cobrar la suscripción este mes
+  const handleCobrarSub = async (sub: Movimiento) => {
+    setProcessingSub(sub.id)
+    const { data: newSub, error } = await supabase.from("movimientos").insert({
+      cantidad: sub.cantidad,
+      categoria: sub.categoria,
+      nota: sub.nota,
+      is_recurring: true
+      // No pasamos created_at para que Supabase le ponga la fecha y hora de AHORA
+    }).select().single()
+
+    if (!error && newSub) {
+      setMovimientos(prev => [newSub, ...prev])
+      setPendingSubs(prev => prev.filter(p => p.id !== sub.id))
+    }
+    setProcessingSub(null)
+  }
+
+  // Función para cancelar la suscripción (quita la etiqueta verde al registro antiguo)
+  const handleCancelarSub = async (id: string) => {
+    setProcessingSub(id)
+    const { error } = await supabase.from("movimientos").update({ is_recurring: false }).eq("id", id)
+    if (!error) {
+      setPendingSubs(prev => prev.filter(p => p.id !== id))
+      setMovimientos(prev => prev.map(m => m.id === id ? { ...m, is_recurring: false } : m))
+    }
+    setProcessingSub(null)
+  }
 
   if (loading) return <div className="flex-1 flex items-center justify-center py-20"><Loader2 className="w-6 h-6 text-zinc-600 animate-spin" /></div>
 
@@ -693,11 +835,45 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
+      
       <div className="flex items-center justify-between">
         <button onClick={handlePrevMonth} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors text-zinc-400"><ChevronLeft className="w-5 h-5" /></button>
         <p className="text-sm font-medium text-zinc-300 capitalize flex-1 text-center">{monthLabel}</p>
         <button onClick={handleNextMonth} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors text-zinc-400"><ChevronRight className="w-5 h-5" /></button>
       </div>
+
+      {/* --- BANNER DE SUSCRIPCIONES PENDIENTES --- */}
+      {pendingSubs.length > 0 && selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear() && (
+        <div className="bg-emerald-950/20 border border-emerald-900/50 rounded-2xl p-4 space-y-3 shadow-lg shadow-emerald-900/10">
+          <div className="flex items-center gap-2 text-emerald-400 mb-2">
+            <CalendarDays className="w-5 h-5" />
+            <h3 className="font-medium text-sm">Suscripciones este mes</h3>
+          </div>
+          <div className="space-y-2">
+            {pendingSubs.map(sub => {
+              const cat = getCatConfig(sub.categoria, categorias)
+              return (
+                <div key={sub.id} className="flex items-center justify-between bg-zinc-900/80 rounded-xl p-3 border border-emerald-900/30">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <p className="text-sm text-zinc-200 truncate font-medium">
+                      {cat.emoji} {cat.label} {sub.nota ? `· ${sub.nota}` : ''}
+                    </p>
+                    <p className="text-xs text-zinc-500 font-medium mt-0.5">{sub.cantidad}€</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleCancelarSub(sub.id)} disabled={processingSub === sub.id} className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-red-400 hover:border-red-900/50 flex items-center justify-center transition-all" title="Cancelar suscripción">
+                      <X className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleCobrarSub(sub)} disabled={processingSub === sub.id} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500 hover:text-zinc-950 transition-all flex items-center gap-1">
+                      {processingSub === sub.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Añadir"}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-4">
         <div>
@@ -722,8 +898,8 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
           <div className="flex flex-col items-center justify-center py-10 gap-2"><Package className="w-8 h-8 text-zinc-700" /><p className="text-sm text-zinc-600">Sin gastos este mes</p></div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
+            <div className="flex justify-center w-full">
+              <PieChart width={280} height={260}>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
                   {pieData.map((_, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
                 </Pie>
@@ -736,7 +912,7 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
                   }}
                 />
               </PieChart>
-            </ResponsiveContainer>
+            </div>
             <div className="flex flex-wrap gap-4 mt-4 justify-center">
               {pieData.map((entry, index) => {
                 const cat = getCatConfig(entry.name, categorias)
@@ -754,14 +930,14 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
 
       <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
         <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Últimos 6 Meses</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <div className="flex justify-center w-full overflow-x-auto">
+          <BarChart width={320} height={200} data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
             <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={(v) => `${v}€`} />
             <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }} itemStyle={{ color: "#f4f4f5" }} formatter={(value: any) => [`${Number(value).toFixed(2)}€`, "Total"]} />
             <Bar dataKey="total" fill="#10b981" radius={[6, 6, 0, 0]} />
           </BarChart>
-        </ResponsiveContainer>
+        </div>
       </div>
     </div>
   )
@@ -849,6 +1025,9 @@ function MainApp({ session }: { session: Session }) {
         </div>
       </nav>
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} categorias={categorias} onCategoriesChange={handleCategoriesChange} session={session} />
+      {session?.user?.id && (
+        <FeedbackWidget userId={session.user.id} />
+      )}
     </div>
   )
 }

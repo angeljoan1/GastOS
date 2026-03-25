@@ -10,7 +10,7 @@ import {
   CalendarDays,
   Package,
   LogOut,
- 
+
   Loader2,
   WalletCards,
   History,
@@ -155,8 +155,8 @@ function MainApp({ session }: { session: Session }) {
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function App() {
   // 1. TODOS LOS ESTADOS
-  const [session, setSession] = useState<Session | null>(null); 
-  const [loading, setLoading] = useState(true); 
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false)
   const [needsUpdate, setNeedsUpdate] = useState(false)
 
@@ -172,7 +172,7 @@ export default function App() {
   }, [])
 
   useEffect(() => { setMounted(true) }, [])
-  
+
   useEffect(() => {
     if (!mounted) return
     async function checkSession() { const { data } = await supabase.auth.getSession(); setSession(data.session); setLoading(false) }
@@ -193,7 +193,7 @@ export default function App() {
   }
 
   // 4. LOS RETURNS VISUALES (Siempre al final, ¡orden estricto!)
-  
+
   // A. El Bloqueador Prioritario
   if (needsUpdate) {
     return (
@@ -205,7 +205,7 @@ export default function App() {
         <p className="text-zinc-400 mb-8 max-w-sm">
           Hemos mejorado GastOS y añadido nuevas funciones de seguridad. Necesitas recargar la aplicación para continuar.
         </p>
-        <button 
+        <button
           onClick={forceUpdate}
           className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-8 rounded-2xl w-full max-w-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
         >
@@ -219,7 +219,7 @@ export default function App() {
   if (!mounted || loading) {
     return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-400 animate-spin" /></div>
   }
-  
+
   // C. La Aplicación Real
   return session ? <MainApp session={session} /> : <AuthScreen />
 }

@@ -1,14 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from "@supabase/supabase-js"
-
-// 1. INICIALIZACIÓN GLOBAL (Fuera del componente)
-// Esto asegura que solo se crea UNA conexión al cargar la app, matando el bucle infinito.
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function FeedbackWidget({ userId }: { userId: string }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -23,22 +15,34 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     
     setIsSubmitting(true)
     
-    // Guardamos en la tabla tickets
-    const { error } = await supabase
-      .from('tickets')
-      .insert([
-        { user_id: userId, tipo, mensaje }
-      ])
+    try {
+      // Llamamos a nuestra nueva ruta de API
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          tipo,
+          mensaje
+        }),
+      })
 
-    setIsSubmitting(false)
-    
-    if (!error) {
-      setSuccess(true)
-      setTimeout(() => {
-        setIsOpen(false)
-        setSuccess(false)
-        setMensaje('')
-      }, 3000)
+      if (response.ok) {
+        setSuccess(true)
+        setTimeout(() => {
+          setIsOpen(false)
+          setSuccess(false)
+          setMensaje('')
+        }, 3000)
+      } else {
+        alert("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
+      }
+    } catch (error) {
+      alert("Error de conexión al enviar el ticket.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 

@@ -80,6 +80,7 @@ function getCatConfig(cat: string, allCats: typeof DEFAULT_CATEGORIAS) {
 function AuthScreen() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [isLogin, setIsLogin] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +91,23 @@ function AuthScreen() {
     setError(null)
     setSuccess(null)
     setLoading(true)
+
+    if (!isLogin) {
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.")
+      setLoading(false)
+      return // Cortamos la ejecución aquí mismo
+    }
+
+    const tieneLetras = /[a-zA-Z]/.test(password)
+    const tieneNumeros = /[0-9]/.test(password)
+
+    if (password.length < 8 || !tieneLetras || !tieneNumeros) {
+      setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+      setLoading(false)
+      return // Cortamos la ejecución aquí mismo
+    }
+  }
 
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -115,10 +133,10 @@ function AuthScreen() {
         </div>
 
         <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800">
-          <button onClick={() => { setIsLogin(true); setError(null); setSuccess(null) }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
+          <button onClick={() => { setIsLogin(true); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
             Iniciar Sesión
           </button>
-          <button onClick={() => { setIsLogin(false); setError(null); setSuccess(null) }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${!isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
+          <button onClick={() => { setIsLogin(false); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${!isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
             Registrarse
           </button>
         </div>
@@ -132,6 +150,21 @@ function AuthScreen() {
             <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Contraseña</label>
             <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
           </div>
+          {!isLogin && (
+            <div className="animate-in fade-in duration-300">
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
+                Confirmar Contraseña
+              </label>
+              <input 
+                type="password" 
+                required 
+                value={confirmPassword} 
+                onChange={(e) => setConfirmPassword(e.target.value)} 
+                placeholder="••••••••" 
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" 
+              />
+            </div>
+          )}
           {error && <div className="bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
           {success && <div className="bg-emerald-950/50 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">{success}</div>}
           <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2">

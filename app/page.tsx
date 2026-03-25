@@ -43,6 +43,7 @@ import {
 const supabaseUrl = "https://hwvkfobocmzvlezjviqy.supabase.co"
 const supabaseKey = "sb_publishable_s1ISa8PMnxviz21ADMtyqA_tSSdcuyA"
 const supabase = createClient(supabaseUrl, supabaseKey)
+const APP_VERSION = 2;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
@@ -326,18 +327,18 @@ function SettingsModal({ isOpen, onClose, categorias, onCategoriesChange, sessio
 function EditMovimientoModal({ isOpen, onClose, movimiento, categorias, onSave }: {
   isOpen: boolean; onClose: () => void; movimiento: Movimiento | null; categorias: typeof DEFAULT_CATEGORIAS; onSave: (updatedMov: Movimiento) => Promise<void>
 }) {
-  const [cantidad, setCantidad] = useState(""); 
+  const [cantidad, setCantidad] = useState("");
   const [categoria, setCategoria] = useState("");
-  const [nota, setNota] = useState(""); 
+  const [nota, setNota] = useState("");
   const [fecha, setFecha] = useState(""); // NUEVO ESTADO PARA LA FECHA
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (movimiento) { 
-      setCantidad(movimiento.cantidad.toString()); 
-      setCategoria(movimiento.categoria); 
+    if (movimiento) {
+      setCantidad(movimiento.cantidad.toString());
+      setCategoria(movimiento.categoria);
       setNota(movimiento.nota || "");
-      
+
       // Extraemos solo el "YYYY-MM-DD" de la fecha original para el calendario
       const d = new Date(movimiento.created_at);
       const isoDate = d.toISOString().split('T')[0];
@@ -378,7 +379,7 @@ function EditMovimientoModal({ isOpen, onClose, movimiento, categorias, onSave }
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all [color-scheme:dark]" />
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">Categoría</label>
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all">
@@ -407,9 +408,78 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
   const [display, setDisplay] = useState("0"); const [nota, setNota] = useState(""); const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false); const [error, setError] = useState<string | null>(null)
 
-  // Nuevos estados para el modal de suscripción
   const [showRecurModal, setShowRecurModal] = useState(false)
   const [pendingCat, setPendingCat] = useState<string | null>(null)
+
+  // ESTADOS PARA SUSCRIPCIONES PENDIENTES
+  const [pendingSubs, setPendingSubs] = useState<Movimiento[]>([])
+  const [processingSub, setProcessingSub] = useState<string | null>(null)
+
+  // Comprobar suscripciones pendientes al cargar la pestaña
+  useEffect(() => {
+    async function checkSubs() {
+      const { data } = await supabase.from("movimientos").select("*").eq("is_recurring", true).order("created_at", { ascending: false })
+      if (data) {
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+
+        const mapUltimosPagos = new Map<string, Movimiento>()
+        data.forEach(m => {
+          const key = `${m.categoria}-${m.nota || ''}`
+          if (!mapUltimosPagos.has(key)) mapUltimosPagos.set(key, m)
+        })
+
+        const pending: Movimiento[] = []
+        mapUltimosPagos.forEach(sub => {
+          const d = new Date(sub.created_at)
+          if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) {
+            pending.push(sub)
+          }
+        })
+        setPendingSubs(pending)
+      }
+    }
+    checkSubs()
+  }, [])
+
+  // Cobrar suscripción manteniendo su día original
+  const handleCobrarSub = async (sub: Movimiento) => {
+    setProcessingSub(sub.id)
+
+    // Calcular la fecha correcta (mismo día del mes original, pero en el mes actual)
+    const originalDate = new Date(sub.created_at)
+    const newDate = new Date() // Hoy
+
+    // Límite de días (ej: si la original es 31 y estamos en febrero, la pone al 28)
+    const maxDaysInThisMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate()
+    const targetDay = Math.min(originalDate.getDate(), maxDaysInThisMonth)
+
+    newDate.setDate(targetDay)
+    newDate.setHours(12, 0, 0, 0) // Ponemos mediodía para evitar problemas de zona horaria
+
+    const { error } = await supabase.from("movimientos").insert({
+      cantidad: sub.cantidad,
+      categoria: sub.categoria,
+      nota: sub.nota,
+      is_recurring: true,
+      created_at: newDate.toISOString() // ¡Usamos la fecha inteligente!
+    })
+
+    if (!error) {
+      setPendingSubs(prev => prev.filter(p => p.id !== sub.id))
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 1800)
+    }
+    setProcessingSub(null)
+  }
+
+  const handleCancelarSub = async (id: string) => {
+    setProcessingSub(id)
+    const { error } = await supabase.from("movimientos").update({ is_recurring: false }).eq("id", id)
+    if (!error) setPendingSubs(prev => prev.filter(p => p.id !== id))
+    setProcessingSub(null)
+  }
 
   function handleDigit(d: string) {
     triggerHaptic(); setError(null)
@@ -426,13 +496,11 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
     setDisplay((prev) => (prev.length <= 1 ? "0" : prev.slice(0, -1)))
   }
 
-  // Interceptamos el clic antes de guardar
   function onCategoryClick(catId: string) {
     if (catId === "Suscripciones" || catId === "suscripciones") {
-      setPendingCat(catId)
-      setShowRecurModal(true) // Abre la pregunta
+      setPendingCat(catId); setShowRecurModal(true)
     } else {
-      handleCategoria(catId, false) // Guarda normal
+      handleCategoria(catId, false)
     }
   }
 
@@ -442,12 +510,8 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
     if (!cantidad || cantidad <= 0) return setError("Introduce una cantidad mayor que 0.")
     setLoading(true); setError(null)
 
-    // Guardamos en Supabase incluyendo si es recurrente
     const { error } = await supabase.from("movimientos").insert({
-      cantidad,
-      categoria: cat,
-      nota: nota || null,
-      is_recurring: isRecurring
+      cantidad, categoria: cat, nota: nota || null, is_recurring: isRecurring
     })
 
     setLoading(false)
@@ -460,13 +524,12 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
   return (
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-8 duration-500">
       {success && (
-        <div className="absolute inset-0 z-20 bg-zinc-950/95 flex flex-col items-center justify-center gap-3 rounded-t-xl animate-in fade-in duration-300">
+        <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-3 rounded-t-xl animate-in fade-in duration-300">
           <CheckCircle2 className="w-16 h-16 text-emerald-400" strokeWidth={1.5} />
           <p className="text-emerald-400 font-semibold text-lg">¡Guardado!</p>
         </div>
       )}
 
-      {/* Modal de Suscripción Recurrente */}
       {showRecurModal && (
         <div className="absolute inset-0 z-30 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
@@ -474,19 +537,46 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
             <h3 className="text-zinc-100 font-semibold mb-2">¿Es un pago mensual?</h3>
             <p className="text-zinc-500 text-sm mb-6">Podemos marcarlo como suscripción para llevar un mejor control.</p>
             <div className="flex flex-col gap-3">
-              <button onClick={() => handleCategoria(pendingCat!, true)} className="w-full py-3 text-sm bg-emerald-500 text-zinc-950 rounded-xl font-bold hover:bg-emerald-400 transition-all">
-                Sí, se repite cada mes
-              </button>
-              <button onClick={() => handleCategoria(pendingCat!, false)} className="w-full py-3 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all">
-                No, es solo un pago puntual
-              </button>
+              <button onClick={() => handleCategoria(pendingCat!, true)} className="w-full py-3 text-sm bg-emerald-500 text-zinc-950 rounded-xl font-bold hover:bg-emerald-400 transition-all">Sí, se repite cada mes</button>
+              <button onClick={() => handleCategoria(pendingCat!, false)} className="w-full py-3 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all">No, es solo un pago puntual</button>
               <button onClick={() => setShowRecurModal(false)} className="mt-2 text-xs text-zinc-600 hover:text-zinc-400">Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-col items-end justify-end px-6 pt-8 pb-4 border-b border-zinc-800/60">
+      {/* BANNER DE SUSCRIPCIONES PENDIENTES */}
+      {pendingSubs.length > 0 && (
+        <div className="bg-emerald-950/30 border-b border-emerald-900/50 p-4 shadow-md">
+          <div className="flex items-center gap-2 text-emerald-400 mb-2">
+            <CalendarDays className="w-4 h-4" />
+            <h3 className="font-semibold text-xs uppercase tracking-wider">
+              ¿Cobrar para {new Date().toLocaleDateString('es-ES', { month: 'long' })}?
+            </h3>
+          </div>
+          <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+            {pendingSubs.map(sub => {
+              const cat = getCatConfig(sub.categoria, categorias)
+              return (
+                <div key={sub.id} className="flex items-center justify-between bg-zinc-900/80 rounded-xl p-3 border border-emerald-900/30">
+                  <div className="min-w-0 flex-1 pr-3">
+                    <p className="text-sm text-zinc-200 truncate font-medium">{cat.emoji} {cat.label} {sub.nota ? `· ${sub.nota}` : ''}</p>
+                    <p className="text-xs text-zinc-500 font-medium mt-0.5">{sub.cantidad}€</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => handleCancelarSub(sub.id)} disabled={processingSub === sub.id} className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-red-400 hover:border-red-900/50 flex items-center justify-center transition-all"><X className="w-4 h-4" /></button>
+                    <button onClick={() => handleCobrarSub(sub)} disabled={processingSub === sub.id} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500 hover:text-zinc-950 transition-all flex items-center gap-1">
+                      {processingSub === sub.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Cobrar"}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col items-end justify-end px-6 pt-6 pb-4 border-b border-zinc-800/60 bg-zinc-950">
         {error && <p className="text-xs text-red-400 mb-2 self-start">{error}</p>}
         <div className="flex items-baseline gap-2">
           <span className="text-zinc-500 text-3xl font-light">€</span>
@@ -499,9 +589,7 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
           {keys.map((k) => (
             <button key={k} onClick={() => handleDigit(k)} disabled={loading} className="h-14 rounded-2xl bg-zinc-900 border border-zinc-800/80 text-zinc-100 text-xl font-light active:bg-zinc-800 transition-colors select-none">{k}</button>
           ))}
-          <button onClick={handleBackspace} disabled={loading} className="h-14 rounded-2xl bg-zinc-900 border border-zinc-800/80 text-zinc-400 active:bg-zinc-800 transition-colors flex items-center justify-center select-none">
-            <Delete className="w-5 h-5" />
-          </button>
+          <button onClick={handleBackspace} disabled={loading} className="h-14 rounded-2xl bg-zinc-900 border border-zinc-800/80 text-zinc-400 active:bg-zinc-800 transition-colors flex items-center justify-center select-none"><Delete className="w-5 h-5" /></button>
         </div>
 
         <div>
@@ -513,12 +601,7 @@ function IngresoTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS }) {
           <p className="text-xs text-zinc-600 uppercase tracking-widest mb-3 px-1">Categoría</p>
           <div className="grid grid-cols-3 gap-3 mb-3 px-1">
             {categorias.map((cat) => (
-              <CategoryButton
-                key={cat.id}
-                cat={cat}
-                onPress={onCategoryClick}
-                loading={loading || display === "0" || display === "0."}
-              />
+              <CategoryButton key={cat.id} cat={cat} onPress={onCategoryClick} loading={loading || display === "0" || display === "0."} />
             ))}
           </div>
         </div>
@@ -614,7 +697,7 @@ function HistorialTab({ categorias }: { categorias: typeof DEFAULT_CATEGORIAS })
     if (!error) setMovimientos((prev) => prev.filter((m) => m.id !== id))
   }
 
-async function handleUpdateMovimiento(updatedMov: Movimiento) {
+  async function handleUpdateMovimiento(updatedMov: Movimiento) {
     // 1. Limpiamos la nota
     const notaFinal = updatedMov.nota?.trim() === "" ? null : updatedMov.nota?.trim();
 
@@ -737,7 +820,7 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
-  
+
   // NUEVOS ESTADOS PARA SUSCRIPCIONES
   const [pendingSubs, setPendingSubs] = useState<Movimiento[]>([])
   const [processingSub, setProcessingSub] = useState<string | null>(null)
@@ -757,7 +840,7 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
 
         // 1. Buscamos todas las suscripciones (is_recurring = true)
         const recurringActivas = data.filter(m => m.is_recurring)
-        
+
         // 2. Nos quedamos solo con el último pago de cada tipo (por categoría y nota)
         const mapUltimosPagos = new Map<string, Movimiento>()
         recurringActivas.forEach(m => {
@@ -835,45 +918,12 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
-      
+
       <div className="flex items-center justify-between">
         <button onClick={handlePrevMonth} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors text-zinc-400"><ChevronLeft className="w-5 h-5" /></button>
         <p className="text-sm font-medium text-zinc-300 capitalize flex-1 text-center">{monthLabel}</p>
         <button onClick={handleNextMonth} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors text-zinc-400"><ChevronRight className="w-5 h-5" /></button>
       </div>
-
-      {/* --- BANNER DE SUSCRIPCIONES PENDIENTES --- */}
-      {pendingSubs.length > 0 && selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear() && (
-        <div className="bg-emerald-950/20 border border-emerald-900/50 rounded-2xl p-4 space-y-3 shadow-lg shadow-emerald-900/10">
-          <div className="flex items-center gap-2 text-emerald-400 mb-2">
-            <CalendarDays className="w-5 h-5" />
-            <h3 className="font-medium text-sm">Suscripciones este mes</h3>
-          </div>
-          <div className="space-y-2">
-            {pendingSubs.map(sub => {
-              const cat = getCatConfig(sub.categoria, categorias)
-              return (
-                <div key={sub.id} className="flex items-center justify-between bg-zinc-900/80 rounded-xl p-3 border border-emerald-900/30">
-                  <div className="min-w-0 flex-1 pr-3">
-                    <p className="text-sm text-zinc-200 truncate font-medium">
-                      {cat.emoji} {cat.label} {sub.nota ? `· ${sub.nota}` : ''}
-                    </p>
-                    <p className="text-xs text-zinc-500 font-medium mt-0.5">{sub.cantidad}€</p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button onClick={() => handleCancelarSub(sub.id)} disabled={processingSub === sub.id} className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-red-400 hover:border-red-900/50 flex items-center justify-center transition-all" title="Cancelar suscripción">
-                      <X className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleCobrarSub(sub)} disabled={processingSub === sub.id} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500 hover:text-zinc-950 transition-all flex items-center gap-1">
-                      {processingSub === sub.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Añadir"}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-4">
         <div>
@@ -898,20 +948,22 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
           <div className="flex flex-col items-center justify-center py-10 gap-2"><Package className="w-8 h-8 text-zinc-700" /><p className="text-sm text-zinc-600">Sin gastos este mes</p></div>
         ) : (
           <>
-            <div className="flex justify-center w-full">
-              <PieChart width={280} height={260}>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
-                  {pieData.map((_, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-                  itemStyle={{ color: "#f4f4f5" }}
-                  formatter={(value: any, name: any) => {
-                    const cat = getCatConfig(name, categorias);
-                    return [`${Number(value).toFixed(2)}€`, cat.label];
-                  }}
-                />
-              </PieChart>
+            <div className="w-full h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
+                    {pieData.map((_, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
+                    itemStyle={{ color: "#f4f4f5" }}
+                    formatter={(value: any, name: any) => {
+                      const cat = getCatConfig(name, categorias);
+                      return [`${Number(value).toFixed(2)}€`, cat.label];
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
             <div className="flex flex-wrap gap-4 mt-4 justify-center">
               {pieData.map((entry, index) => {
@@ -930,13 +982,15 @@ function DashboardTab({ categorias, session }: { categorias: typeof DEFAULT_CATE
 
       <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
         <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Últimos 6 Meses</p>
-        <div className="flex justify-center w-full overflow-x-auto">
-          <BarChart width={320} height={200} data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={(v) => `${v}€`} />
-            <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }} itemStyle={{ color: "#f4f4f5" }} formatter={(value: any) => [`${Number(value).toFixed(2)}€`, "Total"]} />
-            <Bar dataKey="total" fill="#10b981" radius={[6, 6, 0, 0]} />
-          </BarChart>
+        <div className="w-full h-[240px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={(v) => `${v}€`} />
+              <Tooltip cursor={{ fill: "rgba(255,255,255,0.05)" }} contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }} itemStyle={{ color: "#f4f4f5" }} formatter={(value: any) => [`${Number(value).toFixed(2)}€`, "Total"]} />
+              <Bar dataKey="total" fill="#10b981" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
@@ -1034,8 +1088,25 @@ function MainApp({ session }: { session: Session }) {
 
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function App() {
-  const [session, setSession] = useState<Session | null>(null); const [loading, setLoading] = useState(true); const [mounted, setMounted] = useState(false)
+  // 1. TODOS LOS ESTADOS
+  const [session, setSession] = useState<Session | null>(null); 
+  const [loading, setLoading] = useState(true); 
+  const [mounted, setMounted] = useState(false)
+  const [needsUpdate, setNeedsUpdate] = useState(false)
+
+  // 2. TODOS LOS EFECTOS (HOOKS)
+  useEffect(() => {
+    async function checkVersion() {
+      const { data } = await supabase.from('app_config').select('min_version').eq('id', 1).single()
+      if (data && data.min_version > APP_VERSION) {
+        setNeedsUpdate(true)
+      }
+    }
+    checkVersion()
+  }, [])
+
   useEffect(() => { setMounted(true) }, [])
+  
   useEffect(() => {
     if (!mounted) return
     async function checkSession() { const { data } = await supabase.auth.getSession(); setSession(data.session); setLoading(false) }
@@ -1043,6 +1114,46 @@ export default function App() {
     const { data } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session) })
     return () => data.subscription.unsubscribe()
   }, [mounted])
-  if (!mounted || loading) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-400 animate-spin" /></div>
+
+  // 3. FUNCIONES
+  const forceUpdate = async () => {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys()
+      for (let name of cacheNames) {
+        await caches.delete(name)
+      }
+    }
+    window.location.reload()
+  }
+
+  // 4. LOS RETURNS VISUALES (Siempre al final, ¡orden estricto!)
+  
+  // A. El Bloqueador Prioritario
+  if (needsUpdate) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+        </div>
+        <h2 className="text-2xl font-bold text-zinc-100 mb-3">Actualización Importante</h2>
+        <p className="text-zinc-400 mb-8 max-w-sm">
+          Hemos mejorado GastOS y añadido nuevas funciones de seguridad. Necesitas recargar la aplicación para continuar.
+        </p>
+        <button 
+          onClick={forceUpdate}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-8 rounded-2xl w-full max-w-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
+        >
+          Actualizar ahora
+        </button>
+      </div>
+    )
+  }
+
+  // B. Pantalla de carga normal
+  if (!mounted || loading) {
+    return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-400 animate-spin" /></div>
+  }
+  
+  // C. La Aplicación Real
   return session ? <MainApp session={session} /> : <AuthScreen />
 }

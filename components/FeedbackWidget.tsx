@@ -51,7 +51,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-all z-50 flex items-center justify-center"
+        className="fixed bottom-24 right-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-all z-50 flex items-center justify-center"
         title="Enviar sugerencia o error"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -61,7 +61,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
 
   // Modal del formulario abierto
   return (
-    <div className="fixed bottom-6 right-6 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-24 right-6 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-5">
       <div className="bg-zinc-800 px-4 py-3 flex justify-between items-center border-b border-zinc-700">
         <h3 className="font-medium text-zinc-100">Buzón de Sugerencias</h3>
         <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-zinc-100">

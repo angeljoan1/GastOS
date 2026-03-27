@@ -2,131 +2,79 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
-import { Loader2, Package, Edit2, Trash2, Search, TrendingDown, TrendingUp } from "lucide-react"
+import { Loader2, Package, Edit2, Trash2, Search, TrendingDown, TrendingUp, ArrowLeftRight } from "lucide-react"
+import { getIcon } from "@/lib/icons"
 import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
-import type { Categoria, Movimiento } from "@/types"
+import type { Categoria, Movimiento, Cuenta } from "@/types"
+import BottomSheet, { SheetTrigger, type SheetOption } from "@/components/ui/BottomSheet"
 
+type TipoFilter = "todos" | "gasto" | "ingreso" | "transferencia"
 
-type TipoFilter = "todos" | "gasto" | "ingreso"
-
-function getCatConfig(cat: string, allCats: Categoria[]) {
-  return allCats.find((c) => c.id === cat) ?? { id: cat, label: cat, Icon: Package, tipo: 'ambos' as const }
-}
-
-export default function HistorialTab({ categorias }: { categorias: Categoria[] }) {
+export default function HistorialTab({
+  categorias, cuentas,
+}: {
+  categorias: Categoria[]
+  cuentas: Cuenta[]
+}) {
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmarBorrado, setConfirmarBorrado] = useState<string | null>(null)
   const [editingMov, setEditingMov] = useState<Movimiento | null>(null)
-
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("")
-  const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos") // ← NUEVO
+  const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos")
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
+  const [showCatSheet, setShowCatSheet] = useState(false)
 
-  // ── Fetch con filtro de tipo ────────────────────────────────────────────────
   const fetchMovimientos = useCallback(async (
-    pageIndex: number,
-    search: string,
-    categoryFilter: string,
-    tipo: TipoFilter,
-    isNewSearch = false
+    pageIndex: number, search: string, categoryFilter: string, tipo: TipoFilter, isNew = false
   ) => {
-    if (isNewSearch) setIsSearching(true)
-
-    let query = supabase.from("movimientos").select("*").order("created_at", { ascending: false })
-
-    if (search.trim() !== "") {
-      query = query.ilike("nota", `%${search}%`)
-    }
-    if (categoryFilter !== "") {
-      query = query.eq("categoria", categoryFilter)
-    }
-    // Filtro de tipo: si es "todos" no aplicamos nada
-    // Fallback defensivo: registros sin 'tipo' se asumen 'gasto'
-    if (tipo === "gasto") {
-      query = query.or("tipo.eq.gasto,tipo.is.null")
-    } else if (tipo === "ingreso") {
-      query = query.eq("tipo", "ingreso")
-    }
-
+    if (isNew) setIsSearching(true)
+    let q = supabase.from("movimientos").select("*").order("created_at", { ascending: false })
+    if (search.trim()) q = q.ilike("nota", `%${search}%`)
+    if (categoryFilter) q = q.eq("categoria", categoryFilter)
+    if (tipo === "gasto") q = q.or("tipo.eq.gasto,tipo.is.null")
+    else if (tipo === "ingreso") q = q.eq("tipo", "ingreso")
+    else if (tipo === "transferencia") q = q.eq("tipo", "transferencia")
     const from = pageIndex * 20
-    query = query.range(from, from + 19)
-
-    const { data } = await query
-
+    const { data } = await q.range(from, from + 19)
     if (data) {
-      if (isNewSearch) setMovimientos(data)
-      else setMovimientos((prev) => [...prev, ...data])
+      if (isNew) setMovimientos(data); else setMovimientos(prev => [...prev, ...data])
       setHasMore(data.length === 20)
     }
-
-    setLoading(false)
-    setIsSearching(false)
+    setLoading(false); setIsSearching(false)
   }, [])
 
-  // Re-fetch cuando cambia cualquier filtro
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(0)
-      fetchMovimientos(0, searchTerm, selectedCategory, tipoFilter, true)
-    }, 300)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => { setPage(0); fetchMovimientos(0, searchTerm, selectedCategory, tipoFilter, true) }, 300)
+    return () => clearTimeout(t)
   }, [searchTerm, selectedCategory, tipoFilter, fetchMovimientos])
 
-  const loadMore = () => {
-    const nextPage = page + 1
-    setPage(nextPage)
-    fetchMovimientos(nextPage, searchTerm, selectedCategory, tipoFilter, false)
-  }
-
-  // ── CRUD ───────────────────────────────────────────────────────────────────
   async function handleDelete(id: string) {
     setDeletingId(id)
     const { error } = await supabase.from("movimientos").delete().eq("id", id)
-    setDeletingId(null)
-    setConfirmarBorrado(null)
-    if (!error) setMovimientos((prev) => prev.filter((m) => m.id !== id))
+    setDeletingId(null); setConfirmarBorrado(null)
+    if (!error) setMovimientos(prev => prev.filter(m => m.id !== id))
   }
 
-  async function handleUpdateMovimiento(updatedMov: Movimiento) {
-    const notaFinal = updatedMov.nota?.trim() === "" ? null : updatedMov.nota?.trim()
-
-    const { data, error } = await supabase
-      .from("movimientos")
-      .update({
-        cantidad: updatedMov.cantidad,
-        categoria: updatedMov.categoria,
-        nota: notaFinal,
-        is_recurring: updatedMov.is_recurring,
-        tipo: updatedMov.tipo ?? "gasto", // ← incluimos tipo para no perderlo
-        created_at: updatedMov.created_at,
-      })
-      .eq("id", updatedMov.id)
-      .select()
-
-    if (error) {
-      alert("Error de la base de datos: " + error.message)
-    } else if (!data || data.length === 0) {
-      alert("❌ Supabase ha bloqueado la edición silenciosamente.")
-    } else {
-      setMovimientos((prev) =>
-        prev.map((m) => (m.id === updatedMov.id ? { ...updatedMov, nota: notaFinal || undefined } : m))
-      )
-    }
+  async function handleUpdateMovimiento(updated: Movimiento) {
+    const nota = updated.nota?.trim() === "" ? null : updated.nota?.trim()
+    const { data, error } = await supabase.from("movimientos")
+      .update({ cantidad: updated.cantidad, categoria: updated.categoria, nota, tipo: updated.tipo ?? "gasto", created_at: updated.created_at, cuenta_id: updated.cuenta_id })
+      .eq("id", updated.id).select()
+    if (error) alert("Error: " + error.message)
+    else if (data?.length) setMovimientos(prev => prev.map(m => m.id === updated.id ? { ...updated, nota: nota ?? undefined } : m))
   }
 
   function formatDate(iso: string) {
     return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
   }
 
-  // Movimiento que se va a borrar (para el texto del modal)
-  const movABorrar = confirmarBorrado
-    ? movimientos.find((m) => m.id === confirmarBorrado)
-    : null
+  const getCuenta = (id?: string | null) => cuentas.find(c => c.id === id)
+  const movABorrar = confirmarBorrado ? movimientos.find(m => m.id === confirmarBorrado) : null
 
   if (loading && page === 0) return (
     <div className="flex-1 flex items-center justify-center py-20">
@@ -137,65 +85,47 @@ export default function HistorialTab({ categorias }: { categorias: Categoria[] }
   return (
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-8 duration-500">
 
-      {/* ── Header: búsqueda + categoría ────────────────────────────────── */}
+      {/* Header filtros */}
       <div className="flex gap-2 px-4 pt-4 pb-3 border-b border-zinc-800/60 bg-zinc-950 flex-col">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               placeholder="Buscar en notas..."
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
-            />
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all" />
           </div>
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all w-1/3 max-w-[120px] truncate"
-          >
-            <option value="">Todas</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>{c.label}</option>
-            ))}
-          </select>
+          {(() => {
+            const cat = categorias.find(c => c.id === selectedCategory)
+            return (
+              <SheetTrigger onClick={() => setShowCatSheet(true)}
+                placeholder="Todas"
+                label={cat?.label}
+                icono={cat?.icono} />
+            )
+          })()}
         </div>
 
-        {/* ── Toggle Todos / Gastos / Ingresos ──────────────────────────── */}
         <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800">
-          {(["todos", "gasto", "ingreso"] as TipoFilter[]).map((t) => {
-            const active = tipoFilter === t
-            const label = t === "todos" ? "Todos" : t === "gasto" ? "Gastos" : "Ingresos"
-            const activeClass =
-              t === "todos"
-                ? "bg-zinc-700 text-zinc-100"
-                : t === "gasto"
-                ? "bg-red-500/15 text-red-400 border border-red-500/30"
-                : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-            return (
-              <button
-                key={t}
-                onClick={() => setTipoFilter(t)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                  active ? activeClass : "text-zinc-600 hover:text-zinc-400"
-                }`}
-              >
-                {t === "gasto" && <TrendingDown className="w-3 h-3" />}
-                {t === "ingreso" && <TrendingUp className="w-3 h-3" />}
-                {label}
-              </button>
-            )
-          })}
+          {([
+            { id: "todos", label: "Todos", activeClass: "bg-zinc-700 text-zinc-100", Icon: undefined },
+            { id: "gasto", label: "Gastos", activeClass: "bg-red-500/15 text-red-400 border border-red-500/30", Icon: TrendingDown },
+            { id: "ingreso", label: "Ingresos", activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30", Icon: TrendingUp },
+            { id: "transferencia", label: "Transfer.", activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30", Icon: ArrowLeftRight },
+          ] as const satisfies { id: TipoFilter; label: string; activeClass: string; Icon: any }[]).map(({ id, label, activeClass, Icon }) => (
+            <button key={id} onClick={() => setTipoFilter(id)}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-semibold rounded-lg transition-all duration-200 ${tipoFilter === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
+                }`}>
+              {Icon && <Icon className="w-3 h-3" />}
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── Lista ────────────────────────────────────────────────────────── */}
+      {/* Lista */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
         {isSearching ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
-          </div>
+          <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 text-emerald-400 animate-spin" /></div>
         ) : movimientos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Package className="w-10 h-10 text-zinc-700" />
@@ -203,66 +133,61 @@ export default function HistorialTab({ categorias }: { categorias: Categoria[] }
           </div>
         ) : (
           <>
-            {movimientos.map((m) => {
-              const cat = getCatConfig(m.categoria, categorias)
+            {movimientos.map(m => {
+              const cat = categorias.find(c => c.id === m.categoria)
+              const CatIcon = getIcon(cat?.icono ?? "Package")
               const isDeleting = deletingId === m.id
               const esIngreso = m.tipo === "ingreso"
+              const esTransfer = m.tipo === "transferencia"
+              const cuenta = getCuenta(m.cuenta_id)
+              const cuentaDest = getCuenta(m.cuenta_destino_id)
+
+              const borderColor = esTransfer ? "border-blue-900/40" : esIngreso ? "border-emerald-900/40" : "border-zinc-800/70"
+              const amountColor = esTransfer ? "text-blue-400" : esIngreso ? "text-emerald-400" : "text-red-400"
+              const amountPrefix = esTransfer ? "↔" : esIngreso ? "+" : "-"
 
               return (
-                <div
-                  key={m.id}
-                  className={`flex items-center gap-3 bg-zinc-900 border rounded-2xl px-4 py-3 transition-all duration-200 ${
-                    esIngreso ? "border-emerald-900/40" : "border-zinc-800/70"
-                  }`}
-                  style={{ opacity: isDeleting ? 0.5 : 1 }}
-                >
-                  {/* Icono con badge de recurrente */}
-                  <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center flex-shrink-0 relative">
-                    {m.is_recurring && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
-                      </span>
-                    )}
+                <div key={m.id}
+                  className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 transition-all duration-200`}
+                  style={{ opacity: isDeleting ? 0.5 : 1 }}>
+
+                  <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                    {esTransfer
+                      ? <ArrowLeftRight className="w-4 h-4 text-blue-400" />
+                      : <CatIcon className="w-4 h-4 text-zinc-400" />
+                    }
                   </div>
 
-                  {/* Texto */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-medium text-zinc-200 truncate">{cat.label}</p>
-                      <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        esIngreso
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : 'bg-red-500/15 text-red-400'
+                    <p className="text-sm font-medium text-zinc-200 truncate">
+                      {esTransfer ? "Transferencia" : (cat?.label ?? m.categoria)}
+                    </p>
+                    <span className={`w-fit text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${esTransfer ? "bg-blue-500/15 text-blue-400"
+                      : esIngreso ? "bg-emerald-500/15 text-emerald-400"
+                        : "bg-red-500/15 text-red-400"
                       }`}>
-                        {esIngreso ? 'Ingreso' : 'Gasto'}
-                      </span>
-                    </div>
+                      {esTransfer ? "Transfer" : esIngreso ? "Ingreso" : "Gasto"}
+                    </span>
+                    {esTransfer && cuenta && cuentaDest && (
+                      <p className="text-xs text-zinc-500 mt-0.5 truncate">{cuenta.nombre} → {cuentaDest.nombre}</p>
+                    )}
+                    {!esTransfer && cuenta && (
+                      <p className="text-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
+                    )}
                     {m.nota && <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>}
-                    <p className="text-xs text-zinc-600 mt-0.5">{formatDate(m.created_at)}</p>
+                    <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
                   </div>
 
-                  {/* Importe con color según tipo */}
-                  <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${
-                    esIngreso ? "text-emerald-400" : "text-red-400"
-                  }`}>
-                    {esIngreso ? "+" : "-"}
-                    {m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                  <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${amountColor}`}>
+                    {amountPrefix}{m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                   </p>
 
-                  {/* Acciones */}
-                  <button
-                    onClick={() => setEditingMov(m)}
-                    disabled={isDeleting}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 transition-all flex-shrink-0"
-                  >
+                  <button onClick={() => setEditingMov(m)} disabled={isDeleting}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 transition-all flex-shrink-0">
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => setConfirmarBorrado(m.id)}
-                    disabled={isDeleting}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 transition-all flex-shrink-0"
-                  >
+                  <button onClick={() => setConfirmarBorrado(m.id)} disabled={isDeleting}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 transition-all flex-shrink-0">
                     {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </button>
                 </div>
@@ -270,11 +195,9 @@ export default function HistorialTab({ categorias }: { categorias: Categoria[] }
             })}
 
             {hasMore && (
-              <button
-                onClick={loadMore}
+              <button onClick={() => { const next = page + 1; setPage(next); fetchMovimientos(next, searchTerm, selectedCategory, tipoFilter) }}
                 disabled={loading}
-                className="w-full py-4 mt-4 text-sm font-medium text-zinc-400 bg-zinc-900/50 hover:bg-zinc-900 rounded-xl transition-all flex justify-center items-center gap-2"
-              >
+                className="w-full py-4 mt-2 text-sm font-medium text-zinc-400 bg-zinc-900/50 hover:bg-zinc-900 rounded-xl transition-all flex justify-center items-center gap-2">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cargar más antiguos"}
               </button>
             )}
@@ -282,12 +205,12 @@ export default function HistorialTab({ categorias }: { categorias: Categoria[] }
         )}
       </div>
 
-      {/* ── Modal confirmación borrado ────────────────────────────────────── */}
+      {/* Modal confirmación borrado */}
       {confirmarBorrado && (
         <div className="absolute inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
             <h3 className="text-zinc-100 font-semibold mb-2">
-              ¿Borrar {movABorrar?.tipo === "ingreso" ? "ingreso" : "gasto"}?
+              ¿Borrar {movABorrar?.tipo === "ingreso" ? "ingreso" : movABorrar?.tipo === "transferencia" ? "transferencia" : "gasto"}?
             </h3>
             <p className="text-zinc-500 text-sm mb-6">Esta acción no se puede deshacer.</p>
             <div className="flex gap-3">
@@ -299,11 +222,18 @@ export default function HistorialTab({ categorias }: { categorias: Categoria[] }
       )}
 
       <EditMovimientoModal
-        isOpen={!!editingMov}
-        onClose={() => setEditingMov(null)}
-        movimiento={editingMov}
-        categorias={categorias}
-        onSave={handleUpdateMovimiento}
+        isOpen={!!editingMov} onClose={() => setEditingMov(null)}
+        movimiento={editingMov} categorias={categorias}
+        cuentas={cuentas} onSave={handleUpdateMovimiento} />
+
+      <BottomSheet
+        isOpen={showCatSheet} onClose={() => setShowCatSheet(false)}
+        title="Filtrar por categoría" value={selectedCategory}
+        onChange={setSelectedCategory}
+        options={[
+          { value: "", label: "Todas las categorías" },
+          ...categorias.map(c => ({ value: c.id, label: c.label, icono: c.icono, tipo: c.tipo }))
+        ]}
       />
     </div>
   )

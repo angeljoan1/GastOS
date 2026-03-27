@@ -1,0 +1,2356 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+app/
+  api/
+    feedback/
+      route.ts
+  reset-password/
+    page.tsx
+  apple-icon.png
+  globals.css
+  icon.png
+  layout.tsx
+  manifest.ts
+  page.tsx
+components/
+  auth/
+    AuthScreen.tsx
+  modals/
+    EditMovimientoModal.tsx
+    SettingsModal.tsx
+  tabs/
+    DashboardTab.tsx
+    HistorialTab.tsx
+    IngresoTab.tsx
+  FeedbackWidget.tsx
+lib/
+  supabase.ts
+public/
+  file.svg
+  globe.svg
+  logo.png
+  next.svg
+  vercel.svg
+  window.svg
+types/
+  index.ts
+.gitignore
+AGENTS.md
+CLAUDE.md
+eslint.config.mjs
+next.config.ts
+package.json
+postcss.config.mjs
+README.md
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="lib/supabase.ts">
+import { createClient } from "@supabase/supabase-js"
+
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+</file>
+
+<file path="types/index.ts">
+export type TipoMovimiento = 'gasto' | 'ingreso'
+export type TipoCategoria = 'gasto' | 'ingreso' | 'ambos'
+
+export interface Categoria {
+  id: string
+  label: string
+  Icon: any
+  tipo: TipoCategoria
+}
+
+export interface Movimiento {
+  id: string
+  created_at: string
+  cantidad: number
+  categoria: string
+  nota?: string
+  is_recurring?: boolean
+  tipo?: TipoMovimiento
+}
+</file>
+
+<file path="app/api/feedback/route.ts">
+import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
+
+// Inicializamos Resend con la llave de entorno
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { tipo, mensaje, userId } = body;
+
+    if (!mensaje) {
+      return NextResponse.json({ error: "El mensaje está vacío" }, { status: 400 });
+    }
+
+    // Usamos tu correo verificado para enviar el mensaje a tu bandeja de entrada personal
+    const { data, error } = await resend.emails.send({
+      from: 'GastOS App <soporte@angeljoan.com>', 
+      to: 'ajgamundi@gmail.com', 
+      subject: `[GastOS ${tipo}] Nuevo ticket recibido`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: ${tipo === 'Bug' ? '#ef4444' : '#10b981'};">
+            Nuevo ticket de tipo: ${tipo}
+          </h2>
+          <p><strong>Usuario ID:</strong> ${userId}</p>
+          <hr style="border: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 16px; line-height: 1.5;">${mensaje}</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    return NextResponse.json({ error: "Hubo un error en el servidor" }, { status: 500 });
+  }
+}
+</file>
+
+<file path="app/globals.css">
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+</file>
+
+<file path="app/layout.tsx">
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: 'GastOS',
+  description: 'Aplicación personal y segura para el registro diario de gastos.',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col">{children}</body>
+    </html>
+  );
+}
+</file>
+
+<file path="app/manifest.ts">
+import { MetadataRoute } from 'next'
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'GastOS - Tu dinero, bajo control',
+    short_name: 'GastOS',
+    description: 'Registro personal y seguro para el control diario de tus finanzas.',
+    start_url: '/',
+    display: 'standalone', // <-- Imprescindible para que no parezca una web
+    orientation: 'portrait', // Bloquea la app en vertical para que se vea mejor
+    background_color: '#000000', // El negro ultra oscuro del fondo de la app
+    theme_color: '#10b981', // Tu verde neón esmeralda
+    lang: 'es',
+    id: '/', // Ayuda a Android a identificar la app de forma única
+    scope: '/', // Define qué URLs pertenecen a la app
+    icons: [
+      {
+        src: '/icon.png', // Tu logo verde neón que Vercel ya conoce
+        sizes: '192x192', // Tamaño estándar para Android
+        type: 'image/png',
+        purpose: 'any', // Uso normal del icono
+      },
+      {
+        src: '/icon.png', // Re-usamos el mismo icono de alta resolución
+        sizes: '512x512', // Tamaño grande para pantallas HD y Splash Screen
+        type: 'image/png',
+        purpose: 'any',
+      },
+      // ¡ESTE ES EL TRUCO PARA ANDROID!
+      {
+        src: '/icon.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable', // <-- LE DICE A ANDROID: "NO ME PONGAS BORDE BLANCO, YO YA SÉ GESTIONAR MIS BORDES"
+      },
+    ],
+  }
+}
+</file>
+
+<file path="components/auth/AuthScreen.tsx">
+"use client"
+
+import { useState } from "react"
+import { supabase } from "@/lib/supabase"
+import { Loader2 } from "lucide-react"
+
+// ─── Auth Screen ─────────────────────────────────────────────────────────────
+export default function AuthScreen() {
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
+    const [confirmPassword, setConfirmPassword] = useState("")
+    const [isLogin, setIsLogin] = useState(true)
+    const [isResettingPassword, setIsResettingPassword] = useState(false) // NUEVO ESTADO
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState<string | null>(null)
+
+    // Función para Login y Registro
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault()
+        setError(null)
+        setSuccess(null)
+        setLoading(true)
+
+        if (!isLogin) {
+            if (password !== confirmPassword) {
+                setError("Las contraseñas no coinciden.")
+                setLoading(false)
+                return
+            }
+
+            const tieneLetras = /[a-zA-Z]/.test(password)
+            const tieneNumeros = /[0-9]/.test(password)
+
+            if (password.length < 8 || !tieneLetras || !tieneNumeros) {
+                setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+                setLoading(false)
+                return
+            }
+        }
+
+        if (isLogin) {
+            const { error } = await supabase.auth.signInWithPassword({ email, password })
+            if (error) setError("Credenciales incorrectas. Inténtalo de nuevo.")
+        } else {
+            const { error } = await supabase.auth.signUp({ email, password })
+            if (error) setError(error.message)
+            else setSuccess("Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
+        }
+
+        setLoading(false)
+    }
+
+    // NUEVA FUNCIÓN: Enviar correo de recuperación
+    async function handleResetPassword(e: React.FormEvent) {
+        e.preventDefault()
+        if (!email) {
+            setError("Por favor, introduce tu correo electrónico.")
+            return
+        }
+
+        setLoading(true)
+        setError(null)
+        setSuccess(null)
+
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/reset-password`,
+        })
+
+        if (error) {
+            setError(error.message)
+        } else {
+            setSuccess("Te hemos enviado un enlace para recuperar tu contraseña. Revisa tu bandeja de entrada.")
+        }
+        setLoading(false)
+    }
+
+    return (
+        <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
+            <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
+                <div className="flex flex-col items-center mb-10">
+                    <div className="mb-4">
+                        <img src="/icon.png" alt="Logo GastOS" className="w-22 h-22 rounded-3xl shadow-lg shadow-emerald-400/80" />
+                    </div>
+                    <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">GastOS</h1>
+                    <p className="text-sm text-zinc-500 mt-1">Registro de gastos personal</p>
+                </div>
+
+                {/* Solo mostramos las pestañas si NO estamos recuperando la contraseña */}
+                {!isResettingPassword && (
+                    <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800">
+                        <button onClick={() => { setIsLogin(true); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
+                            Iniciar Sesión
+                        </button>
+                        <button onClick={() => { setIsLogin(false); setError(null); setSuccess(null); setConfirmPassword(""); setPassword(""); }} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${!isLogin ? "bg-zinc-700 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}>
+                            Registrarse
+                        </button>
+                    </div>
+                )}
+
+                {/* El formulario cambia su onSubmit dependiendo del modo */}
+                <form onSubmit={isResettingPassword ? handleResetPassword : handleSubmit} className="space-y-3">
+                    <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Correo electrónico</label>
+                        <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
+                    </div>
+
+                    {/* Ocultamos las contraseñas si estamos en modo recuperación */}
+                    {!isResettingPassword && (
+                        <>
+                            <div>
+                                <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Contraseña</label>
+                                <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
+                            </div>
+
+                            {isLogin && (
+                                <div className="flex justify-end mt-1">
+                                    <button type="button" onClick={() => { setIsResettingPassword(true); setError(null); setSuccess(null); }} className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors">
+                                        ¿Has olvidado tu contraseña?
+                                    </button>
+                                </div>
+                            )}
+
+                            {!isLogin && (
+                                <div className="animate-in fade-in duration-300">
+                                    <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
+                                        Confirmar Contraseña
+                                    </label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {error && <div className="bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">{error}</div>}
+                    {success && <div className="bg-emerald-950/50 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">{success}</div>}
+
+                    {/* Botón dinámico */}
+                    <button type="submit" disabled={loading} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2">
+                        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {isResettingPassword ? "Enviar enlace" : (isLogin ? "Entrar" : "Crear cuenta")}
+                    </button>
+
+                    {/* Botón para volver atrás */}
+                    {isResettingPassword && (
+                        <button type="button" onClick={() => { setIsResettingPassword(false); setError(null); setSuccess(null); }} className="w-full text-sm text-zinc-400 hover:text-zinc-200 mt-2 transition-colors py-2">
+                            Volver a Iniciar Sesión
+                        </button>
+                    )}
+                </form>
+            </div>
+        </div>
+    )
+}
+</file>
+
+<file path="components/modals/EditMovimientoModal.tsx">
+"use client"
+
+import { useState, useEffect } from "react"
+import { X, Loader2 } from "lucide-react"
+import type { Movimiento, Categoria } from "@/types"
+
+
+export default function EditMovimientoModal({ isOpen, onClose, movimiento, categorias, onSave }: {
+  isOpen: boolean; onClose: () => void; movimiento: Movimiento | null; categorias: Categoria[]; onSave: (updatedMov: Movimiento) => Promise<void>
+}) {
+  const [cantidad, setCantidad] = useState("");
+  const [categoria, setCategoria] = useState("");
+  const [nota, setNota] = useState("");
+  const [fecha, setFecha] = useState("");
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (movimiento) {
+      setCantidad(movimiento.cantidad.toString());
+      setCategoria(movimiento.categoria);
+      setNota(movimiento.nota || "");
+
+      // Extraemos solo el "YYYY-MM-DD" para el input date
+      const d = new Date(movimiento.created_at);
+      const isoDate = d.toISOString().split('T')[0];
+      setFecha(isoDate);
+    }
+  }, [movimiento])
+
+  const handleSave = async () => {
+    if (!movimiento || !cantidad || !categoria || !fecha) return
+    setLoading(true)
+    try {
+      const nuevaFecha = new Date(`${fecha}T12:00:00Z`).toISOString();
+      await onSave({ ...movimiento, cantidad: parseFloat(cantidad), categoria, nota, created_at: nuevaFecha })
+      onClose()
+    } finally { setLoading(false) }
+  }
+
+  if (!isOpen || !movimiento) return null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end">
+      <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-zinc-100">Editar Gasto</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"><X className="w-5 h-5 text-zinc-400" /></button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Cantidad (€)</label>
+              <input type="number" step="0.01" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Fecha</label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all [color-scheme:dark]" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Categoría</label>
+            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all">
+              {categorias.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Nota (opcional)</label>
+            <textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Añade una descripción..." maxLength={80} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all resize-none h-20" />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all">Cancelar</button>
+          <button onClick={handleSave} disabled={loading} className="flex-1 py-3 text-sm bg-emerald-500 text-zinc-950 font-semibold rounded-xl hover:bg-emerald-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />} Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="components/modals/SettingsModal.tsx">
+"use client"
+
+import { useState, useEffect } from "react"
+import { X, Trash2, Loader2, UtensilsCrossed, Briefcase, Plus } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import type { Categoria, Movimiento } from "@/types"
+
+// Definimos los tipos para que TypeScript esté contento
+type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
+
+export default function SettingsModal({ isOpen, onClose, categorias, onCategoriesChange, session }: {
+  isOpen: boolean; onClose: () => void; categorias: Categoria[]; onCategoriesChange: (cats: Categoria[]) => void; session: Session
+}) {
+  const [presupuesto, setPresupuesto] = useState<string>(() => session?.user?.user_metadata?.presupuesto?.toString() || "")
+  const [newCatName, setNewCatName] = useState("")
+  const [newCatTipo, setNewCatTipo] = useState<'gasto' | 'ingreso' | 'ambos'>('gasto')
+  const [editingCats, setEditingCats] = useState<Categoria[]>(categorias)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setEditingCats(categorias)
+      setPresupuesto(session?.user?.user_metadata?.presupuesto?.toString() || "")
+    }
+  }, [isOpen, categorias, session])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    await supabase.auth.updateUser({
+      data: {
+        categorias_custom: editingCats,
+        presupuesto: presupuesto ? parseFloat(presupuesto) : null
+      }
+    })
+    onCategoriesChange(editingCats)
+    setIsSaving(false)
+    onClose()
+  }
+
+  const addCategory = () => {
+    if (newCatName.trim()) {
+      const newCat: Categoria = {
+        id: newCatName.toLowerCase().replace(/\s+/g, '_'),
+        label: newCatName.trim(),
+        Icon: newCatTipo === 'ingreso' ? Briefcase : UtensilsCrossed,
+        tipo: newCatTipo,
+      }
+      setEditingCats([...editingCats, newCat])
+      setNewCatName("")
+    }
+  }
+
+  const removeCategory = (id: string) => {
+    setEditingCats(editingCats.filter((c) => c.id !== id))
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end">
+      <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-zinc-100">Configuración</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"><X className="w-5 h-5 text-zinc-400" /></button>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-2">Presupuesto Mensual (€)</label>
+            <input type="number" inputMode="decimal" value={presupuesto} onChange={(e) => setPresupuesto(e.target.value)} placeholder="Ej: 1000" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" />
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-zinc-300 mb-3">Categorías</p>
+
+            {/* Gastos */}
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Gastos</p>
+            <div className="space-y-2 mb-4">
+              {editingCats.filter(c => c.tipo === 'gasto' || c.tipo === 'ambos').map((cat) => (
+                <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-zinc-200">{cat.label}</span>
+                  </div>
+                  <button onClick={() => removeCategory(cat.id)} className="text-zinc-600 hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+
+            {/* Ingresos */}
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Ingresos</p>
+            <div className="space-y-2 mb-4">
+              {editingCats.filter(c => c.tipo === 'ingreso').map((cat) => (
+                <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-zinc-200">{cat.label}</span>
+                  </div>
+                  <button onClick={() => removeCategory(cat.id)} className="text-zinc-600 hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+
+            {/* Formulario nueva categoría */}
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <p className="text-xs text-zinc-500 uppercase tracking-widest pt-1">Nueva categoría</p>
+              <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700">
+                {(['gasto', 'ingreso', 'ambos'] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setNewCatTipo(t)}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t ? 'bg-zinc-600 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    {t === 'gasto' ? 'Gasto' : t === 'ingreso' ? 'Ingreso' : 'Ambos'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Nombre de la categoría"
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                />
+                <button onClick={addCategory} className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-lg text-sm font-medium hover:bg-emerald-400 transition-all">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-8">
+          <button onClick={onClose} disabled={isSaving} className="flex-1 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all disabled:opacity-50">Cancelar</button>
+          <button onClick={handleSave} disabled={isSaving} className="flex-1 flex justify-center items-center gap-2 py-3 text-sm bg-emerald-500 text-zinc-950 font-semibold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50">
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />} Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="components/tabs/DashboardTab.tsx">
+"use client"
+
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { Loader2, Package, ChevronLeft, ChevronRight, TrendingDown, TrendingUp, Wallet } from "lucide-react"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts"
+import type { Categoria, Movimiento } from "@/types"
+
+type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
+
+// ─── Utilidades y Constantes ─────────────────────────────────────────────────
+const CHART_COLORS = ["#ef4444", "#f97316", "#f59e0b", "#3b82f6", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#64748b", "#10b981"]
+
+function getCatConfig(cat: string, allCats: Categoria[]) {
+  return allCats.find((c) => c.id === cat) ?? { id: cat, label: cat, Icon: Package, tipo: 'ambos' as const }
+}
+
+export default function DashboardTab({ categorias, session }: { categorias: Categoria[]; session: Session }) {
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState(new Date())
+
+  const presupuesto = session?.user?.user_metadata?.presupuesto || null
+
+  useEffect(() => {
+    async function fetchMovimientos() {
+      const { data } = await supabase.from("movimientos").select("*").order("created_at", { ascending: false })
+      if (data) setMovimientos(data)
+      setLoading(false)
+    }
+    fetchMovimientos()
+  }, [])
+
+  if (loading) return (
+    <div className="flex-1 flex items-center justify-center py-20">
+      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+    </div>
+  )
+
+  const selectedMonth = selectedDate.getMonth()
+  const selectedYear = selectedDate.getFullYear()
+
+  // ── Movimientos del mes filtrados por tipo ────────────────────────────────
+  const monthMovimientos = movimientos.filter((m) => {
+    const d = new Date(m.created_at)
+    return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear
+  })
+
+  // Solo gastos (donut, barra, presupuesto)
+  const monthGastos = monthMovimientos.filter((m) => (m.tipo ?? 'gasto') === 'gasto')
+  // Solo ingresos
+  const monthIngresos = monthMovimientos.filter((m) => m.tipo === 'ingreso')
+
+  const totalGastosMonth = monthGastos.reduce((acc, m) => acc + m.cantidad, 0)
+  const totalIngresosMonth = monthIngresos.reduce((acc, m) => acc + m.cantidad, 0)
+  const balanceNeto = totalIngresosMonth - totalGastosMonth
+
+  const percentUsed = presupuesto ? (totalGastosMonth / presupuesto) * 100 : 0
+
+  // Donut: solo gastos, agrupados por categoría
+  const categoryTotals = monthGastos.reduce((acc, m) => {
+    acc[m.categoria] = (acc[m.categoria] || 0) + m.cantidad
+    return acc
+  }, {} as Record<string, number>)
+  const pieData = Object.entries(categoryTotals).map(([name, value]) => ({
+    name,
+    value: Math.round(value * 100) / 100,
+  }))
+
+  // Barras: últimos 6 meses, solo gastos
+  const last6Months: { month: string; gastos: number; ingresos: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date(selectedYear, selectedMonth - i, 1)
+    const monthNum = date.getMonth()
+    const year = date.getFullYear()
+
+    const movsMes = movimientos.filter((m) => {
+      const d = new Date(m.created_at)
+      return d.getMonth() === monthNum && d.getFullYear() === year
+    })
+
+    const gastosMes = movsMes
+      .filter((m) => (m.tipo ?? 'gasto') === 'gasto')
+      .reduce((acc, m) => acc + m.cantidad, 0)
+
+    const ingresosMes = movsMes
+      .filter((m) => m.tipo === 'ingreso')
+      .reduce((acc, m) => acc + m.cantidad, 0)
+
+    const label = date.toLocaleDateString("es-ES", { month: "short" })
+    last6Months.push({
+      month: label.charAt(0).toUpperCase() + label.slice(1),
+      gastos: Math.round(gastosMes * 100) / 100,
+      ingresos: Math.round(ingresosMes * 100) / 100,
+    })
+  }
+
+  const handlePrevMonth = () => setSelectedDate(new Date(selectedYear, selectedMonth - 1, 1))
+  const handleNextMonth = () => setSelectedDate(new Date(selectedYear, selectedMonth + 1, 1))
+  const monthLabel = selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
+
+      {/* ── Selector de mes ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <button onClick={handlePrevMonth} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors text-zinc-400">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <p className="text-sm font-medium text-zinc-300 capitalize flex-1 text-center">{monthLabel}</p>
+        <button onClick={handleNextMonth} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors text-zinc-400">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* ── Tarjetas de resumen: Gastos + Ingresos + Balance ─────────────── */}
+      <div className="space-y-3">
+        {/* Fila superior: Gastos e Ingresos */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <TrendingDown className="w-3.5 h-3.5 text-red-400" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">Gastos</p>
+            </div>
+            <p className="text-2xl font-light text-red-400 tabular-nums">
+              {totalGastosMonth.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className="text-zinc-500 text-base ml-1">€</span>
+            </p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4">
+            <div className="flex items-center gap-1.5 mb-2">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">Ingresos</p>
+            </div>
+            <p className="text-2xl font-light text-emerald-400 tabular-nums">
+              {totalIngresosMonth.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className="text-zinc-500 text-base ml-1">€</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Balance neto */}
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Wallet className="w-3.5 h-3.5 text-zinc-400" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">Balance neto</p>
+            </div>
+            <p className={`text-2xl font-light tabular-nums ${balanceNeto >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {balanceNeto >= 0 ? "+" : ""}
+              {balanceNeto.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span className="text-zinc-500 text-base ml-1">€</span>
+            </p>
+          </div>
+
+          {/* Barra de presupuesto (solo si hay presupuesto configurado) */}
+          {presupuesto && (
+            <div className="space-y-2 mt-3 pt-3 border-t border-zinc-800/60">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-zinc-500">Presupuesto mensual: {presupuesto.toFixed(2)}€</p>
+                <p className="text-xs text-zinc-500">{Math.round(percentUsed)}%</p>
+              </div>
+              <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${percentUsed > 100 ? "bg-red-500" : percentUsed > 75 ? "bg-amber-500" : "bg-emerald-500"}`}
+                  style={{ width: `${Math.min(percentUsed, 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Donut: solo gastos por categoría ─────────────────────────────── */}
+      <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">Gastos por Categoría</p>
+        {pieData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <Package className="w-8 h-8 text-zinc-700" />
+            <p className="text-sm text-zinc-600">Sin gastos este mes</p>
+          </div>
+        ) : (
+          <>
+            <div className="w-full h-[260px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value" stroke="none">
+                    {pieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
+                    itemStyle={{ color: "#f4f4f5" }}
+                    formatter={(value: any, name: any) => {
+                      const cat = getCatConfig(name, categorias)
+                      return [`${Number(value).toFixed(2)}€`, cat.label]
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-4 mt-4 justify-center">
+              {pieData.map((entry, index) => {
+                const cat = getCatConfig(entry.name, categorias)
+                return (
+                  <div key={entry.name} className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
+                    <span className="text-xs text-zinc-300 font-medium">{cat.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Barras: últimos 6 meses, gastos vs ingresos ──────────────────── */}
+      <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Últimos 6 Meses</p>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /><span className="text-xs text-zinc-500">Gastos</span></div>
+          <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-xs text-zinc-500">Ingresos</span></div>
+        </div>
+        <div className="w-full h-[240px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barCategoryGap="25%">
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={(v) => `${v}€`} />
+              <Tooltip
+                cursor={{ fill: "rgba(255,255,255,0.05)" }}
+                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
+                itemStyle={{ color: "#f4f4f5" }}
+                formatter={(value: any, name: any) => [`${Number(value).toFixed(2)}€`, name === "gastos" ? "Gastos" : "Ingresos"]}
+              />
+              <Bar dataKey="gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+    </div>
+  )
+}
+</file>
+
+<file path="components/tabs/HistorialTab.tsx">
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { Loader2, Package, Edit2, Trash2, Search, TrendingDown, TrendingUp } from "lucide-react"
+import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
+import type { Categoria, Movimiento } from "@/types"
+
+
+type TipoFilter = "todos" | "gasto" | "ingreso"
+
+function getCatConfig(cat: string, allCats: Categoria[]) {
+  return allCats.find((c) => c.id === cat) ?? { id: cat, label: cat, Icon: Package, tipo: 'ambos' as const }
+}
+
+export default function HistorialTab({ categorias }: { categorias: Categoria[] }) {
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmarBorrado, setConfirmarBorrado] = useState<string | null>(null)
+  const [editingMov, setEditingMov] = useState<Movimiento | null>(null)
+
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos") // ← NUEVO
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
+
+  // ── Fetch con filtro de tipo ────────────────────────────────────────────────
+  const fetchMovimientos = useCallback(async (
+    pageIndex: number,
+    search: string,
+    categoryFilter: string,
+    tipo: TipoFilter,
+    isNewSearch = false
+  ) => {
+    if (isNewSearch) setIsSearching(true)
+
+    let query = supabase.from("movimientos").select("*").order("created_at", { ascending: false })
+
+    if (search.trim() !== "") {
+      query = query.ilike("nota", `%${search}%`)
+    }
+    if (categoryFilter !== "") {
+      query = query.eq("categoria", categoryFilter)
+    }
+    // Filtro de tipo: si es "todos" no aplicamos nada
+    // Fallback defensivo: registros sin 'tipo' se asumen 'gasto'
+    if (tipo === "gasto") {
+      query = query.or("tipo.eq.gasto,tipo.is.null")
+    } else if (tipo === "ingreso") {
+      query = query.eq("tipo", "ingreso")
+    }
+
+    const from = pageIndex * 20
+    query = query.range(from, from + 19)
+
+    const { data } = await query
+
+    if (data) {
+      if (isNewSearch) setMovimientos(data)
+      else setMovimientos((prev) => [...prev, ...data])
+      setHasMore(data.length === 20)
+    }
+
+    setLoading(false)
+    setIsSearching(false)
+  }, [])
+
+  // Re-fetch cuando cambia cualquier filtro
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(0)
+      fetchMovimientos(0, searchTerm, selectedCategory, tipoFilter, true)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm, selectedCategory, tipoFilter, fetchMovimientos])
+
+  const loadMore = () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchMovimientos(nextPage, searchTerm, selectedCategory, tipoFilter, false)
+  }
+
+  // ── CRUD ───────────────────────────────────────────────────────────────────
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    const { error } = await supabase.from("movimientos").delete().eq("id", id)
+    setDeletingId(null)
+    setConfirmarBorrado(null)
+    if (!error) setMovimientos((prev) => prev.filter((m) => m.id !== id))
+  }
+
+  async function handleUpdateMovimiento(updatedMov: Movimiento) {
+    const notaFinal = updatedMov.nota?.trim() === "" ? null : updatedMov.nota?.trim()
+
+    const { data, error } = await supabase
+      .from("movimientos")
+      .update({
+        cantidad: updatedMov.cantidad,
+        categoria: updatedMov.categoria,
+        nota: notaFinal,
+        is_recurring: updatedMov.is_recurring,
+        tipo: updatedMov.tipo ?? "gasto", // ← incluimos tipo para no perderlo
+        created_at: updatedMov.created_at,
+      })
+      .eq("id", updatedMov.id)
+      .select()
+
+    if (error) {
+      alert("Error de la base de datos: " + error.message)
+    } else if (!data || data.length === 0) {
+      alert("❌ Supabase ha bloqueado la edición silenciosamente.")
+    } else {
+      setMovimientos((prev) =>
+        prev.map((m) => (m.id === updatedMov.id ? { ...updatedMov, nota: notaFinal || undefined } : m))
+      )
+    }
+  }
+
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
+  }
+
+  // Movimiento que se va a borrar (para el texto del modal)
+  const movABorrar = confirmarBorrado
+    ? movimientos.find((m) => m.id === confirmarBorrado)
+    : null
+
+  if (loading && page === 0) return (
+    <div className="flex-1 flex items-center justify-center py-20">
+      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+    </div>
+  )
+
+  return (
+    <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-8 duration-500">
+
+      {/* ── Header: búsqueda + categoría ────────────────────────────────── */}
+      <div className="flex gap-2 px-4 pt-4 pb-3 border-b border-zinc-800/60 bg-zinc-950 flex-col">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar en notas..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
+            />
+          </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all w-1/3 max-w-[120px] truncate"
+          >
+            <option value="">Todas</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* ── Toggle Todos / Gastos / Ingresos ──────────────────────────── */}
+        <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800">
+          {(["todos", "gasto", "ingreso"] as TipoFilter[]).map((t) => {
+            const active = tipoFilter === t
+            const label = t === "todos" ? "Todos" : t === "gasto" ? "Gastos" : "Ingresos"
+            const activeClass =
+              t === "todos"
+                ? "bg-zinc-700 text-zinc-100"
+                : t === "gasto"
+                ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                : "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+            return (
+              <button
+                key={t}
+                onClick={() => setTipoFilter(t)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
+                  active ? activeClass : "text-zinc-600 hover:text-zinc-400"
+                }`}
+              >
+                {t === "gasto" && <TrendingDown className="w-3 h-3" />}
+                {t === "ingreso" && <TrendingUp className="w-3 h-3" />}
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── Lista ────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        {isSearching ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+          </div>
+        ) : movimientos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Package className="w-10 h-10 text-zinc-700" />
+            <p className="text-sm text-zinc-600">No hay movimientos</p>
+          </div>
+        ) : (
+          <>
+            {movimientos.map((m) => {
+              const cat = getCatConfig(m.categoria, categorias)
+              const isDeleting = deletingId === m.id
+              const esIngreso = m.tipo === "ingreso"
+
+              return (
+                <div
+                  key={m.id}
+                  className={`flex items-center gap-3 bg-zinc-900 border rounded-2xl px-4 py-3 transition-all duration-200 ${
+                    esIngreso ? "border-emerald-900/40" : "border-zinc-800/70"
+                  }`}
+                  style={{ opacity: isDeleting ? 0.5 : 1 }}
+                >
+                  {/* Icono con badge de recurrente */}
+                  <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center flex-shrink-0 relative">
+                    {m.is_recurring && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Texto */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-zinc-200 truncate">{cat.label}</p>
+                      <span className={`shrink-0 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        esIngreso
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : 'bg-red-500/15 text-red-400'
+                      }`}>
+                        {esIngreso ? 'Ingreso' : 'Gasto'}
+                      </span>
+                    </div>
+                    {m.nota && <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>}
+                    <p className="text-xs text-zinc-600 mt-0.5">{formatDate(m.created_at)}</p>
+                  </div>
+
+                  {/* Importe con color según tipo */}
+                  <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${
+                    esIngreso ? "text-emerald-400" : "text-red-400"
+                  }`}>
+                    {esIngreso ? "+" : "-"}
+                    {m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                  </p>
+
+                  {/* Acciones */}
+                  <button
+                    onClick={() => setEditingMov(m)}
+                    disabled={isDeleting}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 transition-all flex-shrink-0"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setConfirmarBorrado(m.id)}
+                    disabled={isDeleting}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 transition-all flex-shrink-0"
+                  >
+                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  </button>
+                </div>
+              )
+            })}
+
+            {hasMore && (
+              <button
+                onClick={loadMore}
+                disabled={loading}
+                className="w-full py-4 mt-4 text-sm font-medium text-zinc-400 bg-zinc-900/50 hover:bg-zinc-900 rounded-xl transition-all flex justify-center items-center gap-2"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cargar más antiguos"}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Modal confirmación borrado ────────────────────────────────────── */}
+      {confirmarBorrado && (
+        <div className="absolute inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
+            <h3 className="text-zinc-100 font-semibold mb-2">
+              ¿Borrar {movABorrar?.tipo === "ingreso" ? "ingreso" : "gasto"}?
+            </h3>
+            <p className="text-zinc-500 text-sm mb-6">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmarBorrado(null)} className="flex-1 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-all">Cancelar</button>
+              <button onClick={() => handleDelete(confirmarBorrado)} className="flex-1 py-2 text-sm bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all">Borrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <EditMovimientoModal
+        isOpen={!!editingMov}
+        onClose={() => setEditingMov(null)}
+        movimiento={editingMov}
+        categorias={categorias}
+        onSave={handleUpdateMovimiento}
+      />
+    </div>
+  )
+}
+</file>
+
+<file path="components/tabs/IngresoTab.tsx">
+"use client"
+
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { CalendarDays, X, Loader2, CheckCircle2, Delete, Package, TrendingDown, TrendingUp } from "lucide-react"
+import type { Categoria, Movimiento } from "@/types"
+
+// ─── Utilidades ──────────────────────────────────────────────────────────────
+function triggerHaptic() {
+  if (typeof window !== "undefined" && window.navigator && window.navigator.vibrate) {
+    window.navigator.vibrate(50)
+  }
+}
+
+function getCatConfig(cat: string, allCats: Categoria[]) {
+  return allCats.find((c) => c.id === cat) ?? { id: cat, label: cat, Icon: Package, tipo: 'ambos' as const }
+}
+
+// ─── Componente Principal ────────────────────────────────────────────────────
+export default function IngresoTab({ categorias }: { categorias: Categoria[] }) {
+  const [display, setDisplay] = useState("0")
+  const [nota, setNota] = useState("")
+  const [success, setSuccess] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // ── NUEVO: tipo de movimiento ──────────────────────────────────────────────
+  const [tipoMovimiento, setTipoMovimiento] = useState<'gasto' | 'ingreso'>('gasto')
+
+  const [showRecurModal, setShowRecurModal] = useState(false)
+  const [pendingCat, setPendingCat] = useState<string | null>(null)
+
+  const [pendingSubs, setPendingSubs] = useState<Movimiento[]>([])
+  const [processingSub, setProcessingSub] = useState<string | null>(null)
+
+  // Colores dinámicos según tipo
+  const isIngreso = tipoMovimiento === 'ingreso'
+  const accentColor = isIngreso
+    ? { text: "text-emerald-400", bg: "bg-emerald-500", bgHover: "hover:bg-emerald-400", bgActive: "active:bg-emerald-600", border: "border-emerald-500/50", ring: "focus:ring-emerald-500/20", shadow: "shadow-emerald-900/20" }
+    : { text: "text-red-400", bg: "bg-red-500", bgHover: "hover:bg-red-400", bgActive: "active:bg-red-600", border: "border-red-500/50", ring: "focus:ring-red-500/20", shadow: "shadow-red-900/20" }
+
+  useEffect(() => {
+    async function checkSubs() {
+      const { data } = await supabase
+        .from("movimientos")
+        .select("*")
+        .eq("is_recurring", true)
+        .order("created_at", { ascending: false })
+
+      if (data) {
+        const now = new Date()
+        const currentMonth = now.getMonth()
+        const currentYear = now.getFullYear()
+
+        const mapUltimosPagos = new Map<string, Movimiento>()
+        data.forEach(m => {
+          const key = `${m.categoria}-${m.nota || ''}`
+          if (!mapUltimosPagos.has(key)) mapUltimosPagos.set(key, m)
+        })
+
+        const pending: Movimiento[] = []
+        mapUltimosPagos.forEach(sub => {
+          const d = new Date(sub.created_at)
+          if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) {
+            pending.push(sub)
+          }
+        })
+        setPendingSubs(pending)
+      }
+    }
+    checkSubs()
+  }, [])
+
+  const handleCobrarSub = async (sub: Movimiento) => {
+    setProcessingSub(sub.id)
+    const originalDate = new Date(sub.created_at)
+    const newDate = new Date()
+    const maxDaysInThisMonth = new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate()
+    const targetDay = Math.min(originalDate.getDate(), maxDaysInThisMonth)
+    newDate.setDate(targetDay)
+    newDate.setHours(12, 0, 0, 0)
+
+    const { error } = await supabase.from("movimientos").insert({
+      cantidad: sub.cantidad,
+      categoria: sub.categoria,
+      nota: sub.nota,
+      is_recurring: true,
+      tipo: sub.tipo ?? 'gasto', // Respetamos el tipo original (nómina = ingreso recurrente)
+      created_at: newDate.toISOString()
+    })
+
+    if (!error) {
+      setPendingSubs(prev => prev.filter(p => p.id !== sub.id))
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 1800)
+    }
+    setProcessingSub(null)
+  }
+
+  const handleCancelarSub = async (id: string) => {
+    setProcessingSub(id)
+    const { error } = await supabase.from("movimientos").update({ is_recurring: false }).eq("id", id)
+    if (!error) setPendingSubs(prev => prev.filter(p => p.id !== id))
+    setProcessingSub(null)
+  }
+
+  function handleDigit(d: string) {
+    triggerHaptic()
+    setError(null)
+    setDisplay((prev) => {
+      if (prev.length >= 8) return prev
+      if (d === "." && prev.includes(".")) return prev
+      if (prev === "0" && d !== ".") return d
+      return prev + d
+    })
+  }
+
+  function handleBackspace() {
+    triggerHaptic()
+    setError(null)
+    setDisplay((prev) => (prev.length <= 1 ? "0" : prev.slice(0, -1)))
+  }
+
+  function onCategoryClick(catId: string) {
+    // Ingresos: el modal aplica a TODOS (una nómina es un ingreso recurrente)
+    // Gastos: el modal solo aplica a la categoría Suscripciones
+    const debePreguntar = isIngreso || catId === "Suscripciones" || catId === "suscripciones"
+    if (debePreguntar) {
+      setPendingCat(catId)
+      setShowRecurModal(true)
+    } else {
+      handleGuardar(catId, false)
+    }
+  }
+
+  async function handleGuardar(cat: string, isRecurring: boolean) {
+    triggerHaptic()
+    setShowRecurModal(false)
+    const cantidad = parseFloat(display)
+    if (!cantidad || cantidad <= 0) return setError("Introduce una cantidad mayor que 0.")
+    setLoading(true)
+    setError(null)
+
+    const { error } = await supabase.from("movimientos").insert({
+      cantidad,
+      categoria: cat,
+      nota: nota || null,
+      is_recurring: isRecurring,
+      tipo: tipoMovimiento, // ← NUEVO: enviamos el tipo
+    })
+
+    setLoading(false)
+    if (error) {
+      setError("Error al guardar.")
+    } else {
+      setSuccess(true)
+      setDisplay("0")
+      setNota("")
+      setTimeout(() => setSuccess(false), 1800)
+    }
+  }
+
+  const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0"]
+  const isDisabled = loading || display === "0" || display === "0."
+
+  return (
+    <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-8 duration-500">
+
+      {/* ── Overlay de éxito ─────────────────────────────────────────────── */}
+      {success && (
+        <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-3 rounded-t-xl animate-in fade-in duration-300">
+          <CheckCircle2 className={`w-16 h-16 ${accentColor.text}`} strokeWidth={1.5} />
+          <p className={`font-semibold text-lg ${accentColor.text}`}>¡Guardado!</p>
+        </div>
+      )}
+
+      {/* ── Modal de recurrencia ─────────────────────────────────────────── */}
+      {showRecurModal && (
+        <div className="absolute inset-0 z-30 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
+            <CalendarDays className={`w-10 h-10 mx-auto mb-3 ${accentColor.text}`} />
+            <h3 className="text-zinc-100 font-semibold mb-2">
+              {isIngreso ? "¿Se cobra cada mes?" : "¿Es un pago mensual?"}
+            </h3>
+            <p className="text-zinc-500 text-sm mb-6">
+              {isIngreso
+                ? "Podemos recordártelo cada mes para que confirmes si ya has cobrado."
+                : "Podemos marcarlo como suscripción para llevar un mejor control."}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => handleGuardar(pendingCat!, true)}
+                className={`w-full py-3 text-sm ${accentColor.bg} text-zinc-950 rounded-xl font-bold ${accentColor.bgHover} transition-all`}
+              >
+                {isIngreso ? "Sí, se cobra mensualmente" : "Sí, se repite cada mes"}
+              </button>
+              <button onClick={() => handleGuardar(pendingCat!, false)} className="w-full py-3 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all">
+                {isIngreso ? "No, es un ingreso puntual" : "No, es solo un pago puntual"}
+              </button>
+              <button onClick={() => setShowRecurModal(false)} className="mt-2 text-xs text-zinc-600 hover:text-zinc-400">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Banner de recurrentes pendientes ─────────────────────────────── */}
+      {pendingSubs.length > 0 && (
+        <div className="border-b border-zinc-800/60 p-4 shadow-md bg-zinc-950">
+          <div className="flex items-center gap-2 text-zinc-400 mb-2">
+            <CalendarDays className="w-4 h-4" />
+            <h3 className="font-semibold text-xs uppercase tracking-wider text-zinc-400">
+              Recurrentes pendientes — {new Date().toLocaleDateString('es-ES', { month: 'long' })}
+            </h3>
+          </div>
+          <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+            {pendingSubs.map(sub => {
+              const cat = getCatConfig(sub.categoria, categorias)
+              const esIngreso = sub.tipo === 'ingreso'
+              return (
+                <div
+                  key={sub.id}
+                  className={`flex items-center justify-between rounded-xl p-3 border ${
+                    esIngreso
+                      ? 'bg-emerald-950/20 border-emerald-900/30'
+                      : 'bg-red-950/20 border-red-900/30'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1 pr-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                        esIngreso ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {esIngreso ? '↑ Ingreso' : '↓ Gasto'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-zinc-200 truncate font-medium mt-1">{cat.label} {sub.nota ? `· ${sub.nota}` : ''}</p>
+                    <p className="text-xs text-zinc-500 font-medium mt-0.5">{sub.cantidad}€</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleCancelarSub(sub.id)}
+                      disabled={processingSub === sub.id}
+                      className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-red-400 hover:border-red-900/50 flex items-center justify-center transition-all"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleCobrarSub(sub)}
+                      disabled={processingSub === sub.id}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                        esIngreso
+                          ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950'
+                          : 'bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950'
+                      }`}
+                    >
+                      {processingSub === sub.id
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : esIngreso ? "¿Ya cobrado?" : "Cobrar"
+                      }
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Toggle Gasto / Ingreso ────────────────────────────────────────── */}
+      <div className="px-4 pt-4 pb-2">
+        <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800">
+          <button
+            onClick={() => { setTipoMovimiento('gasto'); setError(null) }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              tipoMovimiento === 'gasto'
+                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                : 'text-zinc-600 hover:text-zinc-400'
+            }`}
+          >
+            <TrendingDown className="w-4 h-4" />
+            Gasto
+          </button>
+          <button
+            onClick={() => { setTipoMovimiento('ingreso'); setError(null) }}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              tipoMovimiento === 'ingreso'
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                : 'text-zinc-600 hover:text-zinc-400'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Ingreso
+          </button>
+        </div>
+      </div>
+
+      {/* ── Display numérico ─────────────────────────────────────────────── */}
+      <div className="flex flex-col items-end justify-end px-6 pt-3 pb-4 border-b border-zinc-800/60 bg-zinc-950">
+        {error && <p className="text-xs text-red-400 mb-2 self-start">{error}</p>}
+        <div className="flex items-baseline gap-2">
+          <span className={`text-3xl font-light transition-colors duration-200 ${accentColor.text}`}>€</span>
+          <span className={`text-6xl font-light tracking-tight leading-none tabular-nums transition-colors duration-200 ${
+            display === "0" ? "text-zinc-600" : accentColor.text
+          }`}>
+            {display}
+          </span>
+        </div>
+        <p className={`text-xs mt-1 font-medium uppercase tracking-widest transition-colors duration-200 ${accentColor.text} opacity-60`}>
+          {isIngreso ? "Ingreso" : "Gasto"}
+        </p>
+      </div>
+
+      {/* ── Teclado + Nota + Categorías ──────────────────────────────────── */}
+      <div className="flex-1 px-4 py-4 flex flex-col gap-3 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-3">
+          {keys.map((k) => (
+            <button
+              key={k}
+              onClick={() => handleDigit(k)}
+              disabled={loading}
+              className="h-14 rounded-2xl bg-zinc-900 border border-zinc-800/80 text-zinc-100 text-xl font-light active:bg-zinc-800 transition-colors select-none"
+            >
+              {k}
+            </button>
+          ))}
+          <button
+            onClick={handleBackspace}
+            disabled={loading}
+            className="h-14 rounded-2xl bg-zinc-900 border border-zinc-800/80 text-zinc-400 active:bg-zinc-800 transition-colors flex items-center justify-center select-none"
+          >
+            <Delete className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div>
+          <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">Nota opcional</p>
+          <input
+            type="text"
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            maxLength={80}
+            placeholder={isIngreso ? "Ej: Nómina de marzo" : "Ej: Cena con Juan"}
+            className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accentColor.border} ${accentColor.ring}`}
+          />
+        </div>
+
+        {/* Las categorías se filtran por tipo activo */}
+        <div>
+          <p className="text-xs text-zinc-600 uppercase tracking-widest mb-3 px-1">Categoría</p>
+          <div className="grid grid-cols-3 gap-3 mb-3 px-1">
+            {categorias
+              .filter(c => isIngreso ? c.tipo === 'ingreso' || c.tipo === 'ambos' : c.tipo === 'gasto' || c.tipo === 'ambos')
+              .map((cat) => (
+                <CategoryButton key={cat.id} cat={cat} onPress={onCategoryClick} disabled={isDisabled} />
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Subcomponente Botón Categoría ───────────────────────────────────────────
+function CategoryButton({ cat, onPress, disabled }: {
+  cat: Categoria
+  onPress: (id: string) => void
+  disabled: boolean
+}) {
+  return (
+    <button
+      onClick={() => onPress(cat.id)}
+      disabled={disabled}
+      className="h-20 w-full rounded-2xl bg-zinc-800 border border-zinc-700 hover:border-zinc-500 hover:bg-zinc-700 disabled:opacity-50 transition-all duration-200 flex flex-col items-center justify-center gap-2 select-none p-2"
+    >
+      <span className="text-[12px] font-medium text-zinc-300 text-center leading-tight break-words">
+        {cat.label}
+      </span>
+    </button>
+  )
+}
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="AGENTS.md">
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+</file>
+
+<file path="CLAUDE.md">
+@AGENTS.md
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</file>
+
+<file path="postcss.config.mjs">
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+<file path="components/FeedbackWidget.tsx">
+'use client'
+
+import { useState } from 'react'
+
+export default function FeedbackWidget({ userId }: { userId: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [tipo, setTipo] = useState<'Bug' | 'Idea'>('Idea')
+  const [mensaje, setMensaje] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!mensaje.trim()) return
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Llamamos a nuestra nueva ruta de API
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          tipo,
+          mensaje
+        }),
+      })
+
+      if (response.ok) {
+        setSuccess(true)
+        setTimeout(() => {
+          setIsOpen(false)
+          setSuccess(false)
+          setMensaje('')
+        }, 3000)
+      } else {
+        alert("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
+      }
+    } catch (error) {
+      alert("Error de conexión al enviar el ticket.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Botón flotante cerrado
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-6 right-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-all z-50 flex items-center justify-center"
+        title="Enviar sugerencia o error"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+      </button>
+    )
+  }
+
+  // Modal del formulario abierto
+  return (
+    <div className="fixed bottom-6 right-6 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-5">
+      <div className="bg-zinc-800 px-4 py-3 flex justify-between items-center border-b border-zinc-700">
+        <h3 className="font-medium text-zinc-100">Buzón de Sugerencias</h3>
+        <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-zinc-100">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      
+      {success ? (
+        <div className="p-6 text-center text-emerald-400">
+          <p>¡Gracias por tu aportación!</p>
+          <p className="text-xs mt-2 text-zinc-500">Tomamos nota para mejorar GastOS.</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="p-4 flex flex-col gap-4">
+          <div className="flex gap-2 bg-zinc-950 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setTipo('Idea')}
+              className={`flex-1 py-1 text-sm rounded-md transition-all ${tipo === 'Idea' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500'}`}
+            >
+              💡 Idea
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipo('Bug')}
+              className={`flex-1 py-1 text-sm rounded-md transition-all ${tipo === 'Bug' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500'}`}
+            >
+              🐛 Error
+            </button>
+          </div>
+          
+          <textarea
+            required
+            rows={4}
+            value={mensaje}
+            onChange={(e) => setMensaje(e.target.value)}
+            placeholder={tipo === 'Idea' ? "¿Qué nueva función te gustaría ver?" : "¿Qué no funciona correctamente?"}
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
+          />
+          
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {isSubmitting ? 'Enviando...' : 'Enviar ticket'}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "gastos-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/supabase-js": "^2.100.0",
+    "lucide-react": "^1.7.0",
+    "next": "16.2.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.0",
+    "resend": "^6.9.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="app/reset-password/page.tsx">
+"use client"
+
+import { useState, useEffect } from "react"
+import { createClient } from "@supabase/supabase-js"
+import { Loader2, CheckCircle2, Lock, AlertCircle } from "lucide-react"
+
+// 1. PRO MOVE: Volvemos a las variables de entorno seguras
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+export default function ResetPasswordPage() {
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  
+  const [isVerifying, setIsVerifying] = useState(true)
+  const [hasSession, setHasSession] = useState(false)
+
+  useEffect(() => {
+    async function initializeSecureSession() {
+      // Extraemos la llave sin importar por qué método la mande Supabase/Gmail
+      const searchParams = new URLSearchParams(window.location.search)
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'))
+
+      const code = searchParams.get('code')
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const errorDesc = searchParams.get('error_description') || hashParams.get('error_description')
+
+      if (errorDesc) {
+         setError("El enlace es inválido o ha caducado.")
+         setIsVerifying(false)
+         return
+      }
+
+      let sessionEstablished = false
+
+      if (accessToken && refreshToken) {
+         const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+         if (!error) sessionEstablished = true
+      } else if (code) {
+         const { error } = await supabase.auth.exchangeCodeForSession(code)
+         if (!error) sessionEstablished = true
+      } else {
+         const { data: { session } } = await supabase.auth.getSession()
+         if (session) sessionEstablished = true
+      }
+
+      if (sessionEstablished) {
+         setHasSession(true)
+         // 2. PRO MOVE: Limpiamos la URL para que no quede rastro de la llave secreta por seguridad
+         window.history.replaceState({}, document.title, window.location.pathname)
+      } else {
+         setError("No se ha detectado una llave válida. Es posible que el enlace ya se haya usado.")
+      }
+      
+      setIsVerifying(false)
+    }
+
+    initializeSecureSession()
+  }, [])
+
+  async function handleUpdatePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (password !== confirmPassword) return setError("Las contraseñas no coinciden.")
+    if (password.length < 8) return setError("La contraseña debe tener al menos 8 caracteres.")
+
+    setLoading(true)
+    setError(null)
+
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+
+    if (updateError) {
+      setError("Error al actualizar: " + updateError.message)
+    } else {
+      setSuccess(true)
+      setTimeout(() => { window.location.href = "/" }, 2000)
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+        
+        <div className="flex flex-col items-center mb-8 text-center">
+          <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
+            <Lock className="w-6 h-6 text-emerald-400" />
+          </div>
+          <h1 className="text-xl font-bold text-zinc-100">Nueva Contraseña</h1>
+        </div>
+
+        {isVerifying && (
+          <div className="flex flex-col items-center py-4">
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-4" />
+            <p className="text-zinc-400 text-sm">Validando seguridad...</p>
+          </div>
+        )}
+
+        {!isVerifying && !hasSession && (
+          <div className="flex flex-col items-center animate-in fade-in">
+            <AlertCircle className="w-12 h-12 text-red-500 mb-4 opacity-80" />
+            <div className="bg-red-950/30 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400 text-center mb-6">
+              {error}
+            </div>
+            <button onClick={() => window.location.href = "/"} className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
+              Volver al inicio
+            </button>
+          </div>
+        )}
+
+        {!isVerifying && hasSession && success && (
+          <div className="flex flex-col items-center py-4 animate-in fade-in">
+            <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3" />
+            <p className="text-emerald-400 font-medium">¡Contraseña cambiada!</p>
+          </div>
+        )}
+
+        {!isVerifying && hasSession && !success && (
+          <form onSubmit={handleUpdatePassword} className="space-y-4 animate-in fade-in">
+            <input 
+              type="password" 
+              required 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              placeholder="Nueva contraseña" 
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" 
+            />
+            <input 
+              type="password" 
+              required 
+              value={confirmPassword} 
+              onChange={(e) => setConfirmPassword(e.target.value)} 
+              placeholder="Repite la contraseña" 
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" 
+            />
+            
+            {error && (
+              <div className="bg-red-950/30 border border-red-900/50 rounded-xl px-4 py-3 text-xs text-red-400 text-center">
+                {error}
+              </div>
+            )}
+
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Guardar y acceder"}
+            </button>
+          </form>
+        )}
+
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="app/page.tsx">
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import FeedbackWidget from '@/components/FeedbackWidget'
+import { createClient } from "@supabase/supabase-js"
+import {
+  UtensilsCrossed,
+  Bus,
+  CalendarDays,
+  Package,
+  LogOut,
+  Loader2,
+  WalletCards,
+  History,
+  BarChart3,
+  Settings,
+  Menu,
+  Download,
+  Upload,
+  Briefcase,
+  Laptop,
+  PiggyBank,
+  Repeat2,
+  CircleDollarSign,
+} from "lucide-react"
+import AuthScreen from '@/components/auth/AuthScreen'
+import SettingsModal from '@/components/modals/SettingsModal'
+import EditMovimientoModal from '@/components/modals/EditMovimientoModal'
+import IngresoTab from '@/components/tabs/IngresoTab'
+import HistorialTab from '@/components/tabs/HistorialTab'
+import DashboardTab from '@/components/tabs/DashboardTab'
+import type { Categoria, Movimiento } from "@/types"
+import { supabase } from "@/lib/supabase"
+
+const APP_VERSION = 2;
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
+
+const DEFAULT_CATEGORIAS: Categoria[] = [
+  // Gastos
+  { id: "Comida",        label: "Comida",       Icon: UtensilsCrossed, tipo: "gasto"   },
+  { id: "Transporte",    label: "Transporte",   Icon: Bus,             tipo: "gasto"   },
+  { id: "Suscripciones", label: "Suscripciones",Icon: CalendarDays,    tipo: "gasto"   },
+  { id: "Otros",         label: "Otros",        Icon: Package,         tipo: "ambos"   },
+  // Ingresos
+  { id: "Nomina",        label: "Nómina",       Icon: Briefcase,       tipo: "ingreso" },
+  { id: "Freelance",     label: "Freelance",    Icon: Laptop,          tipo: "ingreso" },
+  { id: "Ahorro",        label: "Ahorro",       Icon: PiggyBank,       tipo: "ingreso" },
+  { id: "Rendimiento",   label: "Rendimiento",  Icon: Repeat2,         tipo: "ingreso" },
+  { id: "Ingreso",       label: "Otros ingresos", Icon: CircleDollarSign, tipo: "ingreso" },
+]
+
+function getCatConfig(cat: string, allCats: typeof DEFAULT_CATEGORIAS) {
+  return allCats.find((c) => c.id === cat) ?? { label: cat, Icon: Package, tipo: "ambos" as const }
+}
+
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+function MainApp({ session }: { session: Session }) {
+  const [tab, setTab] = useState<"ingreso" | "historial" | "dashboard">("ingreso")
+  const [showSettings, setShowSettings] = useState(false)
+
+  // Al cargar, si las categorías guardadas son del esquema viejo (sin 'tipo'), usamos las por defecto
+  const savedCats = session?.user?.user_metadata?.categorias_custom
+  const validCats = savedCats?.every((c: any) => c.tipo) ? savedCats : DEFAULT_CATEGORIAS
+
+  const [categorias, setCategorias] = useState<typeof DEFAULT_CATEGORIAS>(validCats)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // Si la sesión se actualiza (ej: al guardar ajustes), actualizamos las categorías en pantalla
+  useEffect(() => {
+    const saved = session?.user?.user_metadata?.categorias_custom
+    if (saved?.every((c: any) => c.tipo)) setCategorias(saved)
+    else if (saved) setCategorias(DEFAULT_CATEGORIAS)
+  }, [session])
+
+  const handleCategoriesChange = (cats: typeof DEFAULT_CATEGORIAS) => { setCategorias(cats) }
+  async function handleLogout() { await supabase.auth.signOut() }
+
+  const handleExportCSV = async () => {
+    const { data } = await supabase.from("movimientos").select("*").order("created_at", { ascending: false });
+    if (!data || data.length === 0) return alert("No hay gastos para exportar");
+    const headers = ["ID", "Fecha", "Categoria", "Cantidad", "Nota"];
+    const rows = data.map(m => [m.id, new Date(m.created_at).toLocaleString(), m.categoria, m.cantidad, m.nota || ""]);
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = "mis_gastos.csv"; link.click();
+    setIsMenuOpen(false);
+  };
+
+  return (
+    <div className="h-screen bg-zinc-950 flex flex-col overflow-hidden relative">
+      {/* Cierra el menú si haces clic fuera */}
+      {isMenuOpen && <div className="absolute inset-0 z-40" onClick={() => setIsMenuOpen(false)} />}
+
+      <header className="border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-5 py-4 flex items-center justify-between relative z-50">
+        <h1 className="text-lg font-semibold text-zinc-100">GastOS</h1>
+
+        {/* El nuevo botón de menú hamburguesa */}
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-zinc-900 transition-all text-zinc-400 hover:text-zinc-200">
+          <Menu className="w-6 h-6" />
+        </button>
+
+        {/* El menú desplegable */}
+        {isMenuOpen && (
+          <div className="absolute top-16 right-4 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl flex flex-col p-2 animate-in fade-in slide-in-from-top-4 duration-200">
+            <button onClick={() => { setShowSettings(true); setIsMenuOpen(false); }} className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors text-left">
+              <Settings className="w-4 h-4" /> Ajustes
+            </button>
+            <button onClick={handleExportCSV} className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors text-left">
+              <Download className="w-4 h-4" /> Exportar a CSV
+            </button>
+            <label className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">
+              <Upload className="w-4 h-4" /> Importar CSV
+              <input type="file" accept=".csv" className="hidden" onChange={(e) => { alert("Función de importación próximamente..."); setIsMenuOpen(false); }} />
+            </label>
+            <div className="h-px bg-zinc-800 my-1 mx-2" />
+            <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-950/30 rounded-lg transition-colors text-left">
+              <LogOut className="w-4 h-4" /> Cerrar Sesión
+            </button>
+          </div>
+        )}
+      </header>
+
+      <main className="flex-1 overflow-hidden flex flex-col min-h-0">
+        {tab === "ingreso" && <IngresoTab categorias={categorias} />}
+        {tab === "historial" && <HistorialTab categorias={categorias} />}
+        {tab === "dashboard" && <DashboardTab categorias={categorias} session={session} />}
+      </main>
+
+      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-3">
+        <div className="flex items-end justify-around relative">
+          <button onClick={() => setTab("ingreso")} className={`flex-1 flex flex-col items-center gap-1 py-3 transition-all duration-200 relative ${tab === "ingreso" ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-400"}`}><WalletCards className="w-5 h-5" /><span className="text-[11px] font-medium">Ingreso</span>{tab === "ingreso" && <span className="absolute bottom-0 block w-8 h-0.5 bg-emerald-400 rounded-full" />}</button>
+          <button onClick={() => setTab("historial")} className={`flex-1 flex flex-col items-center gap-1 py-3 transition-all duration-200 relative ${tab === "historial" ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-400"}`}><History className="w-5 h-5" /><span className="text-[11px] font-medium">Historial</span>{tab === "historial" && <span className="absolute bottom-0 block w-8 h-0.5 bg-emerald-400 rounded-full" />}</button>
+          <button onClick={() => setTab("dashboard")} className={`flex-1 flex flex-col items-center gap-1 py-3 transition-all duration-200 relative ${tab === "dashboard" ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-400"}`}><BarChart3 className="w-5 h-5" /><span className="text-[11px] font-medium">Dashboard</span>{tab === "dashboard" && <span className="absolute bottom-0 block w-8 h-0.5 bg-emerald-400 rounded-full" />}</button>
+        </div>
+      </nav>
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} categorias={categorias} onCategoriesChange={handleCategoriesChange} session={session} />
+      {session?.user?.id && (
+        <FeedbackWidget userId={session.user.id} />
+      )}
+    </div>
+  )
+}
+
+// ─── Root Component ───────────────────────────────────────────────────────────
+export default function App() {
+  // 1. TODOS LOS ESTADOS
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false)
+  const [needsUpdate, setNeedsUpdate] = useState(false)
+
+  // 2. TODOS LOS EFECTOS (HOOKS)
+  useEffect(() => {
+    async function checkVersion() {
+      const { data } = await supabase.from('app_config').select('min_version').eq('id', 1).single()
+      if (data && data.min_version > APP_VERSION) {
+        setNeedsUpdate(true)
+      }
+    }
+    checkVersion()
+  }, [])
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    async function checkSession() { const { data } = await supabase.auth.getSession(); setSession(data.session); setLoading(false) }
+    checkSession()
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session) })
+    return () => data.subscription.unsubscribe()
+  }, [mounted])
+
+  // 3. FUNCIONES
+  const forceUpdate = async () => {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys()
+      for (let name of cacheNames) {
+        await caches.delete(name)
+      }
+    }
+    window.location.reload()
+  }
+
+  // 4. LOS RETURNS VISUALES (Siempre al final, ¡orden estricto!)
+
+  // A. El Bloqueador Prioritario
+  if (needsUpdate) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+        </div>
+        <h2 className="text-2xl font-bold text-zinc-100 mb-3">Actualización Importante</h2>
+        <p className="text-zinc-400 mb-8 max-w-sm">
+          Hemos mejorado GastOS y añadido nuevas funciones de seguridad. Necesitas recargar la aplicación para continuar.
+        </p>
+        <button
+          onClick={forceUpdate}
+          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 px-8 rounded-2xl w-full max-w-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
+        >
+          Actualizar ahora
+        </button>
+      </div>
+    )
+  }
+
+  // B. Pantalla de carga normal
+  if (!mounted || loading) {
+    return <div className="min-h-screen bg-zinc-950 flex items-center justify-center"><Loader2 className="w-8 h-8 text-emerald-400 animate-spin" /></div>
+  }
+
+  // C. La Aplicación Real
+  return session ? <MainApp session={session} /> : <AuthScreen />
+}
+</file>
+
+</files>

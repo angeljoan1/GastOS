@@ -5,22 +5,23 @@ import FeedbackWidget from '@/components/FeedbackWidget'
 import { createClient } from "@supabase/supabase-js"
 import {
   UtensilsCrossed,
-  Beer,
   Bus,
   CalendarDays,
   Package,
   LogOut,
-
   Loader2,
   WalletCards,
   History,
   BarChart3,
   Settings,
-
   Menu,
   Download,
   Upload,
-  Search,
+  Briefcase,
+  Laptop,
+  PiggyBank,
+  Repeat2,
+  CircleDollarSign,
 } from "lucide-react"
 import AuthScreen from '@/components/auth/AuthScreen'
 import SettingsModal from '@/components/modals/SettingsModal'
@@ -28,38 +29,30 @@ import EditMovimientoModal from '@/components/modals/EditMovimientoModal'
 import IngresoTab from '@/components/tabs/IngresoTab'
 import HistorialTab from '@/components/tabs/HistorialTab'
 import DashboardTab from '@/components/tabs/DashboardTab'
+import type { Categoria, Movimiento } from "@/types"
+import { supabase } from "@/lib/supabase"
 
-// ─── Supabase Client ────────────────────────────────────────────────────────
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 const APP_VERSION = 2;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
 
-interface Movimiento {
-  id: string
-  created_at: string
-  cantidad: number
-  categoria: string
-  nota?: string
-  is_recurring?: boolean
-}
-
-
-// ─── Category Config ─────────────────────────────────────────────────────────
-const DEFAULT_CATEGORIAS = [
-  { id: "Comida", label: "Comida", emoji: "🍔", Icon: UtensilsCrossed },
-  { id: "Ocio", label: "Ocio", emoji: "🍻", Icon: Beer },
-  { id: "Transporte", label: "Transporte", emoji: "🚌", Icon: Bus },
-  { id: "Suscripciones", label: "Suscripciones", emoji: "📅", Icon: CalendarDays },
-  { id: "Otros", label: "Otros", emoji: "📦", Icon: Package },
+const DEFAULT_CATEGORIAS: Categoria[] = [
+  // Gastos
+  { id: "Comida",        label: "Comida",       Icon: UtensilsCrossed, tipo: "gasto"   },
+  { id: "Transporte",    label: "Transporte",   Icon: Bus,             tipo: "gasto"   },
+  { id: "Suscripciones", label: "Suscripciones",Icon: CalendarDays,    tipo: "gasto"   },
+  { id: "Otros",         label: "Otros",        Icon: Package,         tipo: "ambos"   },
+  // Ingresos
+  { id: "Nomina",        label: "Nómina",       Icon: Briefcase,       tipo: "ingreso" },
+  { id: "Freelance",     label: "Freelance",    Icon: Laptop,          tipo: "ingreso" },
+  { id: "Ahorro",        label: "Ahorro",       Icon: PiggyBank,       tipo: "ingreso" },
+  { id: "Rendimiento",   label: "Rendimiento",  Icon: Repeat2,         tipo: "ingreso" },
+  { id: "Ingreso",       label: "Otros ingresos", Icon: CircleDollarSign, tipo: "ingreso" },
 ]
 
 function getCatConfig(cat: string, allCats: typeof DEFAULT_CATEGORIAS) {
-  return allCats.find((c) => c.id === cat) ?? { emoji: "📦", label: cat, Icon: Package }
+  return allCats.find((c) => c.id === cat) ?? { label: cat, Icon: Package, tipo: "ambos" as const }
 }
 
 
@@ -68,17 +61,18 @@ function MainApp({ session }: { session: Session }) {
   const [tab, setTab] = useState<"ingreso" | "historial" | "dashboard">("ingreso")
   const [showSettings, setShowSettings] = useState(false)
 
-  // INICIALIZAMOS CON LAS CATEGORIAS DE LA NUBE (O LAS POR DEFECTO)
-  const [categorias, setCategorias] = useState<typeof DEFAULT_CATEGORIAS>(
-    session?.user?.user_metadata?.categorias_custom || DEFAULT_CATEGORIAS
-  )
+  // Al cargar, si las categorías guardadas son del esquema viejo (sin 'tipo'), usamos las por defecto
+  const savedCats = session?.user?.user_metadata?.categorias_custom
+  const validCats = savedCats?.every((c: any) => c.tipo) ? savedCats : DEFAULT_CATEGORIAS
+
+  const [categorias, setCategorias] = useState<typeof DEFAULT_CATEGORIAS>(validCats)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // Si la sesión se actualiza (ej: al guardar ajustes), actualizamos las categorías en pantalla
   useEffect(() => {
-    if (session?.user?.user_metadata?.categorias_custom) {
-      setCategorias(session?.user?.user_metadata.categorias_custom)
-    }
+    const saved = session?.user?.user_metadata?.categorias_custom
+    if (saved?.every((c: any) => c.tipo)) setCategorias(saved)
+    else if (saved) setCategorias(DEFAULT_CATEGORIAS)
   }, [session])
 
   const handleCategoriesChange = (cats: typeof DEFAULT_CATEGORIAS) => { setCategorias(cats) }

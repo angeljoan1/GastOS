@@ -1,31 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Trash2, Loader2, Package } from "lucide-react"
-import { createClient } from "@supabase/supabase-js"
-
-// Conexión independiente a Supabase para este componente
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+import { X, Trash2, Loader2, UtensilsCrossed, Briefcase, Plus } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import type { Categoria, Movimiento } from "@/types"
 
 // Definimos los tipos para que TypeScript esté contento
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
-
-type Categoria = {
-  id: string
-  label: string
-  emoji: string
-  Icon: any
-}
 
 export default function SettingsModal({ isOpen, onClose, categorias, onCategoriesChange, session }: {
   isOpen: boolean; onClose: () => void; categorias: Categoria[]; onCategoriesChange: (cats: Categoria[]) => void; session: Session
 }) {
   const [presupuesto, setPresupuesto] = useState<string>(() => session?.user?.user_metadata?.presupuesto?.toString() || "")
   const [newCatName, setNewCatName] = useState("")
-  const [newCatEmoji, setNewCatEmoji] = useState("📌")
+  const [newCatTipo, setNewCatTipo] = useState<'gasto' | 'ingreso' | 'ambos'>('gasto')
   const [editingCats, setEditingCats] = useState<Categoria[]>(categorias)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -50,10 +38,15 @@ export default function SettingsModal({ isOpen, onClose, categorias, onCategorie
   }
 
   const addCategory = () => {
-    if (newCatName.trim() && newCatEmoji.trim()) {
-      const newCat = { id: newCatName.toLowerCase(), label: newCatName, emoji: newCatEmoji, Icon: Package }
+    if (newCatName.trim()) {
+      const newCat: Categoria = {
+        id: newCatName.toLowerCase().replace(/\s+/g, '_'),
+        label: newCatName.trim(),
+        Icon: newCatTipo === 'ingreso' ? Briefcase : UtensilsCrossed,
+        tipo: newCatTipo,
+      }
       setEditingCats([...editingCats, newCat])
-      setNewCatName(""); setNewCatEmoji("📌")
+      setNewCatName("")
     }
   }
 
@@ -78,19 +71,62 @@ export default function SettingsModal({ isOpen, onClose, categorias, onCategorie
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-3">Categorías Personalizadas</label>
-            <div className="space-y-2 mb-3">
-              {editingCats.map((cat) => (
+            <p className="text-sm font-medium text-zinc-300 mb-3">Categorías</p>
+
+            {/* Gastos */}
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Gastos</p>
+            <div className="space-y-2 mb-4">
+              {editingCats.filter(c => c.tipo === 'gasto' || c.tipo === 'ambos').map((cat) => (
                 <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
-                  <span className="text-sm text-zinc-200">{cat.emoji} {cat.label}</span>
-                  <button onClick={() => removeCategory(cat.id)} className="text-red-400 hover:text-red-300 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-zinc-200">{cat.label}</span>
+                  </div>
+                  <button onClick={() => removeCategory(cat.id)} className="text-zinc-600 hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input type="text" value={newCatEmoji} onChange={(e) => setNewCatEmoji(e.target.value)} className="w-14 text-center bg-zinc-800 border border-zinc-700 rounded-lg py-2 text-xl text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" maxLength={2} title="Pon un emoji" />
-              <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Nueva categoría" className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all" onKeyPress={(e) => e.key === "Enter" && addCategory()} />
-              <button onClick={addCategory} className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-lg text-sm font-medium hover:bg-emerald-400 transition-all">Añadir</button>
+
+            {/* Ingresos */}
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">Ingresos</p>
+            <div className="space-y-2 mb-4">
+              {editingCats.filter(c => c.tipo === 'ingreso').map((cat) => (
+                <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-zinc-200">{cat.label}</span>
+                  </div>
+                  <button onClick={() => removeCategory(cat.id)} className="text-zinc-600 hover:text-red-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+
+            {/* Formulario nueva categoría */}
+            <div className="space-y-2 pt-2 border-t border-zinc-800">
+              <p className="text-xs text-zinc-500 uppercase tracking-widest pt-1">Nueva categoría</p>
+              <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700">
+                {(['gasto', 'ingreso', 'ambos'] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setNewCatTipo(t)}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t ? 'bg-zinc-600 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    {t === 'gasto' ? 'Gasto' : t === 'ingreso' ? 'Ingreso' : 'Ambos'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  placeholder="Nombre de la categoría"
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                />
+                <button onClick={addCategory} className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-lg text-sm font-medium hover:bg-emerald-400 transition-all">
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

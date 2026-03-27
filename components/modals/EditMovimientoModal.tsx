@@ -2,23 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { X, Loader2 } from "lucide-react"
+import type { Movimiento, Categoria } from "@/types"
 
-// Definimos los tipos que necesita este componente
-export interface Movimiento {
-  id: string
-  created_at: string
-  cantidad: number
-  categoria: string
-  nota?: string
-  is_recurring?: boolean
-}
-
-type Categoria = {
-  id: string
-  label: string
-  emoji: string
-  Icon: any
-}
 
 export default function EditMovimientoModal({ isOpen, onClose, movimiento, categorias, onSave }: {
   isOpen: boolean; onClose: () => void; movimiento: Movimiento | null; categorias: Categoria[]; onSave: (updatedMov: Movimiento) => Promise<void>
@@ -77,7 +62,7 @@ export default function EditMovimientoModal({ isOpen, onClose, movimiento, categ
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">Categoría</label>
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all">
-              {categorias.map((cat) => <option key={cat.id} value={cat.id}>{cat.emoji} {cat.label}</option>)}
+              {categorias.map((cat) => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
             </select>
           </div>
           <div>

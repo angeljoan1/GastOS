@@ -34,24 +34,60 @@ export default function HistorialTab({
   ) => {
     if (isNew) setIsSearching(true)
     let q = supabase.from("movimientos").select("*").order("created_at", { ascending: false })
-    if (search.trim()) q = q.ilike("nota", `%${search}%`)
+    
+    // Solo busca coincidencias en la columna "nota"
+    if (search.trim()) {
+      q = q.ilike("nota", `%${search.trim()}%`)
+    }
+    
     if (categoryFilter) q = q.eq("categoria", categoryFilter)
     if (tipo === "gasto") q = q.or("tipo.eq.gasto,tipo.is.null")
     else if (tipo === "ingreso") q = q.eq("tipo", "ingreso")
     else if (tipo === "transferencia") q = q.eq("tipo", "transferencia")
+    
     const from = pageIndex * 20
-    const { data } = await q.range(from, from + 19)
-    if (data) {
+    const { data, error } = await q.range(from, from + 19)
+    
+    if (error) {
+      console.error("Error en la búsqueda:", error.message)
+    } else if (data) {
       if (isNew) setMovimientos(data); else setMovimientos(prev => [...prev, ...data])
       setHasMore(data.length === 20)
     }
     setLoading(false); setIsSearching(false)
   }, [])
 
+  // useEffect para la búsqueda
   useEffect(() => {
     const t = setTimeout(() => { setPage(0); fetchMovimientos(0, searchTerm, selectedCategory, tipoFilter, true) }, 300)
     return () => clearTimeout(t)
   }, [searchTerm, selectedCategory, tipoFilter, fetchMovimientos])
+
+  // NUEVO: useEffect para cambiar el color de la barra de estado del móvil
+  useEffect(() => {
+    const colores = {
+      todos: "#09090b",         // bg-zinc-950
+      gasto: "#7f1d1d",         // bg-red-900
+      ingreso: "#064e3b",       // bg-emerald-900
+      transferencia: "#1e3a8a", // bg-blue-900
+    };
+
+    const colorElegido = colores[tipoFilter];
+    
+    let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute("content", colorElegido);
+    } else {
+      const meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.content = colorElegido;
+      document.head.appendChild(meta);
+    }
+
+    return () => {
+      if (metaThemeColor) metaThemeColor.setAttribute("content", "#09090b");
+    };
+  }, [tipoFilter]);
 
   async function handleDelete(id: string) {
     setDeletingId(id)
@@ -86,39 +122,45 @@ export default function HistorialTab({
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-8 duration-500">
 
       {/* Header filtros */}
-      <div className="flex gap-2 px-4 pt-4 pb-3 border-b border-zinc-800/60 bg-zinc-950 flex-col">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Buscar en notas..."
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all" />
-          </div>
-          {(() => {
-            const cat = categorias.find(c => c.id === selectedCategory)
-            return (
-              <SheetTrigger onClick={() => setShowCatSheet(true)}
-                placeholder="Todas"
-                label={cat?.label}
-                icono={cat?.icono} />
-            )
-          })()}
+      <div className="flex flex-col gap-3 px-4 pt-4 pb-3 border-b border-zinc-800/60 bg-zinc-950">
+
+        {/* Fila 1: Buscador a todo el ancho */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nota..."
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all" />
         </div>
 
-        <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800">
-          {([
-            { id: "todos", label: "Todos", activeClass: "bg-zinc-700 text-zinc-100", Icon: undefined },
-            { id: "gasto", label: "Gastos", activeClass: "bg-red-500/15 text-red-400 border border-red-500/30", Icon: TrendingDown },
-            { id: "ingreso", label: "Ingresos", activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30", Icon: TrendingUp },
-            { id: "transferencia", label: "Transfer.", activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30", Icon: ArrowLeftRight },
-          ] as const satisfies { id: TipoFilter; label: string; activeClass: string; Icon: any }[]).map(({ id, label, activeClass, Icon }) => (
-            <button key={id} onClick={() => setTipoFilter(id)}
-              className={`flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-semibold rounded-lg transition-all duration-200 ${tipoFilter === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
-                }`}>
-              {Icon && <Icon className="w-3 h-3" />}
-              {label}
-            </button>
-          ))}
+        {/* Fila 2: Categoría y Tipos */}
+        <div className="flex gap-2 w-full">
+          <div className="w-[110px] flex-shrink-0">
+            {(() => {
+              const cat = categorias.find(c => c.id === selectedCategory)
+              return (
+                <SheetTrigger onClick={() => setShowCatSheet(true)}
+                  placeholder="Todas"
+                  label={cat?.label}
+                  icono={cat?.icono} />
+              )
+            })()}
+          </div>
+
+          <div className="flex flex-1 rounded-xl bg-zinc-900 p-1 border border-zinc-800 overflow-x-auto">
+            {([
+              { id: "todos", label: "Todos", activeClass: "bg-zinc-700 text-zinc-100", Icon: undefined },
+              { id: "gasto", label: "Gastos", activeClass: "bg-red-500/15 text-red-400 border border-red-500/30", Icon: TrendingDown },
+              { id: "ingreso", label: "Ingresos", activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30", Icon: TrendingUp },
+              { id: "transferencia", label: "Transfer.", activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30", Icon: ArrowLeftRight },
+            ] as const satisfies { id: TipoFilter; label: string; activeClass: string; Icon: any }[]).map(({ id, label, activeClass, Icon }) => (
+              <button key={id} onClick={() => setTipoFilter(id)}
+                className={`flex-1 flex items-center justify-center gap-1 px-1 py-2 text-[11px] font-semibold rounded-lg transition-all duration-200 whitespace-nowrap ${tipoFilter === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
+                  }`}>
+                {Icon && <Icon className="w-3 h-3" />}
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -215,7 +257,7 @@ export default function HistorialTab({
             <p className="text-zinc-500 text-sm mb-6">Esta acción no se puede deshacer.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmarBorrado(null)} className="flex-1 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-all">Cancelar</button>
-              <button onClick={() => handleDelete(confirmarBorrado)} className="flex-1 py-2 text-sm bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all">Borrar</button>
+              <button onClick={() => handleDelete(confirmarBorrado!)} className="flex-1 py-2 text-sm bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all">Borrar</button>
             </div>
           </div>
         </div>

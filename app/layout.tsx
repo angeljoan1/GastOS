@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description: 'Aplicación personal y segura para el registro diario de gastos.',
 }
 
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

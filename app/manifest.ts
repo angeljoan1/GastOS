@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     display: 'standalone', // <-- Imprescindible para que no parezca una web
     orientation: 'portrait', // Bloquea la app en vertical para que se vea mejor
     background_color: '#000000', // El negro ultra oscuro del fondo de la app
-    theme_color: '#10b981', // Tu verde neón esmeralda
+    theme_color: '#09090b', // negro
     lang: 'es',
     id: '/', // Ayuda a Android a identificar la app de forma única
     scope: '/', // Define qué URLs pertenecen a la app
@@ -26,12 +26,12 @@ export default function manifest(): MetadataRoute.Manifest {
         type: 'image/png',
         purpose: 'any',
       },
-      // ¡ESTE ES EL TRUCO PARA ANDROID!
+      
       {
         src: '/icon.png',
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'maskable', // <-- LE DICE A ANDROID: "NO ME PONGAS BORDE BLANCO, YO YA SÉ GESTIONAR MIS BORDES"
+        purpose: 'maskable', 
       },
     ],
   }

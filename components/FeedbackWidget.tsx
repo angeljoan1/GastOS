@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 export default function FeedbackWidget({ userId }: { userId: string }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -9,6 +9,13 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
+  // Estados para arrastrar el botón
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [hasMoved, setHasMoved] = useState(false)
+  const dragStart = useRef({ x: 0, y: 0 })
+  const posStart = useRef({ x: 0, y: 0 })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!mensaje.trim()) return
@@ -16,17 +23,10 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     setIsSubmitting(true)
     
     try {
-      // Llamamos a nuestra nueva ruta de API
       const response = await fetch('/api/feedback', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          tipo,
-          mensaje
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, tipo, mensaje }),
       })
 
       if (response.ok) {
@@ -46,12 +46,47 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     }
   }
 
-  // Botón flotante cerrado
+  // Manejadores de arrastre
+  const onPointerDown = (e: React.PointerEvent) => {
+    setIsDragging(true)
+    setHasMoved(false)
+    dragStart.current = { x: e.clientX, y: e.clientY }
+    posStart.current = { ...pos }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return
+    const dx = e.clientX - dragStart.current.x
+    const dy = e.clientY - dragStart.current.y
+    
+    // Si se mueve más de 5px, es arrastre, no click
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      setHasMoved(true)
+    }
+    
+    setPos({ x: posStart.current.x + dx, y: posStart.current.y + dy })
+  }
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    setIsDragging(false)
+    e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  const handleClick = () => {
+    if (!hasMoved) setIsOpen(true)
+  }
+
+  // Botón flotante arrastrable
   if (!isOpen) {
     return (
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 right-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-all z-50 flex items-center justify-center"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onClick={handleClick}
+        style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
+        className="fixed bottom-24 right-6 bg-zinc-800 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-opacity duration-300 opacity-50 hover:opacity-100 z-50 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
         title="Enviar sugerencia o error"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -59,7 +94,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     )
   }
 
-  // Modal del formulario abierto
+  // Modal del formulario abierto (Posición original)
   return (
     <div className="fixed bottom-24 right-6 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-5">
       <div className="bg-zinc-800 px-4 py-3 flex justify-between items-center border-b border-zinc-700">

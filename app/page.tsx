@@ -205,10 +205,45 @@ export default function App() {
   const [mounted,     setMounted]     = useState(false)
   const [needsUpdate, setNeedsUpdate] = useState(false)
 
+  // ── Magia de Actualización ────────────────────────────────────────────────
   useEffect(() => {
-    supabase.from("app_config").select("min_version").eq("id", 1).single()
-      .then(({ data }) => { if (data && data.min_version > APP_VERSION) setNeedsUpdate(true) })
-  }, [])
+    // Función que hace el ping a la base de datos
+    const checkVersion = async () => {
+      try {
+        const { data } = await supabase
+          .from("app_config")
+          .select("min_version")
+          .eq("id", 1)
+          .single()
+
+        if (data && data.min_version > APP_VERSION) {
+          setNeedsUpdate(true)
+        }
+      } catch (error) {
+        console.error("Error al comprobar la versión:", error)
+      }
+    }
+
+    // 1. Comprueba al cargar la app por primera vez
+    checkVersion()
+
+    // 2. Comprueba cada vez que la app vuelve a primer plano (minimizada -> maximizada)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkVersion()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // 3. Comprueba en segundo plano cada 30 minutos por si acaso
+    const interval = setInterval(checkVersion, 30 * 60 * 1000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      clearInterval(interval)
+    }
+  }, []) // Dependencias vacías para que se suscriba una sola vez al montar
 
   useEffect(() => { setMounted(true) }, [])
 

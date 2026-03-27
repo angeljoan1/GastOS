@@ -105,31 +105,31 @@ export default function IngresoTab({
   }
 
   async function handleGuardarTransferencia() {
-  triggerHaptic()
-  const cantidad = parseFloat(display)
-  if (!cantidad || cantidad <= 0) return setError("Introduce una cantidad mayor que 0.")
-  if (!cuentaId || !cuentaDestinoId) return setError("Selecciona ambas cuentas.")
-  if (cuentaId === cuentaDestinoId) return setError("Las cuentas deben ser diferentes.")
+    triggerHaptic()
+    const cantidad = parseFloat(display)
+    if (!cantidad || cantidad <= 0) return setError("Introduce una cantidad mayor que 0.")
+    if (!cuentaId || !cuentaDestinoId) return setError("Selecciona ambas cuentas.")
+    if (cuentaId === cuentaDestinoId) return setError("Las cuentas deben ser diferentes.")
 
-  setLoading(true); setError(null)
-  const { error } = await supabase.from("movimientos").insert({
-    cantidad,
-    categoria: "transferencia",
-    nota: nota || null,
-    is_recurring: false,
-    tipo: "transferencia",
-    cuenta_id: cuentaId,
-    cuenta_destino_id: cuentaDestinoId,
-  })
-  setLoading(false)
-  if (error) {
-    console.error("Error transferencia:", error) // ← ver el error real
-    setError(`Error: ${error.message}`)          // ← mostrar el mensaje real
-  } else {
-    setSuccess(true); setDisplay("0"); setNota("")
-    setCuentaDestinoId(""); setTimeout(() => setSuccess(false), 1800)
+    setLoading(true); setError(null)
+    const { error } = await supabase.from("movimientos").insert({
+      cantidad,
+      categoria: "transferencia",
+      nota: nota || null,
+      is_recurring: false,
+      tipo: "transferencia",
+      cuenta_id: cuentaId,
+      cuenta_destino_id: cuentaDestinoId,
+    })
+    setLoading(false)
+    if (error) {
+      console.error("Error transferencia:", error) // ← ver el error real
+      setError(`Error: ${error.message}`)          // ← mostrar el mensaje real
+    } else {
+      setSuccess(true); setDisplay("0"); setNota("")
+      setCuentaDestinoId(""); setTimeout(() => setSuccess(false), 1800)
+    }
   }
-}
 
   async function handleCobrarSub(sub: Movimiento) {
     setProcessingSub(sub.id)
@@ -369,11 +369,13 @@ export default function IngresoTab({
             <div>
               <p className="text-xs text-zinc-600 uppercase tracking-widest mb-3 px-1">Categoría</p>
               <div className="grid grid-cols-3 gap-3">
-                {categorias
-                  .filter(c => tipoMovimiento === "ingreso" ? c.tipo === "ingreso" || c.tipo === "ambos" : c.tipo === "gasto" || c.tipo === "ambos")
-                  .map(cat => (
-                    <CategoryButton key={cat.id} cat={cat} onPress={onCategoryClick} disabled={isDisabled} />
-                  ))}
+                {Array.from(new Map(
+                  categorias
+                    .filter(c => tipoMovimiento === "ingreso" ? c.tipo === "ingreso" || c.tipo === "ambos" : c.tipo === "gasto" || c.tipo === "ambos")
+                    .map(c => [c.id, c])
+                ).values()).map(cat => (
+                  <CategoryButton key={cat.id} cat={cat} onPress={onCategoryClick} disabled={isDisabled} />
+                ))}
               </div>
             </div>
           </>

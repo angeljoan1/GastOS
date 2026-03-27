@@ -13,27 +13,27 @@ export default function SettingsModal({
   presupuestos, onPresupuestosChange,
   session, userId,
 }: {
-  isOpen:                 boolean
-  onClose:                () => void
-  categorias:             Categoria[]
-  onCategoriesChange:     (cats: Categoria[]) => void
-  presupuestos:           Presupuesto[]
-  onPresupuestosChange:   (p: Presupuesto[]) => void
-  session:                Session
-  userId:                 string
+  isOpen: boolean
+  onClose: () => void
+  categorias: Categoria[]
+  onCategoriesChange: (cats: Categoria[]) => void
+  presupuestos: Presupuesto[]
+  onPresupuestosChange: (p: Presupuesto[]) => void
+  session: Session
+  userId: string
 }) {
   // ── Estado categorías ──────────────────────────────────────────────────────
-  const [newCatName,  setNewCatName]  = useState("")
-  const [newCatTipo,  setNewCatTipo]  = useState<"gasto" | "ingreso" | "ambos">("gasto")
+  const [newCatName, setNewCatName] = useState("")
+  const [newCatTipo, setNewCatTipo] = useState<"gasto" | "ingreso" | "ambos">("gasto")
   const [newCatIcono, setNewCatIcono] = useState("Package")
-  const [savingCat,   setSavingCat]   = useState(false)
+  const [savingCat, setSavingCat] = useState(false)
   const [deletingCat, setDeletingCat] = useState<string | null>(null)
 
   // ── Estado presupuestos ───────────────────────────────────────────────────
   const [editingPresupuesto, setEditingPresupuesto] = useState<string | null>(null) // categoria_id
-  const [inputPresupuesto,   setInputPresupuesto]   = useState("")
-  const [savingPres,         setSavingPres]         = useState(false)
-  const [deletingPres,       setDeletingPres]       = useState<string | null>(null)
+  const [inputPresupuesto, setInputPresupuesto] = useState("")
+  const [savingPres, setSavingPres] = useState(false)
+  const [deletingPres, setDeletingPres] = useState<string | null>(null)
 
   // ── Tab activo dentro del modal ────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos">("categorias")
@@ -118,13 +118,12 @@ export default function SettingsModal({
         {/* Tabs */}
         <div className="flex rounded-xl bg-zinc-800 p-1 border border-zinc-700/60 mb-6">
           {([
-            { id: "categorias",   label: "Categorías" },
+            { id: "categorias", label: "Categorías" },
             { id: "presupuestos", label: "Presupuestos" },
           ] as const).map(t => (
             <button key={t.id} onClick={() => { setActiveTab(t.id); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-                activeTab === t.id ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-              }`}>
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === t.id ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                }`}>
               {t.label}
             </button>
           ))}
@@ -139,43 +138,41 @@ export default function SettingsModal({
         {/* ── TAB: Categorías ─────────────────────────────────────────────── */}
         {activeTab === "categorias" && (
           <div className="space-y-6">
-            {(["gasto", "ingreso"] as const).map(tipo => {
-              const cats = categorias.filter(c => c.tipo === tipo || c.tipo === "ambos")
+            {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
+              const cats = categorias.filter(c => c.tipo === tipo)
+
+              if (cats.length === 0) return null // Si no hay categorías de este tipo, no pinta la sección
+
               return (
-                <div key={tipo}>
+                <div key={tipo} className="mb-5">
                   <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
-                    {tipo === "gasto" ? "Gastos" : "Ingresos"}
+                    {tipo === "gasto" ? "Solo Gastos" : tipo === "ingreso" ? "Solo Ingresos" : "Compartidas (Ambos)"}
                   </p>
-                  {cats.length === 0
-                    ? <p className="text-xs text-zinc-700 px-1">Sin categorías</p>
-                    : (
-                      <div className="space-y-2">
-                        {cats.map(cat => {
-                          const CIcon      = getIcon(cat.icono)
-                          const isDeleting = deletingCat === cat.id
-                          return (
-                            <div key={cat.id}
-                              className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5">
-                              <div className="flex items-center gap-2.5">
-                                <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-                                <span className="text-sm text-zinc-200">{cat.label}</span>
-                                {cat.tipo === "ambos" && (
-                                  <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">ambos</span>
-                                )}
-                              </div>
-                              <button onClick={() => handleDeleteCat(cat.id)} disabled={!!isDeleting}
-                                className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors">
-                                {isDeleting
-                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  : <Trash2 className="w-3.5 h-3.5" />
-                                }
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  }
+                  <div className="space-y-2">
+                    {cats.map(cat => {
+                      const CIcon = getIcon(cat.icono)
+                      const isDeleting = deletingCat === cat.id
+                      return (
+                        <div key={cat.id}
+                          className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                            <span className="text-sm text-zinc-200">{cat.label}</span>
+                            {cat.tipo === "ambos" && (
+                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">ambos</span>
+                            )}
+                          </div>
+                          <button onClick={() => handleDeleteCat(cat.id)} disabled={!!isDeleting}
+                            className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors">
+                            {isDeleting
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <Trash2 className="w-3.5 h-3.5" />
+                            }
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })}
@@ -186,9 +183,8 @@ export default function SettingsModal({
               <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700">
                 {(["gasto", "ingreso", "ambos"] as const).map(t => (
                   <button key={t} onClick={() => setNewCatTipo(t)}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                      newCatTipo === t ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
-                    }`}>
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+                      }`}>
                     {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Ambos"}
                   </button>
                 ))}
@@ -210,9 +206,8 @@ export default function SettingsModal({
                     const Ico = getIcon(name)
                     return (
                       <button key={name} onClick={() => setNewCatIcono(name)}
-                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${
-                          newCatIcono === name ? "border-emerald-500/60 bg-emerald-950/30" : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"
-                        }`}>
+                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name ? "border-emerald-500/60 bg-emerald-950/30" : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"
+                          }`}>
                         <Ico className="w-4 h-4 text-zinc-300" />
                       </button>
                     )
@@ -236,9 +231,9 @@ export default function SettingsModal({
               </p>
             ) : (
               gastoCats.map(cat => {
-                const CIcon      = getIcon(cat.icono)
-                const pres       = getPresupuesto(cat.id)
-                const isEditing  = editingPresupuesto === cat.id
+                const CIcon = getIcon(cat.icono)
+                const pres = getPresupuesto(cat.id)
+                const isEditing = editingPresupuesto === cat.id
                 const isDeleting = deletingPres === pres?.id
 
                 return (

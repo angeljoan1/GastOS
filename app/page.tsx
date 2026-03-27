@@ -16,7 +16,7 @@ import DashboardTab  from "@/components/tabs/DashboardTab"
 import type { Categoria, Cuenta, Presupuesto } from "@/types"
 import { supabase } from "@/lib/supabase"
 
-const APP_VERSION = 0
+const APP_VERSION = 1
 
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
 

@@ -16,7 +16,7 @@ import DashboardTab  from "@/components/tabs/DashboardTab"
 import type { Categoria, Cuenta, Presupuesto } from "@/types"
 import { supabase } from "@/lib/supabase"
 
-const APP_VERSION = 4
+const APP_VERSION = 0
 
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
 
@@ -220,9 +220,35 @@ export default function App() {
   }, [mounted])
 
   const forceUpdate = async () => {
-    if ("caches" in window) { for (const n of await caches.keys()) await caches.delete(n) }
-    window.location.reload()
-  }
+    try {
+      // 1. Limpiar caché de la aplicación (Cache Storage)
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+      }
+  
+      // 2. Desregistrar Service Workers (el culpable habitual en móviles)
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+  
+      // 3. Forzar recarga omitiendo la caché del navegador
+      // Añadimos un timestamp a la URL para que el servidor crea que es una página nueva
+      const url = new URL(window.location.href);
+      url.searchParams.set('v', Date.now().toString());
+      window.location.href = url.toString();
+      
+    } catch (error) {
+      console.error("Fallo al forzar actualización:", error);
+      // Fallback por si falla lo anterior
+      window.location.reload();
+    }
+  };
 
   if (needsUpdate) return (
     <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">

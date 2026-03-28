@@ -220,7 +220,7 @@ export default function SettingsModal({
     } else {
       const ok = await saveBiometricKey(userId)
       if (ok) setBioEnabled(true)
-        else setBioError(`Error: ${localStorage.getItem('__bioerror') ?? "desconocido"}`)
+        else setBioError("No se pudo activar. Inténtalo de nuevo.")
     }
     setBioLoading(false)
   }
@@ -510,7 +510,7 @@ export default function SettingsModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-200">Desbloqueo biométrico</p>
                     <p className="text-xs text-zinc-600 mt-0.5">
-                      {bioEnabled ? "Activo — huella o Face ID" : "Inactivo — solo PIN"}
+                    {bioEnabled ? "Activo — biometría del dispositivo" : "Inactivo — solo PIN"}
                     </p>
                   </div>
                   <button

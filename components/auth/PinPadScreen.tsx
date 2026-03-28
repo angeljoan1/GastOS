@@ -405,7 +405,7 @@ export default function PinPadScreen({
         <div className="space-y-2 max-w-xs">
           <h2 className="text-xl font-bold text-zinc-100">Desbloqueo rápido</h2>
           <p className="text-sm text-zinc-400 leading-relaxed">
-            ¿Quieres usar tu huella o Face ID para desbloquear GastOS en lugar del PIN?
+            ¿Quieres usar la biometría de tu dispositivo para desbloquear GastOS en lugar del PIN?
           </p>
         </div>
         {biometricError && (

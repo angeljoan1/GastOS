@@ -23,7 +23,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 16
+const APP_VERSION = 17
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
@@ -351,7 +351,6 @@ export default function App() {
         const TIMEOUT_MS = 1 * 60 * 1000
         if (hiddenAt && Date.now() - hiddenAt > TIMEOUT_MS) {
           clearKey()
-          clearBiometricKey()
           setHasKey(false)
         }
         hiddenAt = null

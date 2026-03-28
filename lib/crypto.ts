@@ -246,13 +246,10 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
     try {
       const masterKey = _masterKey
       if (!masterKey) {
-        localStorage.setItem('__bioerror', 'NO_MASTER_KEY')
         return false
       }
   
-      localStorage.setItem('__bioerror', 'STEP1_EXPORT')
       const challenge = crypto.getRandomValues(new Uint8Array(32))
-      localStorage.setItem('__bioerror', 'STEP2_CHALLENGE')
     const userIdBytes = new TextEncoder().encode(userId)
 
     const credential = await navigator.credentials.create({
@@ -269,25 +266,21 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
           { type: 'public-key', alg: -257 }, // RS256 fallback
         ],
         authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'preferred',
-            residentKey: 'discouraged',
-          },
-          excludeCredentials: [],
+          authenticatorAttachment: 'platform',
+          userVerification: 'preferred',
+          residentKey: 'discouraged',
+        },
+        excludeCredentials: [],
         timeout: 60000,
       },
     }) as PublicKeyCredential | null
 
-    localStorage.setItem('__bioerror', 'STEP3_CREDENTIAL_DONE')
     if (!credential) {
-      localStorage.setItem('__bioerror', 'STEP3_NULL_CREDENTIAL')
       return false
     }
 
-    localStorage.setItem('__bioerror', 'STEP4_SAVING_CREDID')
     const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
     localStorage.setItem(BIOMETRIC_CRED_STORAGE, credId)
-    localStorage.setItem('__bioerror', 'STEP5_DERIVING_KEY')
 
     // Cifrar la clave maestra con una clave derivada del userId
     const enc = new TextEncoder()
@@ -307,12 +300,9 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
       ['encrypt', 'decrypt'],
     )
 
-    localStorage.setItem('__bioerror', 'STEP6_EXPORTING_KEY')
     const rawKey = await crypto.subtle.exportKey('raw', masterKey)
-    localStorage.setItem('__bioerror', 'STEP7_ENCRYPTING')
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, rawKey)
-    localStorage.setItem('__bioerror', 'STEP8_SAVING')
 
     const ivB64 = btoa(String.fromCharCode(...iv))
     const ctB64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)))

@@ -23,7 +23,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData } from "@/lib/crypto"
 
-const APP_VERSION = 7
+const APP_VERSION = 8
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {

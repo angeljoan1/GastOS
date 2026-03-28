@@ -65,16 +65,17 @@ export default function EncryptionBadge() {
 
         <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
           <p>
-            Tus cantidades y notas se encriptan con una clave derivada de tu PIN
-            personal antes de salir de tu dispositivo.
+            Tu PIN genera una clave criptográfica que nunca sale de tu dispositivo.
+            Cantidades, notas, nombres de cuentas y presupuestos se cifran con ella
+            antes de enviarse al servidor.
           </p>
           <p>
-            Ni el servidor, ni los administradores, ni nadie que acceda a la base de
-            datos puede leer tus datos financieros. Solo tu PIN los desbloquea.
+            Ni el servidor, ni los administradores, ni nadie con acceso a la base de
+            datos puede leer tus datos financieros. Solo tu PIN los descifra.
           </p>
           <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90">
             <strong className="font-semibold">Importante:</strong> Si pierdes tu PIN,
-            no es posible recuperar tus datos encriptados. Guárdalo en un lugar seguro.
+            tus datos cifrados son irrecuperables. Guárdalo en un lugar seguro.
           </div>
         </div>
 

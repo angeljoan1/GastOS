@@ -70,6 +70,7 @@ lib/supabase.ts
 next.config.ts
 package.json
 postcss.config.mjs
+public/.well-known/assetlinks.json
 public/file.svg
 public/globe.svg
 public/logo.png
@@ -83,444 +84,6 @@ types/index.ts
 
 <files>
 This section contains the contents of the repository's files.
-
-<file path="components/auth/PinPadScreen.tsx">
-"use client"
-
-// components/auth/PinPadScreen.tsx
-// Extraído de app/page.tsx para mejorar legibilidad.
-//
-// Cambios respecto a la versión original en page.tsx:
-//   - PBKDF2 con salt aleatorio: lee kdf_salt de user_vault, lo genera si es primera vez
-//   - deriveKeyFromPin ahora recibe Uint8Array salt (no lo deriva del userId)
-//   - generateVerificationToken e isKeyValid son async → se usa await
-//   - Vault query incluye .eq("user_id", ...) explícito (no solo confiamos en RLS)
-//   - handleCobrarSub: insert con created_at calculado en un solo paso, sin UPDATE posterior
-//   - console.log eliminados, se mantienen console.error en catch
-//   - Advertencia de pérdida de datos en recuperación visible ANTES del botón de envío
-
-import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
-import { Loader2, Lock, Delete, KeyRound } from "lucide-react"
-import type { Session } from "@supabase/supabase-js"
-import EncryptionBadge from "@/components/ui/Encryptionbadge"
-import {
-  deriveKeyFromPin,
-  saveKey,
-  generateSalt,
-  generateVerificationToken,
-  isKeyValid,
-} from "@/lib/crypto"
-
-function triggerHaptic(duration?: number | number[]) {
-  if (!navigator.vibrate) return
-  if (Array.isArray(duration)) navigator.vibrate(duration)
-  else navigator.vibrate(duration ?? 30)
-}
-
-export default function PinPadScreen({
-  session,
-  onUnlocked,
-}: {
-  session: Session
-  onUnlocked: () => void
-}) {
-  const [pinInput, setPinInput]           = useState("")
-  const [pinToConfirm, setPinToConfirm]   = useState<string | null>(null)
-  const [vaultToken, setVaultToken]       = useState<string | null>(null)
-  const [vaultSalt, setVaultSalt]         = useState<string | null>(null)   // base64 del salt
-  const [isFirstTime, setIsFirstTime]     = useState<boolean | null>(null)
-  const [vaultError, setVaultError]       = useState<string | null>(null)
-  const [isUnlocking, setIsUnlocking]     = useState(false)
-  const [showRecovery, setShowRecovery]   = useState(false)
-  const [recoveryLoading, setRecoveryLoading] = useState(false)
-  const [recoverySuccess, setRecoverySuccess] = useState(false)
-
-  // ─── Carga del vault ────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!session) return
-
-    async function loadVault() {
-      try {
-        // Procesamos parámetros de recuperación de vault
-        const params     = new URLSearchParams(window.location.search)
-        const resetVault = params.get("reset_vault") === "1"
-        const resetToken = params.get("reset_token")
-        window.history.replaceState({}, "", window.location.pathname)
-
-        if (resetVault && resetToken) {
-          const { data: vaultCheck } = await supabase
-            .from("user_vault")
-            .select("reset_token, reset_token_expires_at")
-            .eq("user_id", session.user.id)   // explícito, no solo RLS
-            .maybeSingle()
-
-          const ahora   = new Date()
-          const tokenOk = vaultCheck?.reset_token === resetToken
-          const noExpira = vaultCheck?.reset_token_expires_at
-            && new Date(vaultCheck.reset_token_expires_at) > ahora
-
-          if (tokenOk && noExpira) {
-            await supabase
-              .from("user_vault")
-              .update({ reset_token: null, reset_token_expires_at: null })
-              .eq("user_id", session.user.id)
-            await supabase
-              .from("user_vault")
-              .delete()
-              .eq("user_id", session.user.id)
-          } else {
-            setVaultError("El enlace de recuperación ha caducado o ya fue usado.")
-          }
-        }
-
-        // Consulta explícita con user_id — no dependemos solo de RLS
-        const { data: vault, error } = await supabase
-          .from("user_vault")
-          .select("verification_token, kdf_salt")
-          .eq("user_id", session.user.id)
-          .maybeSingle()
-
-        if (error) throw error
-
-        if (vault?.verification_token) {
-          setVaultToken(vault.verification_token)
-          setVaultSalt(vault.kdf_salt ?? null)
-          setIsFirstTime(false)
-        } else {
-          setIsFirstTime(true)
-        }
-      } catch (e) {
-        console.error("loadVault error:", e)
-        setIsFirstTime(true)
-      }
-    }
-
-    loadVault()
-  }, [session])
-
-  // ─── Teclado ────────────────────────────────────────────────────────────────
-  const handleKeyPress = (num: string) => {
-    if (pinInput.length >= 6 || isUnlocking) return
-    triggerHaptic(30)
-    const newPin = pinInput + num
-    setPinInput(newPin)
-
-    if (newPin.length === 6) {
-      if (isFirstTime) {
-        if (pinToConfirm === null) {
-          setTimeout(() => { setPinToConfirm(newPin); setPinInput("") }, 250)
-        } else {
-          setTimeout(() => {
-            if (newPin === pinToConfirm) {
-              processUnlock(newPin)
-            } else {
-              triggerHaptic([50, 50, 50])
-              setVaultError("Los PINs no coinciden. Vuelve a intentarlo.")
-              setPinInput("")
-              setPinToConfirm(null)
-            }
-          }, 250)
-        }
-      } else {
-        setTimeout(() => processUnlock(newPin), 250)
-      }
-    }
-  }
-
-  const handleBackspace = () => {
-    if (isUnlocking) return
-    triggerHaptic(20)
-    setPinInput(prev => {
-      if (isFirstTime && pinToConfirm !== null && prev.length === 0) {
-        setPinToConfirm(null)
-        setVaultError(null)
-        return ""
-      }
-      return prev.slice(0, -1)
-    })
-  }
-
-  // ─── Desbloqueo / Creación de vault ─────────────────────────────────────────
-  const processUnlock = async (pin: string) => {
-    if (isUnlocking) return
-    setIsUnlocking(true)
-    setVaultError(null)
-
-    try {
-      if (isFirstTime) {
-        // Generar salt aleatorio y derivar clave
-        const saltB64    = generateSalt()
-        const saltBytes  = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0))
-        const derivedKey = await deriveKeyFromPin(pin, saltBytes)
-        const newToken   = await generateVerificationToken(derivedKey)
-
-        const { error: dbError } = await supabase
-          .from("user_vault")
-          .insert({
-            user_id:            session.user.id,
-            verification_token: newToken,
-            kdf_salt:           saltB64,
-          })
-
-        if (dbError) {
-          if (dbError.code === "23505") {
-            // Carrera: vault ya existe (raro, pero posible)
-            const { data: existing } = await supabase
-              .from("user_vault")
-              .select("verification_token, kdf_salt")
-              .eq("user_id", session.user.id)
-              .maybeSingle()
-            if (existing) {
-              setVaultToken(existing.verification_token)
-              setVaultSalt(existing.kdf_salt ?? null)
-              setIsFirstTime(false)
-              setVaultError("Ya tienes una bóveda. Introduce tu PIN original.")
-              setPinInput("")
-              setIsUnlocking(false)
-              return
-            }
-          }
-          throw new Error("No se pudo guardar la bóveda.")
-        }
-
-        saveKey(derivedKey)
-        onUnlocked()
-
-      } else if (vaultToken) {
-        if (!vaultSalt) {
-          // Vault antiguo sin salt (pre-migración) — no debería ocurrir tras el vaciado
-          throw new Error("Bóveda sin salt. Contacta con soporte o usa la recuperación.")
-        }
-
-        const saltBytes  = Uint8Array.from(atob(vaultSalt), c => c.charCodeAt(0))
-        const derivedKey = await deriveKeyFromPin(pin, saltBytes)
-        const valid      = await isKeyValid(derivedKey, vaultToken)
-
-        if (valid) {
-          saveKey(derivedKey)
-          onUnlocked()
-        } else {
-          triggerHaptic([50, 50, 50])
-          setVaultError("PIN incorrecto. Inténtalo de nuevo.")
-          setPinInput("")
-        }
-      }
-    } catch (e: unknown) {
-      console.error("processUnlock error:", e)
-      setVaultError(e instanceof Error ? e.message : "Error de seguridad. Reintenta.")
-      setPinInput("")
-    } finally {
-      setIsUnlocking(false)
-    }
-  }
-
-  // ─── Recuperación via email ──────────────────────────────────────────────────
-  const handleRecovery = async () => {
-    setRecoveryLoading(true)
-
-    const resetToken = crypto.randomUUID()
-    const expiresAt  = new Date(Date.now() + 1000 * 60 * 30).toISOString()
-
-    const { error: tokenError } = await supabase
-      .from("user_vault")
-      .update({ reset_token: resetToken, reset_token_expires_at: expiresAt })
-      .eq("user_id", session.user.id)
-
-    if (tokenError) {
-      setVaultError("Error al generar el enlace. Inténtalo más tarde.")
-      setRecoveryLoading(false)
-      return
-    }
-
-    await supabase.auth.signOut()
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email: session.user.email!,
-      options: {
-        emailRedirectTo: `${window.location.origin}/?reset_vault=1&reset_token=${resetToken}`,
-      },
-    })
-
-    setRecoveryLoading(false)
-    if (!error) setRecoverySuccess(true)
-    else setVaultError("Error al enviar el correo. Inténtalo más tarde.")
-  }
-
-  // ─── Renders ────────────────────────────────────────────────────────────────
-  if (isFirstTime === null) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-      </div>
-    )
-  }
-
-  if (showRecovery) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center py-12 px-8 text-center">
-        <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6">
-          <KeyRound className="w-6 h-6 text-emerald-400" />
-        </div>
-        <h2 className="text-xl font-bold text-zinc-100 mb-3">Recuperar acceso</h2>
-
-        {recoverySuccess ? (
-          <div className="space-y-4 max-w-xs">
-            <p className="text-zinc-400 text-sm leading-relaxed">
-              Te hemos enviado un enlace a{" "}
-              <strong className="text-zinc-200">{session.user.email}</strong>.
-            </p>
-            <p className="text-zinc-500 text-xs leading-relaxed bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              ⚠️ Al usar ese enlace podrás crear un{" "}
-              <strong>PIN nuevo</strong>, pero los movimientos cifrados con el PIN anterior
-              ya no serán legibles. Los datos de categorías y cuentas se mantienen.
-            </p>
-            <button
-              onClick={() => supabase.auth.signOut()}
-              className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4 max-w-xs">
-            <p className="text-zinc-400 text-sm leading-relaxed">
-              Si has olvidado tu PIN, podemos enviarte un enlace a{" "}
-              <strong className="text-zinc-200">{session.user.email}</strong> para crear uno nuevo.
-            </p>
-
-            {/* Advertencia ANTES del botón — visible siempre, no solo tras pulsar */}
-            <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90 text-left">
-              <strong className="font-semibold">⚠️ Importante:</strong> los movimientos
-              cifrados con tu PIN actual <strong>no podrán recuperarse</strong> con el PIN
-              nuevo. Las categorías y cuentas sí se mantienen.
-            </div>
-
-            {vaultError && (
-              <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-4 py-3">
-                {vaultError}
-              </p>
-            )}
-
-            <button
-              onClick={handleRecovery}
-              disabled={recoveryLoading}
-              className="w-full py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {recoveryLoading
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-                : "Enviar enlace de recuperación"
-              }
-            </button>
-            <button
-              onClick={() => { setShowRecovery(false); setVaultError(null) }}
-              className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
-            >
-              Volver al PIN
-            </button>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-between py-12 px-8 text-center select-none overflow-hidden">
-      <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-700">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-500 ${
-          vaultError ? "bg-red-500/10" : "bg-emerald-500/10"
-        }`}>
-          <Lock className={`w-6 h-6 ${vaultError ? "text-red-400" : "text-emerald-400"}`} />
-        </div>
-        <h2 className="text-xl font-bold text-zinc-100 uppercase tracking-widest">
-          {isFirstTime
-            ? pinToConfirm !== null ? "Confirma tu PIN" : "Crear PIN de acceso"
-            : "Desbloquear GastOS"
-          }
-        </h2>
-        <p className="text-zinc-500 text-xs max-w-[240px] mx-auto leading-relaxed">
-          {isFirstTime
-            ? pinToConfirm !== null
-              ? vaultError || "Repite los 6 dígitos para confirmar."
-              : "Elige 6 dígitos para proteger tus finanzas. Podrás recuperar el acceso via email si lo olvidas."
-            : vaultError || "Introduce tu PIN de 6 dígitos."
-          }
-        </p>
-      </div>
-
-      {/* Indicadores de dígitos */}
-      <div className="flex gap-4 my-10" aria-label="PIN introducido" aria-live="polite">
-        {[...Array(6)].map((_, i) => (
-          <div
-            key={i}
-            className={`w-3 h-3 rounded-full border-2 transition-all duration-300 ${
-              i < pinInput.length
-                ? "bg-emerald-500 border-emerald-500 scale-125 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                : "border-zinc-800 bg-transparent"
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* Teclado numérico */}
-      <div className="grid grid-cols-3 gap-x-8 gap-y-6 max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
-        {["1","2","3","4","5","6","7","8","9"].map(num => (
-          <button
-            key={num}
-            onClick={() => handleKeyPress(num)}
-            disabled={isUnlocking}
-            aria-label={num}
-            className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 active:scale-90 transition-all flex items-center justify-center tabular-nums shadow-sm"
-          >
-            {num}
-          </button>
-        ))}
-        <div className="w-20 h-20" />
-        <button
-          onClick={() => handleKeyPress("0")}
-          disabled={isUnlocking}
-          aria-label="0"
-          className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 transition-all flex items-center justify-center tabular-nums"
-        >
-          0
-        </button>
-        <button
-          onClick={handleBackspace}
-          disabled={isUnlocking || pinInput.length === 0}
-          aria-label="Borrar dígito"
-          className="w-20 h-20 rounded-full flex items-center justify-center text-zinc-600 hover:text-red-400 active:scale-75 transition-all"
-        >
-          <Delete className="w-7 h-7" />
-        </button>
-      </div>
-
-      <div className="mt-8 flex flex-col items-center gap-4">
-        <EncryptionBadge />
-        {!isFirstTime && (
-          <button
-            onClick={() => setShowRecovery(true)}
-            className="text-[10px] text-zinc-600 uppercase tracking-[0.15em] hover:text-zinc-400 transition-colors"
-          >
-            ¿Olvidaste tu PIN?
-          </button>
-        )}
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="text-[10px] text-zinc-700 uppercase tracking-[0.2em] hover:text-zinc-500 transition-colors"
-        >
-          Cerrar Sesión
-        </button>
-      </div>
-
-      {isUnlocking && (
-        <div className="absolute inset-0 bg-zinc-950/60 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-        </div>
-      )}
-    </div>
-  )
-}
-</file>
 
 <file path=".gitignore">
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
@@ -574,186 +137,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 </file>
 
-<file path="app/api/feedback/route.ts">
-import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
-import { createClient } from '@supabase/supabase-js';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Cliente de Supabase con la service role key para verificar sesiones server-side.
-// La anon key no es suficiente para verificar tokens de usuario en el servidor.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
-
-export async function POST(request: Request) {
-  try {
-    // Verificar que la petición viene de un usuario autenticado
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 })
-    }
-
-    const body = await request.json();
-    const { tipo, mensaje } = body;
-
-    if (!mensaje) {
-      return NextResponse.json({ error: "El mensaje está vacío" }, { status: 400 });
-    }
-
-    const { data, error } = await resend.emails.send({
-      from: 'GastOS App <soporte@angeljoan.com>',
-      to: 'ajgamundi@gmail.com',
-      subject: `[GastOS ${tipo}] Nuevo ticket recibido`,
-      html: `
-        <div style="font-family: sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: ${tipo === 'Bug' ? '#ef4444' : '#10b981'};">
-            Nuevo ticket de tipo: ${tipo}
-          </h2>
-          <p><strong>Usuario ID:</strong> ${user.id}</p>
-          <p><strong>Email:</strong> ${user.email}</p>
-          <hr style="border: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 16px; line-height: 1.5;">${mensaje}</p>
-        </div>
-      `,
-    });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ success: true, data });
-  } catch (error) {
-    console.error('Feedback route error:', error)
-    return NextResponse.json({ error: "Hubo un error en el servidor" }, { status: 500 });
-  }
-}
-</file>
-
 <file path="CLAUDE.md">
 @AGENTS.md
-</file>
-
-<file path="components/ui/Encryptionbadge.tsx">
-"use client"
-
-import { useState, useEffect, useRef } from "react"
-import { createPortal } from "react-dom"
-import { ShieldCheck, X } from "lucide-react"
-
-export default function EncryptionBadge() {
-  const [showInfo, setShowInfo]   = useState(false)
-  const [mounted,  setMounted]    = useState(false)
-
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
-  const triggerRef     = useRef<HTMLButtonElement>(null)
-
-  // Necesario para que createPortal funcione en SSR (Next.js)
-  useEffect(() => { setMounted(true) }, [])
-
-  useEffect(() => {
-    if (showInfo) {
-      const t = setTimeout(() => closeButtonRef.current?.focus(), 50)
-      return () => clearTimeout(t)
-    } else {
-      triggerRef.current?.focus()
-    }
-  }, [showInfo])
-
-  useEffect(() => {
-    if (!showInfo) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowInfo(false)
-    }
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [showInfo])
-
-  const modal = (
-    <div
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="e2ee-dialog-title"
-    >
-      <div
-        className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
-        onClick={() => setShowInfo(false)}
-        aria-hidden="true"
-      />
-      <div className="relative w-full sm:max-w-sm bg-zinc-900 border border-zinc-800/70 rounded-t-3xl sm:rounded-3xl p-6 animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-4 duration-300">
-        <div className="flex items-start justify-between mb-4">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" aria-hidden="true" />
-          </div>
-          <button
-            ref={closeButtonRef}
-            onClick={() => setShowInfo(false)}
-            aria-label="Cerrar información de seguridad"
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
-          >
-            <X className="w-4 h-4 text-zinc-500" aria-hidden="true" />
-          </button>
-        </div>
-
-        <h3 id="e2ee-dialog-title" className="text-base font-semibold text-zinc-100 mb-2">
-          Encriptación de extremo a extremo
-        </h3>
-
-        <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
-          <p>
-            Tus cantidades y notas se encriptan con una clave derivada de tu PIN
-            personal antes de salir de tu dispositivo.
-          </p>
-          <p>
-            Ni el servidor, ni los administradores, ni nadie que acceda a la base de
-            datos puede leer tus datos financieros. Solo tu PIN los desbloquea.
-          </p>
-          <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90">
-            <strong className="font-semibold">Importante:</strong> Si pierdes tu PIN,
-            no es posible recuperar tus datos encriptados. Guárdalo en un lugar seguro.
-          </div>
-        </div>
-
-        <button
-          onClick={() => setShowInfo(false)}
-          className="w-full mt-5 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
-        >
-          Entendido
-        </button>
-      </div>
-    </div>
-  )
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        onClick={() => setShowInfo(true)}
-        aria-label="Ver información de seguridad E2EE"
-        aria-haspopup="dialog"
-        className="flex items-center gap-1.5 text-zinc-700 hover:text-zinc-500 transition-colors opacity-60 hover:opacity-100"
-      >
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" aria-hidden="true" />
-        <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-        <span className="text-[10px] font-medium tracking-wide hidden sm:inline">E2EE</span>
-      </button>
-
-      {/* Portal: el modal se monta directamente en document.body,
-          fuera del stacking context del header */}
-      {mounted && showInfo && createPortal(modal, document.body)}
-    </>
-  )
-}
 </file>
 
 <file path="eslint.config.mjs">
@@ -775,225 +160,6 @@ const eslintConfig = defineConfig([
 ]);
 
 export default eslintConfig;
-</file>
-
-<file path="lib/crypto.ts">
-// lib/crypto.ts
-// ─── Capa de Encriptación E2EE de GastOS ─────────────────────────────────────
-//
-// CONTRATO:
-//   encryptData(valor)  → string cifrado listo para guardar en Supabase
-//   decryptData(cipher) → string en claro listo para usar en UI
-//
-// ARQUITECTURA:
-//   - Web Crypto API nativa del navegador (sin CryptoJS)
-//   - PBKDF2-SHA256 con 300.000 iteraciones
-//   - AES-GCM (cifrado autenticado — detecta manipulación del ciphertext)
-//   - Salt aleatorio de 16 bytes, generado al crear el vault, guardado en BD
-//   - CryptoKey guardada en memoria del módulo (nunca serializada, se pierde al cerrar pestaña)
-//
-// REGLA DE ORO:
-//   - Nunca guardar en Supabase sin pasar por encryptData()
-//   - Nunca mostrar en UI sin pasar por decryptData()
-//   - Los objetos en el estado React siempre están en CLARO
-
-// ─── Estado interno del módulo ────────────────────────────────────────────────
-// La CryptoKey nativa vive aquí. No se exporta, no va a sessionStorage.
-// Se pierde al cerrar la pestaña → el usuario debe introducir el PIN de nuevo.
-let _masterKey: CryptoKey | null = null
-
-const STORAGE_KEY       = 'gastos_master_vault_key_v2'  // versión nueva, no colisiona con CryptoJS
-const VERIFICATION_TEXT = 'GASTOS_VALID_V2'
-
-// ─── Generación de salt ───────────────────────────────────────────────────────
-// Llamar una sola vez al crear el vault. Devuelve base64 para guardar en BD.
-export function generateSalt(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return btoa(String.fromCharCode(...bytes))
-}
-
-function saltFromBase64(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-}
-
-// ─── Derivación de clave ──────────────────────────────────────────────────────
-// salt: Uint8Array generado con generateSalt() y recuperado de BD.
-// Devuelve una CryptoKey AES-GCM lista para usar.
-export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<CryptoKey> {
-  const enc = new TextEncoder()
-
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(pin),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey'],
-  )
-
-  // Copia con buffer propio: TS infiere Uint8Array<ArrayBufferLike> y no encaja con BufferSource de subtle.
-  const saltBytes = new Uint8Array(salt)
-
-  return crypto.subtle.deriveKey(
-    {
-      name:       'PBKDF2',
-      salt:       saltBytes,
-      iterations: 300_000,
-      hash:       'SHA-256',
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,          // no exportable
-    ['encrypt', 'decrypt'],
-  )
-}
-
-// ─── Gestión de la clave maestra en sesión ────────────────────────────────────
-// saveKey: recibe la CryptoKey derivada y la guarda en el módulo.
-// También guarda un flag en sessionStorage para saber si la sesión está activa
-// (la CryptoKey en sí NO se puede serializar — solo el flag).
-export function saveKey(key: CryptoKey): void {
-  _masterKey = key
-  if (typeof window !== 'undefined') {
-    sessionStorage.setItem(STORAGE_KEY, '1')
-  }
-}
-
-export function getMasterKey(): CryptoKey | null {
-  return _masterKey
-}
-
-// Indica si hay una sesión activa (flag en sessionStorage + key en memoria).
-// En recarga de pestaña: sessionStorage tiene '1' pero _masterKey es null → false.
-export function hasActiveSession(): boolean {
-  if (typeof window === 'undefined') return false
-  return _masterKey !== null && sessionStorage.getItem(STORAGE_KEY) === '1'
-}
-
-export function clearKey(): void {
-  _masterKey = null
-  if (typeof window !== 'undefined') {
-    sessionStorage.removeItem(STORAGE_KEY)
-  }
-}
-
-// ─── Verificación de vault ────────────────────────────────────────────────────
-// Cifra el texto de verificación con la clave derivada.
-// El token resultante se guarda en BD y permite verificar el PIN sin guardar la clave.
-export async function generateVerificationToken(key: CryptoKey): Promise<string> {
-  const enc = new TextEncoder()
-  const iv  = crypto.getRandomValues(new Uint8Array(12))
-
-  const cipherBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    enc.encode(VERIFICATION_TEXT),
-  )
-
-  // Formato: base64(iv) + '.' + base64(ciphertext)
-  const ivB64   = btoa(String.fromCharCode(...iv))
-  const ctB64   = btoa(String.fromCharCode(...new Uint8Array(cipherBuffer)))
-  return `${ivB64}.${ctB64}`
-}
-
-export async function isKeyValid(key: CryptoKey, tokenFromDB: string): Promise<boolean> {
-  try {
-    const [ivB64, ctB64] = tokenFromDB.split('.')
-    if (!ivB64 || !ctB64) return false
-
-    const iv         = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
-    const ciphertext = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
-
-    const plainBuffer = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      ciphertext,
-    )
-
-    const dec = new TextDecoder()
-    return dec.decode(plainBuffer) === VERIFICATION_TEXT
-  } catch {
-    return false
-  }
-}
-
-// ─── Cifrado / Descifrado de datos ────────────────────────────────────────────
-//
-// encryptData: acepta string o number, devuelve string cifrado (base64 iv + '.' + base64 ct).
-//   Si no hay clave disponible o el valor es vacío, devuelve '' (fallo silencioso).
-//   SÍNCRONO hacia fuera: usa _masterKey en memoria. Internamente lanza una
-//   micro-task via un truco de sincronización — ver nota abajo.
-//
-// NOTA TÉCNICA: Web Crypto API es async, pero queremos mantener la API síncrona
-// para no tener que convertir en async todos los handlers de IngresoTab, HistorialTab, etc.
-// La solución: usamos XMLHttpRequest síncrono vacío para "drenar" la microtask queue,
-// lo que no es posible en workers pero sí en el main thread de un navegador moderno.
-// Alternativa más limpia si en el futuro se quiere refactorizar: hacer encryptData async
-// y usar Promise.all en los inserts de Supabase.
-//
-// IMPLEMENTACIÓN REAL: dado que XMLHttpRequest síncrono está deprecated y causa
-// warnings, usamos una aproximación diferente: encryptData y decryptData son en
-// realidad async internamente pero exponemos versiones síncronas que operan sobre
-// un buffer de resultados pre-calculados. Esto no es viable en el navegador.
-//
-// DECISIÓN FINAL: mantenemos encryptData/decryptData como funciones que devuelven
-// string directamente usando una implementación XOR+base64 como fallback NO — 
-// La solución correcta es: hacerlas async. El impacto en cascada es mínimo
-// porque los únicos sitios donde se llaman son dentro de funciones async
-// (handleGuardar, handleImport, handleCobrarSub, etc.) que ya usan await.
-// Solo hay que añadir await delante de encryptData/decryptData en esos sitios.
-//
-// Los componentes afectados son: IngresoTab, HistorialTab, CuentasModal,
-// ImportCSVModal, DashboardTab, page.tsx — todos ya tienen funciones async.
-
-export async function encryptData(text: string | number): Promise<string> {
-  const key = _masterKey
-  if (!key || text === null || text === undefined || text === '') return ''
-
-  const enc = new TextEncoder()
-  const iv  = crypto.getRandomValues(new Uint8Array(12))
-
-  const cipherBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    enc.encode(text.toString()),
-  )
-
-  const ivB64 = btoa(String.fromCharCode(...iv))
-  const ctB64 = btoa(String.fromCharCode(...new Uint8Array(cipherBuffer)))
-  return `${ivB64}.${ctB64}`
-}
-
-export async function decryptData(cipherText: string | number): Promise<string> {
-  const key = _masterKey
-  if (!key || cipherText === null || cipherText === undefined || cipherText === '') return ''
-
-  const textString = cipherText.toString()
-
-  // Datos legacy de CryptoJS (prefijo antiguo) o datos en claro: devolver tal cual.
-  // Tras el vaciado de BD esto no debería aparecer, pero lo mantenemos como guardia.
-  if (!textString.includes('.') || textString.startsWith('U2FsdGVkX1')) {
-    return textString
-  }
-
-  try {
-    const [ivB64, ctB64] = textString.split('.')
-    if (!ivB64 || !ctB64) return textString
-
-    const iv         = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
-    const ciphertext = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
-
-    const plainBuffer = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      ciphertext,
-    )
-
-    return new TextDecoder().decode(plainBuffer)
-  } catch {
-    // AES-GCM falla si el ciphertext fue manipulado → devolvemos vacío, no el cifrado
-    return ''
-  }
-}
 </file>
 
 <file path="lib/icons.ts">
@@ -1043,64 +209,6 @@ export const CATEGORIA_ICON_OPTIONS: string[] = [
 ]
 </file>
 
-<file path="next.config.ts">
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            // Evita que la app se cargue en iframes (clickjacking)
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            // Evita que el navegador "adivine" el tipo de contenido
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            // No enviar la URL completa como Referer a terceros
-            // Importante para que el reset_token no aparezca en logs externos
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            // Restringe el acceso a APIs de hardware sensibles
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-          {
-            // Content Security Policy:
-            // - default-src 'self': solo recursos del propio dominio
-            // - script-src: permite scripts propios + inline (Next.js los necesita) + cdnjs para recharts
-            // - connect-src: permite llamadas a Supabase y Resend
-            // - style-src: permite estilos propios e inline (Tailwind los necesita)
-            // - img-src: permite imágenes propias y data URIs
-            // Ajusta los dominios de connect-src si cambias de proveedor
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval necesario para Next.js dev; en prod puedes quitarlo
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co https://api.resend.com",
-              "frame-ancestors 'none'",
-            ].join("; "),
-          },
-        ],
-      },
-    ];
-  },
-};
-
-export default nextConfig;
-</file>
-
 <file path="postcss.config.mjs">
 const config = {
   plugins: {
@@ -1109,6 +217,16 @@ const config = {
 };
 
 export default config;
+</file>
+
+<file path="public/.well-known/assetlinks.json">
+[{
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "web",
+      "site": "https://gastos.angeljoan.com"
+    }
+  }]
 </file>
 
 <file path="public/file.svg">
@@ -1207,6 +325,208 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 }
 </file>
 
+<file path="app/api/feedback/route.ts">
+import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Cliente de Supabase con la service role key para verificar sesiones server-side.
+// La anon key no es suficiente para verificar tokens de usuario en el servidor.
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
+
+export async function POST(request: Request) {
+  try {
+    // Verificar que la petición viene de un usuario autenticado
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 })
+    }
+
+    const body = await request.json();
+    const { tipo, mensaje } = body;
+
+    if (!mensaje) {
+      return NextResponse.json({ error: "El mensaje está vacío" }, { status: 400 });
+    }
+
+    const esc = (s: string) => String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+    const safeMsg  = esc(mensaje)
+    const safeTipo = esc(tipo ?? '')
+
+    const { data, error } = await resend.emails.send({
+      from: 'GastOS App <soporte@angeljoan.com>',
+      to: 'ajgamundi@gmail.com',
+      subject: `[GastOS ${tipo}] Nuevo ticket recibido`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: ${safeTipo === 'Bug' ? '#ef4444' : '#10b981'};">
+            Nuevo ticket de tipo: ${safeTipo}
+          </h2>
+          <p><strong>Usuario ID:</strong> ${user.id}</p>
+          <p><strong>Email:</strong> ${user.email}</p>
+          <hr style="border: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 16px; line-height: 1.5;">${safeMsg}</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    console.error('Feedback route error:', error)
+    return NextResponse.json({ error: "Hubo un error en el servidor" }, { status: 500 });
+  }
+}
+</file>
+
+<file path="components/ui/Encryptionbadge.tsx">
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
+import { ShieldCheck, X } from "lucide-react"
+
+export default function EncryptionBadge() {
+  const [showInfo, setShowInfo]   = useState(false)
+  const [mounted,  setMounted]    = useState(false)
+
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const triggerRef     = useRef<HTMLButtonElement>(null)
+
+  // Necesario para que createPortal funcione en SSR (Next.js)
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    if (showInfo) {
+      const t = setTimeout(() => closeButtonRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    } else {
+      triggerRef.current?.focus()
+    }
+  }, [showInfo])
+
+  useEffect(() => {
+    if (!showInfo) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowInfo(false)
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [showInfo])
+
+  const modal = (
+    <div
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="e2ee-dialog-title"
+    >
+      <div
+        className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
+        onClick={() => setShowInfo(false)}
+        aria-hidden="true"
+      />
+      <div className="relative w-full sm:max-w-sm bg-zinc-900 border border-zinc-800/70 rounded-t-3xl sm:rounded-3xl p-6 animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-4 duration-300">
+        <div className="flex items-start justify-between mb-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <ShieldCheck className="w-5 h-5 text-emerald-400" aria-hidden="true" />
+          </div>
+          <button
+            ref={closeButtonRef}
+            onClick={() => setShowInfo(false)}
+            aria-label="Cerrar información de seguridad"
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-4 h-4 text-zinc-500" aria-hidden="true" />
+          </button>
+        </div>
+
+        <h3 id="e2ee-dialog-title" className="text-base font-semibold text-zinc-100 mb-2">
+          Encriptación de extremo a extremo
+        </h3>
+
+        <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
+          <p>
+            Tu PIN genera una clave criptográfica que nunca sale de tu dispositivo.
+            Cantidades, notas, nombres de cuentas y presupuestos se cifran con ella
+            antes de enviarse al servidor.
+          </p>
+          <p>
+            Ni el servidor, ni los administradores, ni nadie con acceso a la base de
+            datos puede leer tus datos financieros. Solo tu PIN los descifra.
+          </p>
+          <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90">
+            <strong className="font-semibold">Importante:</strong> Si pierdes tu PIN,
+            tus datos cifrados son irrecuperables. Guárdalo en un lugar seguro.
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowInfo(false)}
+          className="w-full mt-5 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
+        >
+          Entendido
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={() => setShowInfo(true)}
+        aria-label="Ver información de seguridad E2EE"
+        aria-haspopup="dialog"
+        className="flex items-center gap-1.5 text-zinc-700 hover:text-zinc-500 transition-colors opacity-60 hover:opacity-100"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" aria-hidden="true" />
+        <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+        <span className="text-[10px] font-medium tracking-wide hidden sm:inline">E2EE</span>
+      </button>
+
+      {/* Portal: el modal se monta directamente en document.body,
+          fuera del stacking context del header */}
+      {mounted && showInfo && createPortal(modal, document.body)}
+    </>
+  )
+}
+</file>
+
+<file path="lib/supabase.ts">
+// lib/supabase.ts
+// ─── Singleton de Supabase ────────────────────────────────────────────────────
+// IMPORTANTE: Este es el ÚNICO lugar donde se crea el cliente de Supabase.
+// Todos los componentes deben importar desde aquí.
+// reset-password/page.tsx tenía su propia instancia — BUG #7 corregido.
+ 
+import { createClient } from "@supabase/supabase-js"
+ 
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+</file>
+
 <file path="app/globals.css">
 /* app/globals.css */
 /* ─── Fixes en este archivo ──────────────────────────────────────────────────
@@ -1254,6 +574,891 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
     70%   { transform: translateX(calc(-100% + 70px)); }
     100%  { transform: translateX(calc(-100% + 70px)); }
   }
+</file>
+
+<file path="app/manifest.ts">
+// app/manifest.ts
+// ─── Fixes en este archivo ────────────────────────────────────────────────────
+// BUG #25: El mismo archivo icon.png se declaraba tres veces con tamaños
+//          inconsistentes (192×2 y 512), y dos entradas tenían el mismo
+//          purpose="any". Android e iOS usaban el icono escalado con pérdida.
+//
+//          FIX: declaramos tres entradas semánticamente distintas:
+//            1. 192×192 any        → icono estándar para pantallas normales
+//            2. 512×512 any        → icono HD para splash screen y instalación
+//               (si tienes un icon-512.png aparte, úsalo aquí; si no, icon.png)
+//            3. 192×192 maskable   → icono adaptable para fondos de Android
+//
+//          Si solo tienes un archivo de icono, no pasa nada — el navegador
+//          escala el de 512 para el uso de 192 mejor que al revés.
+//          Lo ideal es tener icon-192.png e icon-512.png separados.
+
+import { MetadataRoute } from "next"
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name:             "GastOS - Tu dinero, bajo control",
+    short_name:       "GastOS",
+    description:      "Registro personal y seguro para el control diario de tus finanzas.",
+    start_url:        "/",
+    display:          "standalone",
+    orientation:      "portrait",
+    background_color: "#000000",
+    theme_color:      "#09090b",
+    lang:             "es",
+    id:               "/",
+    scope:            "/",
+    icons: [
+      {
+        // Icono estándar para uso general (launcher, notificaciones)
+        src:     "/icon.png",
+        sizes:   "192x192",
+        type:    "image/png",
+        purpose: "any",
+      },
+      {
+        // Icono de alta resolución para splash screen e instalación PWA
+        // Si tienes un icon-512.png de mayor resolución, cámbialo aquí
+        src:     "/icon.png",
+        sizes:   "512x512",
+        type:    "image/png",
+        purpose: "any",
+      },
+      {
+        // Icono maskable: Android lo recorta con máscara circular/redondeada.
+        // El contenido importante debe estar en el 80% central del icono.
+        src:     "/icon.png",
+        sizes:   "192x192",
+        type:    "image/png",
+        purpose: "maskable",
+      },
+    ],
+  }
+}
+</file>
+
+<file path="components/auth/AuthScreen.tsx">
+"use client"
+
+// components/auth/AuthScreen.tsx
+// ─── Fixes en este archivo ────────────────────────────────────────────────────
+// BUG #16: Los labels del formulario usaban text-zinc-400 sobre bg-zinc-900,
+//          generando un contraste ~3:1 para texto de 10px — por debajo del
+//          mínimo WCAG AA (4.5:1 para texto pequeño).
+//          FIX: subimos a text-zinc-300 y aumentamos el tamaño a text-xs (12px)
+//          con tracking normal. También añadimos htmlFor en cada label para
+//          asociarlos correctamente con su input.
+
+import { useState } from "react"
+import { supabase } from "@/lib/supabase"
+import { Loader2 } from "lucide-react"
+
+export default function AuthScreen() {
+  const [email,              setEmail]              = useState("")
+  const [password,           setPassword]           = useState("")
+  const [confirmPassword,    setConfirmPassword]    = useState("")
+  const [isLogin,            setIsLogin]            = useState(true)
+  const [isResettingPassword,setIsResettingPassword]= useState(false)
+  const [loading,            setLoading]            = useState(false)
+  const [error,              setError]              = useState<string | null>(null)
+  const [success,            setSuccess]            = useState<string | null>(null)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    setLoading(true)
+
+    if (!isLogin) {
+      if (password !== confirmPassword) {
+        setError("Las contraseñas no coinciden.")
+        setLoading(false)
+        return
+      }
+      const tieneLetras  = /[a-zA-Z]/.test(password)
+      const tieneNumeros = /[0-9]/.test(password)
+      if (password.length < 8 || !tieneLetras || !tieneNumeros) {
+        setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+        setLoading(false)
+        return
+      }
+    }
+
+    if (isLogin) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setError("No hemos podido iniciar sesión. Verifica que el correo y la contraseña sean correctos, o crea una cuenta si aún no tienes una.")
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password })
+      if (error) setError(error.message)
+      else setSuccess("Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
+    }
+
+    setLoading(false)
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email) {
+      setError("Por favor, introduce tu correo electrónico.")
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+
+    if (error) setError(error.message)
+    else setSuccess("Te hemos enviado un enlace para recuperar tu contraseña. Revisa tu bandeja de entrada.")
+    setLoading(false)
+  }
+
+  const resetModeState = () => {
+    setError(null)
+    setSuccess(null)
+    setConfirmPassword("")
+    setPassword("")
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
+
+        {/* Logo + título */}
+        <div className="flex flex-col items-center mb-10">
+          <div className="mb-4">
+            <img
+              src="/icon.png"
+              alt="Logo GastOS"
+              className="w-20 h-20 rounded-3xl shadow-lg shadow-emerald-400/30"
+            />
+          </div>
+          <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">GastOS</h1>
+          <p className="text-sm text-zinc-400 mt-1">Registro de gastos personal</p>
+        </div>
+
+        {/* Tabs login / registro — ocultos en modo recuperación */}
+        {!isResettingPassword && (
+          <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800" role="tablist">
+            <button
+              role="tab"
+              aria-selected={isLogin}
+              onClick={() => { setIsLogin(true);  resetModeState() }}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                isLogin
+                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Iniciar Sesión
+            </button>
+            <button
+              role="tab"
+              aria-selected={!isLogin}
+              onClick={() => { setIsLogin(false); resetModeState() }}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                !isLogin
+                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Registrarse
+            </button>
+          </div>
+        )}
+
+        {/* Formulario */}
+        <form
+          onSubmit={isResettingPassword ? handleResetPassword : handleSubmit}
+          className="space-y-4"
+          aria-label={
+            isResettingPassword
+              ? "Formulario de recuperación de contraseña"
+              : isLogin
+              ? "Formulario de inicio de sesión"
+              : "Formulario de registro"
+          }
+        >
+          {/* BUG #16 FIX: label con contraste suficiente (text-zinc-300, text-xs)
+              y htmlFor vinculado al id del input correspondiente */}
+          <div>
+            <label
+              htmlFor="auth-email"
+              className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
+            >
+              Correo electrónico
+            </label>
+            <input
+              id="auth-email"
+              type="email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              autoComplete="email"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+            />
+          </div>
+
+          {!isResettingPassword && (
+            <>
+              <div>
+                <label
+                  htmlFor="auth-password"
+                  className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
+                >
+                  Contraseña
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                />
+              </div>
+
+              {isLogin && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setIsResettingPassword(true); resetModeState() }}
+                    className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors"
+                  >
+                    ¿Has olvidado tu contraseña?
+                  </button>
+                </div>
+              )}
+
+              {!isLogin && (
+                <div className="animate-in fade-in duration-300">
+                  <label
+                    htmlFor="auth-confirm-password"
+                    className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
+                  >
+                    Confirmar contraseña
+                  </label>
+                  <input
+                    id="auth-confirm-password"
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {error && (
+            <div role="alert" className="bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div role="status" className="bg-emerald-950/50 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">
+              {success}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+            {isResettingPassword
+              ? "Enviar enlace"
+              : isLogin
+              ? "Entrar"
+              : "Crear cuenta"
+            }
+          </button>
+
+          {isResettingPassword && (
+            <button
+              type="button"
+              onClick={() => { setIsResettingPassword(false); resetModeState() }}
+              className="w-full text-sm text-zinc-400 hover:text-zinc-200 transition-colors py-2"
+            >
+              Volver a Iniciar Sesión
+            </button>
+          )}
+        </form>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="components/auth/PinPadScreen.tsx">
+"use client"
+
+// components/auth/PinPadScreen.tsx
+// Extraído de app/page.tsx para mejorar legibilidad.
+//
+// Cambios respecto a la versión original en page.tsx:
+//   - PBKDF2 con salt aleatorio: lee kdf_salt de user_vault, lo genera si es primera vez
+//   - deriveKeyFromPin ahora recibe Uint8Array salt (no lo deriva del userId)
+//   - generateVerificationToken e isKeyValid son async → se usa await
+//   - Vault query incluye .eq("user_id", ...) explícito (no solo confiamos en RLS)
+//   - handleCobrarSub: insert con created_at calculado en un solo paso, sin UPDATE posterior
+//   - console.log eliminados, se mantienen console.error en catch
+//   - Advertencia de pérdida de datos en recuperación visible ANTES del botón de envío
+
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { Loader2, Lock, Delete, KeyRound } from "lucide-react"
+import type { Session } from "@supabase/supabase-js"
+import EncryptionBadge from "@/components/ui/Encryptionbadge"
+import {
+    deriveKeyFromPin,
+    saveKey,
+    generateSalt,
+    generateVerificationToken,
+    isKeyValid,
+    isBiometricAvailable,
+    hasBiometricKey,
+    loadBiometricKey,
+    saveBiometricKey,
+    clearBiometricKey,
+  } from "@/lib/crypto"
+
+function triggerHaptic(duration?: number | number[]) {
+  if (!navigator.vibrate) return
+  if (Array.isArray(duration)) navigator.vibrate(duration)
+  else navigator.vibrate(duration ?? 30)
+}
+
+export default function PinPadScreen({
+  session,
+  onUnlocked,
+}: {
+  session: Session
+  onUnlocked: () => void
+}) {
+  const [pinInput, setPinInput]           = useState("")
+  const [pinToConfirm, setPinToConfirm]   = useState<string | null>(null)
+  const [vaultToken, setVaultToken]       = useState<string | null>(null)
+  const [vaultSalt, setVaultSalt]         = useState<string | null>(null)   // base64 del salt
+  const [isFirstTime, setIsFirstTime]     = useState<boolean | null>(null)
+  const [vaultError, setVaultError]       = useState<string | null>(null)
+  const [isUnlocking, setIsUnlocking]     = useState(false)
+  const [showRecovery, setShowRecovery]   = useState(false)
+  const [recoveryLoading, setRecoveryLoading] = useState(false)
+  const [recoverySuccess, setRecoverySuccess]   = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricEnabled, setBiometricEnabled]     = useState(false)
+  const [biometricLoading, setBiometricLoading]     = useState(false)
+  const [showBiometricOffer, setShowBiometricOffer] = useState(false)
+  const [biometricError, setBiometricError]         = useState<string | null>(null)
+
+  // ─── Carga del vault ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!session) return
+
+    async function loadVault() {
+      try {
+        // Procesamos parámetros de recuperación de vault
+        const params     = new URLSearchParams(window.location.search)
+        const resetVault = params.get("reset_vault") === "1"
+        const resetToken = params.get("reset_token")
+        window.history.replaceState({}, "", window.location.pathname)
+
+        if (resetVault && resetToken) {
+          const { data: vaultCheck } = await supabase
+            .from("user_vault")
+            .select("reset_token, reset_token_expires_at")
+            .eq("user_id", session.user.id)   // explícito, no solo RLS
+            .maybeSingle()
+
+          const ahora   = new Date()
+          const tokenOk = vaultCheck?.reset_token === resetToken
+          const noExpira = vaultCheck?.reset_token_expires_at
+            && new Date(vaultCheck.reset_token_expires_at) > ahora
+
+            if (tokenOk && noExpira) {
+                await supabase
+                  .from("user_vault")
+                  .update({ reset_token: null, reset_token_expires_at: null })
+                  .eq("user_id", session.user.id)
+              } else {
+            setVaultError("El enlace de recuperación ha caducado o ya fue usado.")
+          }
+        }
+
+        // Consulta explícita con user_id — no dependemos solo de RLS
+        const { data: vault, error } = await supabase
+          .from("user_vault")
+          .select("verification_token, kdf_salt")
+          .eq("user_id", session.user.id)
+          .maybeSingle()
+
+        if (error) throw error
+
+        if (vault?.verification_token) {
+          setVaultToken(vault.verification_token)
+          setVaultSalt(vault.kdf_salt ?? null)
+          setIsFirstTime(false)
+        } else {
+          setIsFirstTime(true)
+        }
+      } catch (e) {
+        console.error("loadVault error:", e)
+        setIsFirstTime(true)
+      }
+    }
+
+    loadVault()
+
+    // Comprobar soporte biométrico
+    isBiometricAvailable().then(available => {
+      setBiometricAvailable(available)
+      setBiometricEnabled(hasBiometricKey())
+    })
+  }, [session])
+
+  // ─── Intento biométrico automático ──────────────────────────────────────────
+  useEffect(() => {
+    if (isFirstTime !== false) return   // solo si vault ya existe
+    if (!hasBiometricKey()) return      // solo si biometría activada
+
+    async function tryBiometric() {
+      setBiometricLoading(true)
+      const ok = await loadBiometricKey(session.user.id)
+      setBiometricLoading(false)
+      if (ok) onUnlocked()
+      // si falla, simplemente muestra el PIN — no hacer nada más
+    }
+
+    tryBiometric()
+  }, [isFirstTime, session.user.id, onUnlocked])
+
+  // ─── Teclado ────────────────────────────────────────────────────────────────
+  const handleKeyPress = (num: string) => {
+    if (pinInput.length >= 6 || isUnlocking) return
+    triggerHaptic(30)
+    const newPin = pinInput + num
+    setPinInput(newPin)
+
+    if (newPin.length === 6) {
+      if (isFirstTime) {
+        if (pinToConfirm === null) {
+          setTimeout(() => { setPinToConfirm(newPin); setPinInput("") }, 250)
+        } else {
+          setTimeout(() => {
+            if (newPin === pinToConfirm) {
+              processUnlock(newPin)
+            } else {
+              triggerHaptic([50, 50, 50])
+              setVaultError("Los PINs no coinciden. Vuelve a intentarlo.")
+              setPinInput("")
+              setPinToConfirm(null)
+            }
+          }, 250)
+        }
+      } else {
+        setTimeout(() => processUnlock(newPin), 250)
+      }
+    }
+  }
+
+  const handleBackspace = () => {
+    if (isUnlocking) return
+    triggerHaptic(20)
+    setPinInput(prev => {
+      if (isFirstTime && pinToConfirm !== null && prev.length === 0) {
+        setPinToConfirm(null)
+        setVaultError(null)
+        return ""
+      }
+      return prev.slice(0, -1)
+    })
+  }
+
+  // ─── Desbloqueo / Creación de vault ─────────────────────────────────────────
+  const processUnlock = async (pin: string) => {
+    if (isUnlocking) return
+    setIsUnlocking(true)
+    setVaultError(null)
+
+    try {
+      if (isFirstTime) {
+        // Generar salt aleatorio y derivar clave
+        const saltB64    = generateSalt()
+        const saltBytes  = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0))
+        const derivedKey = await deriveKeyFromPin(pin, saltBytes)
+        const newToken   = await generateVerificationToken(derivedKey)
+
+        await supabase
+          .from("user_vault")
+          .delete()
+          .eq("user_id", session.user.id)
+
+        const { error: dbError } = await supabase
+          .from("user_vault")
+          .insert({
+            user_id:            session.user.id,
+            verification_token: newToken,
+            kdf_salt:           saltB64,
+          })
+
+        if (dbError) {
+          if (dbError.code === "23505") {
+            // Carrera: vault ya existe (raro, pero posible)
+            const { data: existing } = await supabase
+              .from("user_vault")
+              .select("verification_token, kdf_salt")
+              .eq("user_id", session.user.id)
+              .maybeSingle()
+            if (existing) {
+              setVaultToken(existing.verification_token)
+              setVaultSalt(existing.kdf_salt ?? null)
+              setIsFirstTime(false)
+              setVaultError("Ya tienes una bóveda. Introduce tu PIN original.")
+              setPinInput("")
+              setIsUnlocking(false)
+              return
+            }
+          }
+          throw new Error("No se pudo guardar la bóveda.")
+        }
+
+        saveKey(derivedKey)
+        if (biometricAvailable && !biometricEnabled) {
+          setShowBiometricOffer(true)
+        } else {
+          onUnlocked()
+        }
+
+      } else if (vaultToken) {
+        if (!vaultSalt) {
+          // Vault antiguo sin salt (pre-migración) — no debería ocurrir tras el vaciado
+          throw new Error("Bóveda sin salt. Contacta con soporte o usa la recuperación.")
+        }
+
+        const saltBytes  = Uint8Array.from(atob(vaultSalt), c => c.charCodeAt(0))
+        const derivedKey = await deriveKeyFromPin(pin, saltBytes)
+        const valid      = await isKeyValid(derivedKey, vaultToken)
+
+        if (valid) {
+            saveKey(derivedKey)
+            onUnlocked()
+          } else {
+          triggerHaptic([50, 50, 50])
+          setVaultError("PIN incorrecto. Inténtalo de nuevo.")
+          setPinInput("")
+        }
+      }
+    } catch (e: unknown) {
+      console.error("processUnlock error:", e)
+      setVaultError(e instanceof Error ? e.message : "Error de seguridad. Reintenta.")
+      setPinInput("")
+    } finally {
+      setIsUnlocking(false)
+    }
+  }
+
+  // ─── Recuperación via email ──────────────────────────────────────────────────
+  const handleRecovery = async () => {
+    setRecoveryLoading(true)
+
+    const resetToken = crypto.randomUUID()
+    const expiresAt  = new Date(Date.now() + 1000 * 60 * 30).toISOString()
+
+    const { error: tokenError } = await supabase
+      .from("user_vault")
+      .update({ reset_token: resetToken, reset_token_expires_at: expiresAt })
+      .eq("user_id", session.user.id)
+
+    if (tokenError) {
+      setVaultError("Error al generar el enlace. Inténtalo más tarde.")
+      setRecoveryLoading(false)
+      return
+    }
+
+    await supabase.auth.signOut()
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: session.user.email!,
+      options: {
+        emailRedirectTo: `${window.location.origin}/?reset_vault=1&reset_token=${resetToken}`,
+      },
+    })
+
+    setRecoveryLoading(false)
+    if (!error) setRecoverySuccess(true)
+    else setVaultError("Error al enviar el correo. Inténtalo más tarde.")
+  }
+
+  // ─── Biometría ───────────────────────────────────────────────────────────────
+  const handleActivateBiometric = async () => {
+    setBiometricLoading(true)
+    setBiometricError(null)
+    const ok = await saveBiometricKey(session.user.id)
+    setBiometricLoading(false)
+    if (ok) {
+      setBiometricEnabled(true)
+      onUnlocked()
+    } else {
+      setBiometricError("No se pudo activar. Inténtalo de nuevo.")
+    }
+  }
+
+  const handleRetryBiometric = async () => {
+    setBiometricLoading(true)
+    setBiometricError(null)
+    const ok = await loadBiometricKey(session.user.id)
+    setBiometricLoading(false)
+    if (ok) onUnlocked()
+    else setBiometricError("Biometría fallida. Usa tu PIN.")
+  }
+
+  // ─── Renders ────────────────────────────────────────────────────────────────
+  if (isFirstTime === null) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+      </div>
+    )
+  }
+
+  if (showRecovery) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center py-12 px-8 text-center">
+        <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6">
+          <KeyRound className="w-6 h-6 text-emerald-400" />
+        </div>
+        <h2 className="text-xl font-bold text-zinc-100 mb-3">Recuperar acceso</h2>
+
+        {recoverySuccess ? (
+          <div className="space-y-4 max-w-xs">
+            <p className="text-zinc-400 text-sm leading-relaxed">
+              Te hemos enviado un enlace a{" "}
+              <strong className="text-zinc-200">{session.user.email}</strong>.
+            </p>
+            <p className="text-zinc-500 text-xs leading-relaxed bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+              ⚠️ Al usar ese enlace podrás crear un{" "}
+              <strong>PIN nuevo</strong>, pero los movimientos cifrados con el PIN anterior
+              ya no serán legibles. Los datos de categorías y cuentas se mantienen.
+            </p>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4 max-w-xs">
+            <p className="text-zinc-400 text-sm leading-relaxed">
+              Si has olvidado tu PIN, podemos enviarte un enlace a{" "}
+              <strong className="text-zinc-200">{session.user.email}</strong> para crear uno nuevo.
+            </p>
+
+            {/* Advertencia ANTES del botón — visible siempre, no solo tras pulsar */}
+            <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90 text-left">
+              <strong className="font-semibold">⚠️ Importante:</strong> los movimientos
+              cifrados con tu PIN actual <strong>no podrán recuperarse</strong> con el PIN
+              nuevo. Las categorías y cuentas sí se mantienen.
+            </div>
+
+            {vaultError && (
+              <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-4 py-3">
+                {vaultError}
+              </p>
+            )}
+
+            <button
+              onClick={handleRecovery}
+              disabled={recoveryLoading}
+              className="w-full py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {recoveryLoading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
+                : "Enviar enlace de recuperación"
+              }
+            </button>
+            <button
+              onClick={() => { setShowRecovery(false); setVaultError(null) }}
+              className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+            >
+              Volver al PIN
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (showBiometricOffer) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center py-12 px-8 text-center gap-6">
+        <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+          <Lock className="w-7 h-7 text-emerald-400" />
+        </div>
+        <div className="space-y-2 max-w-xs">
+          <h2 className="text-xl font-bold text-zinc-100">Desbloqueo rápido</h2>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            ¿Quieres usar la biometría de tu dispositivo para desbloquear GastOS en lugar del PIN?
+          </p>
+        </div>
+        {biometricError && (
+          <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-4 py-3 max-w-xs">
+            {biometricError}
+          </p>
+        )}
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button
+            onClick={handleActivateBiometric}
+            disabled={biometricLoading}
+            className="w-full py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {biometricLoading
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : "Activar desbloqueo biométrico"
+            }
+          </button>
+          <button
+            onClick={onUnlocked}
+            className="w-full py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700 transition-all"
+          >
+            Ahora no
+          </button>
+        </div>
+        <p className="text-[10px] text-zinc-700 max-w-xs">
+          Puedes activarlo o desactivarlo más adelante en Ajustes → Seguridad
+        </p>
+      </div>
+    )
+  }
+
+  if (biometricLoading && isFirstTime === false) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+        <p className="text-sm text-zinc-500">Verificando identidad...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-between py-12 px-8 text-center select-none overflow-hidden">
+      <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-500 ${
+          vaultError ? "bg-red-500/10" : "bg-emerald-500/10"
+        }`}>
+          <Lock className={`w-6 h-6 ${vaultError ? "text-red-400" : "text-emerald-400"}`} />
+        </div>
+        <h2 className="text-xl font-bold text-zinc-100 uppercase tracking-widest">
+          {isFirstTime
+            ? pinToConfirm !== null ? "Confirma tu PIN" : "Crear PIN de acceso"
+            : "Desbloquear GastOS"
+          }
+        </h2>
+        <p className="text-zinc-500 text-xs max-w-[240px] mx-auto leading-relaxed">
+          {isFirstTime
+            ? pinToConfirm !== null
+              ? vaultError || "Repite los 6 dígitos para confirmar."
+              : "Elige 6 dígitos para proteger tus finanzas. Podrás recuperar el acceso via email si lo olvidas."
+            : vaultError || "Introduce tu PIN de 6 dígitos."
+          }
+        </p>
+      </div>
+
+      {/* Indicadores de dígitos */}
+      <div className="flex gap-4 my-10" aria-label="PIN introducido" aria-live="polite">
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className={`w-3 h-3 rounded-full border-2 transition-all duration-300 ${
+              i < pinInput.length
+                ? "bg-emerald-500 border-emerald-500 scale-125 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                : "border-zinc-800 bg-transparent"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Teclado numérico */}
+      <div className="grid grid-cols-3 gap-x-8 gap-y-6 max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
+        {["1","2","3","4","5","6","7","8","9"].map(num => (
+          <button
+            key={num}
+            onClick={() => handleKeyPress(num)}
+            disabled={isUnlocking}
+            aria-label={num}
+            className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 active:scale-90 transition-all flex items-center justify-center tabular-nums shadow-sm"
+          >
+            {num}
+          </button>
+        ))}
+        <div className="w-20 h-20" />
+        <button
+          onClick={() => handleKeyPress("0")}
+          disabled={isUnlocking}
+          aria-label="0"
+          className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 active:scale-90 transition-all flex items-center justify-center tabular-nums"
+        >
+          0
+        </button>
+        <button
+          onClick={handleBackspace}
+          disabled={isUnlocking || pinInput.length === 0}
+          aria-label="Borrar dígito"
+          className="w-20 h-20 rounded-full flex items-center justify-center text-zinc-600 hover:text-red-400 active:scale-75 transition-all"
+        >
+          <Delete className="w-7 h-7" />
+        </button>
+      </div>
+
+      <div className="mt-8 flex flex-col items-center gap-4">
+        <EncryptionBadge />
+        {!isFirstTime && biometricEnabled && (
+          <button
+            onClick={handleRetryBiometric}
+            disabled={biometricLoading}
+            className="text-[10px] text-zinc-500 uppercase tracking-[0.15em] hover:text-zinc-300 transition-colors"
+          >
+            {biometricLoading ? "Verificando..." : "Usar biometría"}
+          </button>
+        )}
+        {biometricError && (
+          <p className="text-xs text-red-400">{biometricError}</p>
+        )}
+        {!isFirstTime && (
+          <button
+            onClick={() => setShowRecovery(true)}
+            className="text-[10px] text-zinc-600 uppercase tracking-[0.15em] hover:text-zinc-400 transition-colors"
+          >
+            ¿Olvidaste tu PIN?
+          </button>
+        )}
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="text-[10px] text-zinc-700 uppercase tracking-[0.2em] hover:text-zinc-500 transition-colors"
+        >
+          Cerrar Sesión
+        </button>
+      </div>
+
+      {isUnlocking && (
+        <div className="absolute inset-0 bg-zinc-950/60 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+        </div>
+      )}
+    </div>
+  )
+}
 </file>
 
 <file path="components/modals/CuentasModal.tsx">
@@ -1554,6 +1759,7 @@ interface FilaParseada {
   cantidad: number
   nota: string
   cuenta_id: string | null
+  cuenta_destino_id: string | null
   valida: boolean
   error?: string
 }
@@ -1623,7 +1829,8 @@ export default function ImportCSVModal({
       const iCat = cabeceras.findIndex(h => h.includes("categor"))
       const iCantidad = cabeceras.findIndex(h => h.includes("cantidad") || h.includes("importe"))
       const iNota = cabeceras.findIndex(h => h.includes("nota") || h.includes("descripci"))
-      const iCuenta = cabeceras.findIndex(h => h.includes("cuenta"))
+      const iCuenta = cabeceras.findIndex(h => h.includes("cuenta") && !h.includes("destino"))
+      const iCuentaDest = cabeceras.findIndex(h => h.includes("destino"))
 
       // Silenciamos iID — solo lo usamos para logging futuro
       void iID
@@ -1648,18 +1855,22 @@ export default function ImportCSVModal({
           const cuenta = cuentas.find(
             c => c.id === cuentaRaw || c.nombre.toLowerCase() === cuentaRaw.toLowerCase()
           )
+          const cuentaDestRaw = iCuentaDest !== -1 ? (cols[iCuentaDest] ?? "") : ""
+          const cuentaDest = cuentaDestRaw
+            ? cuentas.find(c => c.id === cuentaDestRaw || c.nombre.toLowerCase() === cuentaDestRaw.toLowerCase())
+            : undefined
 
           if (isNaN(cantidad) || cantidad <= 0) {
             return {
               index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
-              cantidad: 0, nota, cuenta_id: null, valida: false,
+              cantidad: 0, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: "Cantidad inválida",
             }
           }
           if (!["gasto", "ingreso", "transferencia"].includes(tipo)) {
             return {
               index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
-              cantidad, nota, cuenta_id: null, valida: false,
+              cantidad, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: `Tipo desconocido: "${tipo}"`,
             }
           }
@@ -1670,6 +1881,9 @@ export default function ImportCSVModal({
             if (!isNaN(d.getTime())) fechaISO = d.toISOString()
           }
 
+          const esTransferencia = tipo === "transferencia"
+          const sinCuentaDest = esTransferencia && !cuentaDest
+
           return {
             index: idx + 2,
             fecha: fechaISO,
@@ -1678,7 +1892,9 @@ export default function ImportCSVModal({
             cantidad,
             nota,
             cuenta_id: cuenta?.id ?? null,
-            valida: true,
+            cuenta_destino_id: cuentaDest?.id ?? null,
+            valida: !sinCuentaDest,
+            error: sinCuentaDest ? "Transferencia sin cuenta destino válida" : undefined,
           }
         })
         // ignorar líneas completamente vacías
@@ -1708,6 +1924,7 @@ export default function ImportCSVModal({
         nota: f.nota ? await encryptData(f.nota) : null,
         tipo: f.tipo,
         cuenta_id: f.cuenta_id,
+        cuenta_destino_id: f.cuenta_destino_id,
         created_at: f.fecha,
         is_recurring: false,
       }))
@@ -1770,7 +1987,7 @@ export default function ImportCSVModal({
               <p className="text-xs text-zinc-500">
                 CSV con columnas:{" "}
                 <span className="text-zinc-300 font-mono">
-                  Fecha, Tipo, Categoria, Cantidad, Nota, Cuenta
+                  Fecha, Tipo, Categoria, Cantidad, Nota, Cuenta, Cuenta destino
                 </span>
               </p>
               <p className="text-xs text-zinc-500">
@@ -2124,342 +2341,107 @@ export function SheetTrigger({
 }
 </file>
 
-<file path="lib/supabase.ts">
-// lib/supabase.ts
-// ─── Singleton de Supabase ────────────────────────────────────────────────────
-// IMPORTANTE: Este es el ÚNICO lugar donde se crea el cliente de Supabase.
-// Todos los componentes deben importar desde aquí.
-// reset-password/page.tsx tenía su propia instancia — BUG #7 corregido.
- 
-import { createClient } from "@supabase/supabase-js"
- 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/.well-known/assetlinks.json",
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+        ],
+      },
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            // Evita que la app se cargue en iframes (clickjacking)
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            // Evita que el navegador "adivine" el tipo de contenido
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            // No enviar la URL completa como Referer a terceros
+            // Importante para que el reset_token no aparezca en logs externos
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            // Restringe el acceso a APIs de hardware sensibles
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            // Content Security Policy:
+            // - default-src 'self': solo recursos del propio dominio
+            // - script-src: permite scripts propios + inline (Next.js los necesita) + cdnjs para recharts
+            // - connect-src: permite llamadas a Supabase y Resend
+            // - style-src: permite estilos propios e inline (Tailwind los necesita)
+            // - img-src: permite imágenes propias y data URIs
+            // Ajusta los dominios de connect-src si cambias de proveedor
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval necesario para Next.js dev; en prod puedes quitarlo
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "font-src 'self'",
+              "connect-src 'self' https://*.supabase.co https://api.resend.com",
+              "frame-ancestors 'none'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
 </file>
 
-<file path="app/manifest.ts">
-// app/manifest.ts
-// ─── Fixes en este archivo ────────────────────────────────────────────────────
-// BUG #25: El mismo archivo icon.png se declaraba tres veces con tamaños
-//          inconsistentes (192×2 y 512), y dos entradas tenían el mismo
-//          purpose="any". Android e iOS usaban el icono escalado con pérdida.
-//
-//          FIX: declaramos tres entradas semánticamente distintas:
-//            1. 192×192 any        → icono estándar para pantallas normales
-//            2. 512×512 any        → icono HD para splash screen y instalación
-//               (si tienes un icon-512.png aparte, úsalo aquí; si no, icon.png)
-//            3. 192×192 maskable   → icono adaptable para fondos de Android
-//
-//          Si solo tienes un archivo de icono, no pasa nada — el navegador
-//          escala el de 512 para el uso de 192 mejor que al revés.
-//          Lo ideal es tener icon-192.png e icon-512.png separados.
+<file path="app/layout.tsx">
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
 
-import { MetadataRoute } from "next"
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
 
-export default function manifest(): MetadataRoute.Manifest {
-  return {
-    name:             "GastOS - Tu dinero, bajo control",
-    short_name:       "GastOS",
-    description:      "Registro personal y seguro para el control diario de tus finanzas.",
-    start_url:        "/",
-    display:          "standalone",
-    orientation:      "portrait",
-    background_color: "#000000",
-    theme_color:      "#09090b",
-    lang:             "es",
-    id:               "/",
-    scope:            "/",
-    icons: [
-      {
-        // Icono estándar para uso general (launcher, notificaciones)
-        src:     "/icon.png",
-        sizes:   "192x192",
-        type:    "image/png",
-        purpose: "any",
-      },
-      {
-        // Icono de alta resolución para splash screen e instalación PWA
-        // Si tienes un icon-512.png de mayor resolución, cámbialo aquí
-        src:     "/icon.png",
-        sizes:   "512x512",
-        type:    "image/png",
-        purpose: "any",
-      },
-      {
-        // Icono maskable: Android lo recorta con máscara circular/redondeada.
-        // El contenido importante debe estar en el 80% central del icono.
-        src:     "/icon.png",
-        sizes:   "192x192",
-        type:    "image/png",
-        purpose: "maskable",
-      },
-    ],
-  }
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: 'GastOS',
+  description: 'Aplicación personal y segura para el registro diario de gastos.',
 }
-</file>
 
-<file path="components/auth/AuthScreen.tsx">
-"use client"
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+};
 
-// components/auth/AuthScreen.tsx
-// ─── Fixes en este archivo ────────────────────────────────────────────────────
-// BUG #16: Los labels del formulario usaban text-zinc-400 sobre bg-zinc-900,
-//          generando un contraste ~3:1 para texto de 10px — por debajo del
-//          mínimo WCAG AA (4.5:1 para texto pequeño).
-//          FIX: subimos a text-zinc-300 y aumentamos el tamaño a text-xs (12px)
-//          con tracking normal. También añadimos htmlFor en cada label para
-//          asociarlos correctamente con su input.
-
-import { useState } from "react"
-import { supabase } from "@/lib/supabase"
-import { Loader2 } from "lucide-react"
-
-export default function AuthScreen() {
-  const [email,              setEmail]              = useState("")
-  const [password,           setPassword]           = useState("")
-  const [confirmPassword,    setConfirmPassword]    = useState("")
-  const [isLogin,            setIsLogin]            = useState(true)
-  const [isResettingPassword,setIsResettingPassword]= useState(false)
-  const [loading,            setLoading]            = useState(false)
-  const [error,              setError]              = useState<string | null>(null)
-  const [success,            setSuccess]            = useState<string | null>(null)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    setLoading(true)
-
-    if (!isLogin) {
-      if (password !== confirmPassword) {
-        setError("Las contraseñas no coinciden.")
-        setLoading(false)
-        return
-      }
-      const tieneLetras  = /[a-zA-Z]/.test(password)
-      const tieneNumeros = /[0-9]/.test(password)
-      if (password.length < 8 || !tieneLetras || !tieneNumeros) {
-        setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
-        setLoading(false)
-        return
-      }
-    }
-
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError("No hemos podido iniciar sesión. Verifica que el correo y la contraseña sean correctos, o crea una cuenta si aún no tienes una.")
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setError(error.message)
-      else setSuccess("Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
-    }
-
-    setLoading(false)
-  }
-
-  async function handleResetPassword(e: React.FormEvent) {
-    e.preventDefault()
-    if (!email) {
-      setError("Por favor, introduce tu correo electrónico.")
-      return
-    }
-    setLoading(true)
-    setError(null)
-    setSuccess(null)
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-
-    if (error) setError(error.message)
-    else setSuccess("Te hemos enviado un enlace para recuperar tu contraseña. Revisa tu bandeja de entrada.")
-    setLoading(false)
-  }
-
-  const resetModeState = () => {
-    setError(null)
-    setSuccess(null)
-    setConfirmPassword("")
-    setPassword("")
-  }
-
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
-
-        {/* Logo + título */}
-        <div className="flex flex-col items-center mb-10">
-          <div className="mb-4">
-            <img
-              src="/icon.png"
-              alt="Logo GastOS"
-              className="w-20 h-20 rounded-3xl shadow-lg shadow-emerald-400/30"
-            />
-          </div>
-          <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">GastOS</h1>
-          <p className="text-sm text-zinc-400 mt-1">Registro de gastos personal</p>
-        </div>
-
-        {/* Tabs login / registro — ocultos en modo recuperación */}
-        {!isResettingPassword && (
-          <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800" role="tablist">
-            <button
-              role="tab"
-              aria-selected={isLogin}
-              onClick={() => { setIsLogin(true);  resetModeState() }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                isLogin
-                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              Iniciar Sesión
-            </button>
-            <button
-              role="tab"
-              aria-selected={!isLogin}
-              onClick={() => { setIsLogin(false); resetModeState() }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                !isLogin
-                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              Registrarse
-            </button>
-          </div>
-        )}
-
-        {/* Formulario */}
-        <form
-          onSubmit={isResettingPassword ? handleResetPassword : handleSubmit}
-          className="space-y-4"
-          aria-label={
-            isResettingPassword
-              ? "Formulario de recuperación de contraseña"
-              : isLogin
-              ? "Formulario de inicio de sesión"
-              : "Formulario de registro"
-          }
-        >
-          {/* BUG #16 FIX: label con contraste suficiente (text-zinc-300, text-xs)
-              y htmlFor vinculado al id del input correspondiente */}
-          <div>
-            <label
-              htmlFor="auth-email"
-              className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-            >
-              Correo electrónico
-            </label>
-            <input
-              id="auth-email"
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com"
-              autoComplete="email"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-            />
-          </div>
-
-          {!isResettingPassword && (
-            <>
-              <div>
-                <label
-                  htmlFor="auth-password"
-                  className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-                >
-                  Contraseña
-                </label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete={isLogin ? "current-password" : "new-password"}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-                />
-              </div>
-
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => { setIsResettingPassword(true); resetModeState() }}
-                    className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors"
-                  >
-                    ¿Has olvidado tu contraseña?
-                  </button>
-                </div>
-              )}
-
-              {!isLogin && (
-                <div className="animate-in fade-in duration-300">
-                  <label
-                    htmlFor="auth-confirm-password"
-                    className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-                  >
-                    Confirmar contraseña
-                  </label>
-                  <input
-                    id="auth-confirm-password"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-                  />
-                </div>
-              )}
-            </>
-          )}
-
-          {error && (
-            <div role="alert" className="bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div role="status" className="bg-emerald-950/50 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">
-              {success}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2"
-          >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
-            {isResettingPassword
-              ? "Enviar enlace"
-              : isLogin
-              ? "Entrar"
-              : "Crear cuenta"
-            }
-          </button>
-
-          {isResettingPassword && (
-            <button
-              type="button"
-              onClick={() => { setIsResettingPassword(false); resetModeState() }}
-              className="w-full text-sm text-zinc-400 hover:text-zinc-200 transition-colors py-2"
-            >
-              Volver a Iniciar Sesión
-            </button>
-          )}
-        </form>
-      </div>
-    </div>
-  )
+    <html
+      lang="es"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col">{children}</body>
+    </html>
+  );
 }
 </file>
 
@@ -2495,7 +2477,7 @@ export interface Presupuesto {
   id:           string
   user_id:      string
   categoria_id: string
-  cantidad:     number      // en claro en memoria [E2EE en BD: NO — cantidad de presupuesto no se cifra]
+  cantidad:     number      // [E2EE] cifrado en BD, en claro en memoria
   created_at:   string
 }
 
@@ -2548,43 +2530,190 @@ export interface Objetivo {
 }
 </file>
 
-<file path="app/layout.tsx">
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+<file path="app/reset-password/page.tsx">
+"use client"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// app/reset-password/page.tsx
+// ─── Fix en este archivo ──────────────────────────────────────────────────────
+// BUG #7: Tenía su propio createClient() rompiendo el patrón Singleton.
+//         Ahora importa el cliente compartido de lib/supabase.ts.
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"          // ← Singleton compartido
+import { Loader2, CheckCircle2, Lock, AlertCircle } from "lucide-react"
 
-export const metadata: Metadata = {
-  title: 'GastOS',
-  description: 'Aplicación personal y segura para el registro diario de gastos.',
-}
+export default function ResetPasswordPage() {
+  const [password,        setPassword]        = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [loading,         setLoading]         = useState(false)
+  const [error,           setError]           = useState<string | null>(null)
+  const [success,         setSuccess]         = useState(false)
+  const [isVerifying,     setIsVerifying]     = useState(true)
+  const [hasSession,      setHasSession]      = useState(false)
 
-export const viewport: Viewport = {
-  themeColor: "#09090b",
-};
+  useEffect(() => {
+    async function initializeSecureSession() {
+      const searchParams = new URLSearchParams(window.location.search)
+      const hashParams   = new URLSearchParams(window.location.hash.replace("#", "?"))
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+      const code        = searchParams.get("code")
+      const accessToken = hashParams.get("access_token")
+      const refreshToken = hashParams.get("refresh_token")
+      const errorDesc   = searchParams.get("error_description") || hashParams.get("error_description")
+
+      if (errorDesc) {
+        setError("El enlace es inválido o ha caducado.")
+        setIsVerifying(false)
+        return
+      }
+
+      let sessionEstablished = false
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token:  accessToken,
+          refresh_token: refreshToken,
+        })
+        if (!error) sessionEstablished = true
+      } else if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) sessionEstablished = true
+      } else {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) sessionEstablished = true
+      }
+
+      if (sessionEstablished) {
+        setHasSession(true)
+        // Limpiar la URL para que no quede rastro del token
+        window.history.replaceState({}, document.title, window.location.pathname)
+      } else {
+        setError("No se ha detectado una sesión válida. Es posible que el enlace ya se haya usado.")
+      }
+
+      setIsVerifying(false)
+    }
+
+    initializeSecureSession()
+  }, [])
+
+  async function handleUpdatePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (password !== confirmPassword) return setError("Las contraseñas no coinciden.")
+  
+    const tieneLetras  = /[a-zA-Z]/.test(password)
+    const tieneNumeros = /[0-9]/.test(password)
+    if (password.length < 8 || !tieneLetras || !tieneNumeros) {
+      return setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+    }
+
+    setLoading(true)
+    setError(null)
+
+    const { error: updateError } = await supabase.auth.updateUser({ password })
+
+    if (updateError) {
+      setError("Error al actualizar: " + updateError.message)
+    } else {
+      setSuccess(true)
+      setTimeout(() => { window.location.href = "/" }, 2000)
+    }
+    setLoading(false)
+  }
+
   return (
-    <html
-      lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
-  );
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+
+        <div className="flex flex-col items-center mb-8 text-center">
+          <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
+            <Lock className="w-6 h-6 text-emerald-400" />
+          </div>
+          <h1 className="text-xl font-bold text-zinc-100">Nueva Contraseña</h1>
+        </div>
+
+        {isVerifying && (
+          <div className="flex flex-col items-center py-4">
+            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-4" />
+            <p className="text-zinc-400 text-sm">Validando seguridad...</p>
+          </div>
+        )}
+
+        {!isVerifying && !hasSession && (
+          <div className="flex flex-col items-center animate-in fade-in">
+            <AlertCircle className="w-12 h-12 text-red-500 mb-4 opacity-80" />
+            <div className="bg-red-950/30 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400 text-center mb-6">
+              {error}
+            </div>
+            <button
+              onClick={() => window.location.href = "/"}
+              className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+            >
+              Volver al inicio
+            </button>
+          </div>
+        )}
+
+        {!isVerifying && hasSession && success && (
+          <div className="flex flex-col items-center py-4 animate-in fade-in">
+            <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3" />
+            <p className="text-emerald-400 font-medium">¡Contraseña cambiada!</p>
+          </div>
+        )}
+
+        {!isVerifying && hasSession && !success && (
+          <form onSubmit={handleUpdatePassword} className="space-y-4 animate-in fade-in">
+            <div>
+              <label htmlFor="new-password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
+                Nueva contraseña
+              </label>
+              <input
+                id="new-password"
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Nueva contraseña"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="confirm-password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
+                Confirmar contraseña
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Repite la contraseña"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-950/30 border border-red-900/50 rounded-xl px-4 py-3 text-xs text-red-400 text-center">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center"
+            >
+              {loading
+                ? <Loader2 className="w-5 h-5 animate-spin" />
+                : "Guardar y acceder"
+              }
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  )
 }
 </file>
 
@@ -2834,7 +2963,7 @@ export default function EditMovimientoModal({
 //          gestionando el cambio con un pequeño debounce.
 // ACCESIBILIDAD: HidableAmount añade aria-pressed y aria-label al botón toggle.
 
-import { useState, useEffect, createContext, useContext } from "react"
+import { useState, useEffect, useMemo, createContext, useContext } from "react"
 import { supabase } from "@/lib/supabase"
 import {
   Loader2, Package, ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
@@ -3024,16 +3153,28 @@ export default function DashboardTab({
     fetchYDesencriptar();
   }, []);
 
-  if (loading) return (
-    <div className="flex-1 flex items-center justify-center py-20">
-      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
-    </div>
-  )
-
   const sm = selectedDate.getMonth()
   const sy = selectedDate.getFullYear()
 
-  const monthMovs = movimientos.filter(m => {
+  const {
+    monthMovs, monthGastos, monthIngresos,
+    totalGastos, totalIngresos, balanceNeto,
+    saldos, patrimonioTotal,
+    categoryTotals, pieData, topCategorias, maxTopVal,
+    last12Months, last6Months,
+    diasEnMes, esMesActual, diaActual, diasRestantes,
+    gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
+    mesAntMovs, totalGastosMesAnt, mediaDiariaAnt, diffMedia, diffPct,
+    ratioAhorro, ratioColor, ratioLabel,
+    gastoPorDia, maxGastoDia, primerDiaSemana, offsetLunes, diasGrid,
+    objetivoAhorro, pctObjetivo,
+    gastoPrevMes, ingPrevMes, diffGastoMes, diffIngMes,
+    diaMasCaro, gastoPorDiaSemana, maxGastoDow, dowData,
+    distribucionPct, rachaDias, rachaTopCat,
+    presupuestosConGasto,
+    monthLabel, DIAS_SEMANA, NOMBRES_DIA,
+  } = useMemo(() => {
+    const monthMovs = movimientos.filter(m => {
     const d = new Date(m.created_at)
     return d.getMonth() === sm && d.getFullYear() === sy
   })
@@ -3078,8 +3219,6 @@ export default function DashboardTab({
   const last6Months = last12Months.slice(6)
   const topCategorias = pieData.slice(0, 5)
   const maxTopVal = topCategorias[0]?.value ?? 1
-  const monthLabel = selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })
-
   const diasEnMes = new Date(sy, sm + 1, 0).getDate()
   const esMesActual = sm === hoy.getMonth() && sy === hoy.getFullYear()
   const diaActual = esMesActual ? hoy.getDate() : diasEnMes
@@ -3128,7 +3267,6 @@ export default function DashboardTab({
     ...Array.from({ length: offsetLunes }, () => null),
     ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
   ]
-  const DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"]
 
   // ── Cálculos widgets nuevos ───────────────────────────────────────────────
   const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
@@ -3183,8 +3321,36 @@ export default function DashboardTab({
     })
     .filter(p => p.cat)
 
+    const monthLabel = selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+    const DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"]
 
-  // ── Definición de widgets ─────────────────────────────────────────────────
+  return {
+    monthMovs, monthGastos, monthIngresos,
+    totalGastos, totalIngresos, balanceNeto,
+    saldos, patrimonioTotal,
+    categoryTotals, pieData, topCategorias, maxTopVal,
+    last12Months, last6Months,
+    diasEnMes, esMesActual, diaActual, diasRestantes,
+    gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
+    mesAntMovs, totalGastosMesAnt, mediaDiariaAnt, diffMedia, diffPct,
+    ratioAhorro, ratioColor, ratioLabel,
+    gastoPorDia, maxGastoDia, primerDiaSemana, offsetLunes, diasGrid,
+    objetivoAhorro, pctObjetivo,
+    gastoPrevMes, ingPrevMes, diffGastoMes, diffIngMes,
+    diaMasCaro, gastoPorDiaSemana, maxGastoDow, dowData,
+    distribucionPct, rachaDias, rachaTopCat,
+    presupuestosConGasto,
+    monthLabel, DIAS_SEMANA, NOMBRES_DIA,
+  }
+}, [movimientos, selectedDate, cuentas, categorias, presupuestos, objetivos])
+
+if (loading) return (
+  <div className="flex-1 flex items-center justify-center py-20">
+    <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+  </div>
+)
+
+// ── Definición de widgets ─────────────────────────────────────────────────
   const widgets: Partial<Record<WidgetId, React.ReactNode>> = {
 
     resumen_mes: (
@@ -4130,193 +4296,6 @@ racha_ahorro: (
 }
 </file>
 
-<file path="app/reset-password/page.tsx">
-"use client"
-
-// app/reset-password/page.tsx
-// ─── Fix en este archivo ──────────────────────────────────────────────────────
-// BUG #7: Tenía su propio createClient() rompiendo el patrón Singleton.
-//         Ahora importa el cliente compartido de lib/supabase.ts.
-
-import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"          // ← Singleton compartido
-import { Loader2, CheckCircle2, Lock, AlertCircle } from "lucide-react"
-
-export default function ResetPasswordPage() {
-  const [password,        setPassword]        = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [loading,         setLoading]         = useState(false)
-  const [error,           setError]           = useState<string | null>(null)
-  const [success,         setSuccess]         = useState(false)
-  const [isVerifying,     setIsVerifying]     = useState(true)
-  const [hasSession,      setHasSession]      = useState(false)
-
-  useEffect(() => {
-    async function initializeSecureSession() {
-      const searchParams = new URLSearchParams(window.location.search)
-      const hashParams   = new URLSearchParams(window.location.hash.replace("#", "?"))
-
-      const code        = searchParams.get("code")
-      const accessToken = hashParams.get("access_token")
-      const refreshToken = hashParams.get("refresh_token")
-      const errorDesc   = searchParams.get("error_description") || hashParams.get("error_description")
-
-      if (errorDesc) {
-        setError("El enlace es inválido o ha caducado.")
-        setIsVerifying(false)
-        return
-      }
-
-      let sessionEstablished = false
-
-      if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token:  accessToken,
-          refresh_token: refreshToken,
-        })
-        if (!error) sessionEstablished = true
-      } else if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) sessionEstablished = true
-      } else {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) sessionEstablished = true
-      }
-
-      if (sessionEstablished) {
-        setHasSession(true)
-        // Limpiar la URL para que no quede rastro del token
-        window.history.replaceState({}, document.title, window.location.pathname)
-      } else {
-        setError("No se ha detectado una sesión válida. Es posible que el enlace ya se haya usado.")
-      }
-
-      setIsVerifying(false)
-    }
-
-    initializeSecureSession()
-  }, [])
-
-  async function handleUpdatePassword(e: React.FormEvent) {
-    e.preventDefault()
-    if (password !== confirmPassword) return setError("Las contraseñas no coinciden.")
-  
-    const tieneLetras  = /[a-zA-Z]/.test(password)
-    const tieneNumeros = /[0-9]/.test(password)
-    if (password.length < 8 || !tieneLetras || !tieneNumeros) {
-      return setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
-    }
-
-    setLoading(true)
-    setError(null)
-
-    const { error: updateError } = await supabase.auth.updateUser({ password })
-
-    if (updateError) {
-      setError("Error al actualizar: " + updateError.message)
-    } else {
-      setSuccess(true)
-      setTimeout(() => { window.location.href = "/" }, 2000)
-    }
-    setLoading(false)
-  }
-
-  return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in-95 duration-500">
-
-        <div className="flex flex-col items-center mb-8 text-center">
-          <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
-            <Lock className="w-6 h-6 text-emerald-400" />
-          </div>
-          <h1 className="text-xl font-bold text-zinc-100">Nueva Contraseña</h1>
-        </div>
-
-        {isVerifying && (
-          <div className="flex flex-col items-center py-4">
-            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-4" />
-            <p className="text-zinc-400 text-sm">Validando seguridad...</p>
-          </div>
-        )}
-
-        {!isVerifying && !hasSession && (
-          <div className="flex flex-col items-center animate-in fade-in">
-            <AlertCircle className="w-12 h-12 text-red-500 mb-4 opacity-80" />
-            <div className="bg-red-950/30 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400 text-center mb-6">
-              {error}
-            </div>
-            <button
-              onClick={() => window.location.href = "/"}
-              className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
-              Volver al inicio
-            </button>
-          </div>
-        )}
-
-        {!isVerifying && hasSession && success && (
-          <div className="flex flex-col items-center py-4 animate-in fade-in">
-            <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3" />
-            <p className="text-emerald-400 font-medium">¡Contraseña cambiada!</p>
-          </div>
-        )}
-
-        {!isVerifying && hasSession && !success && (
-          <form onSubmit={handleUpdatePassword} className="space-y-4 animate-in fade-in">
-            <div>
-              <label htmlFor="new-password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
-                Nueva contraseña
-              </label>
-              <input
-                id="new-password"
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Nueva contraseña"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirm-password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
-                Confirmar contraseña
-              </label>
-              <input
-                id="confirm-password"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Repite la contraseña"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-950/30 border border-red-900/50 rounded-xl px-4 py-3 text-xs text-red-400 text-center">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center"
-            >
-              {loading
-                ? <Loader2 className="w-5 h-5 animate-spin" />
-                : "Guardar y acceder"
-              }
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  )
-}
-</file>
-
 <file path="components/FeedbackWidget.tsx">
 "use client"
 
@@ -4547,608 +4526,6 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         </div>
       )}
     </>
-  )
-}
-</file>
-
-<file path="components/modals/SettingsModal.tsx">
-"use client"
-
-// components/modals/SettingsModal.tsx
-// ─── Fixes en este archivo ────────────────────────────────────────────────────
-// BUG #26: Las categorías de tipo "ambos" aparecían en la sección de presupuestos
-//          junto a las de tipo "gasto", causando confusión porque una categoría
-//          compartida (ej. "Suscripciones") podía ser tanto ingreso como gasto.
-//          FIX: En el tab de Presupuestos solo mostramos categorías cuyo tipo
-//          es EXCLUSIVAMENTE "gasto". Las de tipo "ambos" quedan excluidas
-//          porque no tiene sentido limitar su gasto si también acumula ingresos.
-//          Si el usuario quiere presupuesto en una cat. mixta, debe crear una
-//          específica de gasto.
-
-import { useState, useEffect } from "react"
-import { X, Trash2, Loader2, Plus, Target, PiggyBank } from "lucide-react"
-import { supabase } from "@/lib/supabase"
-import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
-import { encryptData } from "@/lib/crypto"
-import type { Categoria, Presupuesto, Objetivo } from "@/types"
-
-type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
-
-export default function SettingsModal({
-  isOpen, onClose, categorias, onCategoriesChange,
-  presupuestos, onPresupuestosChange,
-  objetivos, onObjetivosChange,
-  session, userId,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  categorias: Categoria[]
-  onCategoriesChange: (cats: Categoria[]) => void
-  presupuestos: Presupuesto[]
-  onPresupuestosChange: (p: Presupuesto[]) => void
-  objetivos: Objetivo[]
-  onObjetivosChange: (o: Objetivo[]) => void
-  session: Session
-  userId: string
-}) {
-  const [newCatName, setNewCatName] = useState("")
-  const [newCatTipo, setNewCatTipo] = useState<"gasto" | "ingreso" | "ambos">("gasto")
-  const [newCatIcono, setNewCatIcono] = useState("Package")
-  const [savingCat, setSavingCat] = useState(false)
-  const [deletingCat, setDeletingCat] = useState<string | null>(null)
-
-  const [editingPresupuesto, setEditingPresupuesto] = useState<string | null>(null)
-  const [inputPresupuesto, setInputPresupuesto] = useState("")
-  const [savingPres, setSavingPres] = useState(false)
-  const [deletingPres, setDeletingPres] = useState<string | null>(null)
-
-  const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos" | "objetivos">("categorias")
-  const [error, setError] = useState<string | null>(null)
-  const [inputObjetivo, setInputObjetivo] = useState("")
-  const [savingObj, setSavingObj] = useState(false)
-  const [editingObj, setEditingObj] = useState(false)
-
-  useEffect(() => {
-    if (isOpen) {
-      setNewCatName("")
-      setNewCatIcono("Package")
-      setNewCatTipo("gasto")
-      setError(null)
-      setEditingPresupuesto(null)
-      setInputPresupuesto("")
-      setInputObjetivo("")
-      setEditingObj(false)
-    }
-  }, [isOpen])
-
-  // Cerrar con Escape
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const getPresupuesto = (catId: string) =>
-    presupuestos.find(p => p.categoria_id === catId)
-
-  // ── CRUD categorías ───────────────────────────────────────────────────────
-  const handleAddCat = async () => {
-    if (!newCatName.trim()) return
-    setSavingCat(true)
-    setError(null)
-
-    const { data, error } = await supabase
-      .from("categorias")
-      .insert({
-        user_id: userId,
-        label: newCatName.trim(),
-        icono: newCatIcono,
-        tipo: newCatTipo,
-        orden: categorias.length,
-      })
-      .select()
-      .single()
-
-    if (error) setError("Error al crear la categoría.")
-    else if (data) {
-      onCategoriesChange([...categorias, data])
-      setNewCatName("")
-      setNewCatIcono("Package")
-    }
-    setSavingCat(false)
-  }
-
-  const handleDeleteCat = async (id: string) => {
-    setDeletingCat(id)
-    const { error } = await supabase.from("categorias").delete().eq("id", id)
-    if (error) setError("No se pudo borrar. Puede que haya movimientos asociados.")
-    else onCategoriesChange(categorias.filter(c => c.id !== id))
-    setDeletingCat(null)
-  }
-
-  // ── CRUD presupuestos ─────────────────────────────────────────────────────
-  const handleSavePresupuesto = async (catId: string) => {
-    const cantidad = parseFloat(inputPresupuesto)
-    if (!cantidad || cantidad <= 0) return
-    setSavingPres(true)
-    setError(null)
-
-    const cantidadCifrada = await encryptData(cantidad)
-    const existing = getPresupuesto(catId)
-    if (existing) {
-      const { data, error } = await supabase
-        .from("presupuestos")
-        .update({ cantidad: cantidadCifrada })
-        .eq("id", existing.id)
-        .select()
-        .single()
-      if (error) setError("Error al actualizar el presupuesto.")
-      else if (data) onPresupuestosChange(presupuestos.map(p => p.id === existing.id ? { ...data, cantidad } : p))
-    } else {
-      const { data, error } = await supabase
-        .from("presupuestos")
-        .insert({ user_id: userId, categoria_id: catId, cantidad: cantidadCifrada })
-        .select()
-        .single()
-      if (error) setError("Error al crear el presupuesto.")
-      else if (data) onPresupuestosChange([...presupuestos, { ...data, cantidad }])
-    }
-
-    setSavingPres(false)
-    setEditingPresupuesto(null)
-    setInputPresupuesto("")
-  }
-
-  const handleDeletePresupuesto = async (presId: string) => {
-    setDeletingPres(presId)
-    const { error } = await supabase.from("presupuestos").delete().eq("id", presId)
-    if (!error) onPresupuestosChange(presupuestos.filter(p => p.id !== presId))
-    setDeletingPres(null)
-  }
-
-  // BUG #26 FIX: solo categorías de tipo "gasto" para presupuestos.
-  // Las de tipo "ambos" se excluyen deliberadamente — un presupuesto de gasto
-  // sobre una categoría mixta daría cifras incorrectas al mezclar ingresos.
-  // ── CRUD objetivos ────────────────────────────────────────────────────────
-  const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
-
-  const handleSaveObjetivo = async () => {
-    const cantidad = parseFloat(inputObjetivo)
-    if (!cantidad || cantidad <= 0) return
-    setSavingObj(true)
-    setError(null)
-    const cantidadCifrada = await encryptData(cantidad)
-
-    if (objetivoAhorro) {
-      const { data, error } = await supabase
-        .from("objetivos")
-        .update({ cantidad: cantidadCifrada, updated_at: new Date().toISOString() })
-        .eq("id", objetivoAhorro.id)
-        .select()
-        .single()
-      if (error) setError("Error al actualizar el objetivo.")
-      else if (data) onObjetivosChange(objetivos.map(o => o.id === objetivoAhorro.id ? { ...data, cantidad } : o))
-    } else {
-      const { data, error } = await supabase
-        .from("objetivos")
-        .insert({ user_id: userId, tipo: "ahorro_mensual", cantidad: cantidadCifrada })
-        .select()
-        .single()
-      if (error) setError("Error al crear el objetivo.")
-      else if (data) onObjetivosChange([...objetivos, { ...data, cantidad }])
-    }
-
-    setSavingObj(false)
-    setEditingObj(false)
-    setInputObjetivo("")
-  }
-
-  const handleDeleteObjetivo = async () => {
-    if (!objetivoAhorro) return
-    const { error } = await supabase.from("objetivos").delete().eq("id", objetivoAhorro.id)
-    if (!error) onObjetivosChange(objetivos.filter(o => o.id !== objetivoAhorro.id))
-  }
-
-  const gastoCats = categorias.filter(c => c.tipo === "gasto")
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="settings-modal-title"
-    >
-      <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
-      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
-
-        <div className="flex items-center justify-between mb-5">
-          <h2 id="settings-modal-title" className="text-xl font-semibold text-zinc-100">
-            Configuración
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar configuración"
-            className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
-          >
-            <X className="w-5 h-5 text-zinc-400" />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div
-          className="flex rounded-xl bg-zinc-800 p-1 border border-zinc-700/60 mb-6"
-          role="tablist"
-          aria-label="Secciones de configuración"
-        >
-          {([
-            { id: "categorias", label: "Categorías" },
-            { id: "presupuestos", label: "Presupuestos" },
-            { id: "objetivos", label: "Objetivos" },
-          ] as const).map(t => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={activeTab === t.id}
-              onClick={() => { setActiveTab(t.id); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === t.id
-                  ? "bg-zinc-600 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-300"
-                }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div role="alert" className="mb-4 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
-            {error}
-          </div>
-        )}
-
-        {/* ── TAB: Categorías ──────────────────────────────────────────────── */}
-        {activeTab === "categorias" && (
-          <div className="space-y-6">
-            <p className="text-xs text-zinc-600">
-              Las categorías aparecen en la pestaña <strong className="text-zinc-500">Registrar</strong> para clasificar tus movimientos.
-            </p>
-            {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
-              const cats = categorias.filter(c => c.tipo === tipo)
-              if (cats.length === 0) return null
-
-              return (
-                <div key={tipo} className="mb-5">
-                  <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
-                    {tipo === "gasto"
-                      ? "Solo Gastos"
-                      : tipo === "ingreso"
-                        ? "Solo Ingresos"
-                        : "Compartidas (Ambos)"
-                    }
-                  </p>
-                  <div className="space-y-2">
-                    {cats.map(cat => {
-                      const CIcon = getIcon(cat.icono)
-                      const isDeleting = deletingCat === cat.id
-                      return (
-                        <div
-                          key={cat.id}
-                          className="flex items-center justify-between bg-zinc-800 border border-zinc-700/50 rounded-xl px-3 py-2.5"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                            <span className="text-sm text-zinc-200">{cat.label}</span>
-                            {cat.tipo === "ambos" && (
-                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">
-                                ambos
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => handleDeleteCat(cat.id)}
-                            disabled={!!isDeleting}
-                            aria-label={`Borrar categoría ${cat.label}`}
-                            className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors"
-                          >
-                            {isDeleting
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <Trash2 className="w-3.5 h-3.5" />
-                            }
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-
-            {/* Nueva categoría */}
-            <div className="space-y-3 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">Nueva categoría</p>
-
-              <div
-                className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700"
-                role="group"
-                aria-label="Tipo de categoría"
-              >
-                {(["gasto", "ingreso", "ambos"] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setNewCatTipo(t)}
-                    aria-pressed={newCatTipo === t}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t
-                        ? "bg-zinc-600 text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-300"
-                      }`}
-                  >
-                    {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Ambos"}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newCatName}
-                  onChange={e => setNewCatName(e.target.value)}
-                  placeholder="Nombre de la categoría"
-                  aria-label="Nombre de la nueva categoría"
-                  onKeyDown={e => e.key === "Enter" && handleAddCat()}
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
-                />
-                <button
-                  onClick={handleAddCat}
-                  disabled={savingCat || !newCatName.trim()}
-                  aria-label="Crear categoría"
-                  className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-medium hover:bg-emerald-400 disabled:opacity-50 transition-all"
-                >
-                  {savingCat
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Plus className="w-4 h-4" />
-                  }
-                </button>
-              </div>
-
-              <div>
-                <p className="text-xs text-zinc-600 mb-2" id="icono-cat-label">Icono</p>
-                <div className="grid grid-cols-7 gap-1.5" role="group" aria-labelledby="icono-cat-label">
-                  {CATEGORIA_ICON_OPTIONS.map(name => {
-                    const Ico = getIcon(name)
-                    return (
-                      <button
-                        key={name}
-                        onClick={() => setNewCatIcono(name)}
-                        aria-label={`Icono ${name}`}
-                        aria-pressed={newCatIcono === name}
-                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name
-                            ? "border-emerald-500/60 bg-emerald-950/30"
-                            : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"
-                          }`}
-                      >
-                        <Ico className="w-4 h-4 text-zinc-300" aria-hidden="true" />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── TAB: Presupuestos ─────────────────────────────────────────────── */}
-        {activeTab === "presupuestos" && (
-          <div className="space-y-3">
-            {/* BUG #26 FIX: nota informativa sobre el alcance de los presupuestos */}
-            <p className="text-xs text-zinc-600 mb-4">
-              Asigna un límite mensual a tus categorías de{" "}
-              <strong className="text-zinc-500">gasto puro</strong>. El widget de presupuestos
-              en el <strong className="text-zinc-500">Dashboard</strong> muestra el progreso de cada límite.
-            </p>
-
-            {gastoCats.length === 0 ? (
-              <p className="text-sm text-zinc-600 text-center py-8">
-                No tienes categorías de gasto aún.
-              </p>
-            ) : (
-              gastoCats.map(cat => {
-                const CIcon = getIcon(cat.icono)
-                const pres = getPresupuesto(cat.id)
-                const isEditing = editingPresupuesto === cat.id
-                const isDeleting = deletingPres === pres?.id
-
-                return (
-                  <div key={cat.id} className="bg-zinc-800 border border-zinc-700/60 rounded-2xl p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center flex-shrink-0">
-                        <CIcon className="w-4 h-4 text-zinc-300" aria-hidden="true" />
-                      </div>
-                      <p className="text-sm font-medium text-zinc-200 flex-1">{cat.label}</p>
-
-                      {pres && !isEditing && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-emerald-400 tabular-nums">
-                            {pres.cantidad.toFixed(2)}€
-                          </span>
-                          <button
-                            onClick={() => {
-                              setEditingPresupuesto(cat.id)
-                              setInputPresupuesto(pres.cantidad.toString())
-                            }}
-                            aria-label={`Editar presupuesto de ${cat.label}`}
-                            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDeletePresupuesto(pres.id)}
-                            disabled={isDeleting}
-                            aria-label={`Borrar presupuesto de ${cat.label}`}
-                            className="text-zinc-600 hover:text-red-400 transition-colors"
-                          >
-                            {isDeleting
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <Trash2 className="w-3.5 h-3.5" />
-                            }
-                          </button>
-                        </div>
-                      )}
-
-                      {!pres && !isEditing && (
-                        <button
-                          onClick={() => {
-                            setEditingPresupuesto(cat.id)
-                            setInputPresupuesto("")
-                          }}
-                          aria-label={`Añadir límite de presupuesto para ${cat.label}`}
-                          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                        >
-                          <Target className="w-3.5 h-3.5" aria-hidden="true" />
-                          Añadir límite
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Formulario inline de edición */}
-                    {isEditing && (
-                      <div className="flex gap-2 mt-1">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          value={inputPresupuesto}
-                          onChange={e => setInputPresupuesto(e.target.value)}
-                          placeholder="Límite mensual (€)"
-                          aria-label={`Límite mensual para ${cat.label}`}
-                          autoFocus
-                          onKeyDown={e => {
-                            if (e.key === "Enter") handleSavePresupuesto(cat.id)
-                            if (e.key === "Escape") setEditingPresupuesto(null)
-                          }}
-                          className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
-                        />
-                        <button
-                          onClick={() => handleSavePresupuesto(cat.id)}
-                          disabled={savingPres}
-                          aria-label="Guardar presupuesto"
-                          className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all"
-                        >
-                          {savingPres
-                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                            : "OK"
-                          }
-                        </button>
-                        <button
-                          onClick={() => setEditingPresupuesto(null)}
-                          aria-label="Cancelar edición"
-                          className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        )}
-
-        {/* ── TAB: Objetivos ───────────────────────────────────────────────── */}
-        {activeTab === "objetivos" && (
-          <div className="space-y-4">
-            <p className="text-xs text-zinc-600">
-              Define metas de ahorro mensuales. El widget de{" "}
-              <strong className="text-zinc-500">Objetivo de ahorro</strong> en el Dashboard
-              mostrará tu progreso. Los datos se cifran con tu PIN.
-            </p>
-
-            <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                  <PiggyBank className="w-4 h-4 text-emerald-400" aria-hidden="true" />
-                </div>
-                <p className="text-sm font-medium text-zinc-200 flex-1">Ahorro mensual</p>
-
-                {objetivoAhorro && !editingObj && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-emerald-400 tabular-nums">
-                      {objetivoAhorro.cantidad.toFixed(2)}€
-                    </span>
-                    <button
-                      onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }}
-                      className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={handleDeleteObjetivo}
-                      aria-label="Borrar objetivo de ahorro"
-                      className="text-zinc-600 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                {!objetivoAhorro && !editingObj && (
-                  <button
-                    onClick={() => setEditingObj(true)}
-                    className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                  >
-                    <Target className="w-3.5 h-3.5" aria-hidden="true" />
-                    Añadir objetivo
-                  </button>
-                )}
-              </div>
-
-              {editingObj && (
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={inputObjetivo}
-                    onChange={e => setInputObjetivo(e.target.value)}
-                    placeholder="Objetivo mensual (€)"
-                    autoFocus
-                    onKeyDown={e => {
-                      if (e.key === "Enter") handleSaveObjetivo()
-                      if (e.key === "Escape") setEditingObj(false)
-                    }}
-                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
-                  />
-                  <button
-                    onClick={handleSaveObjetivo}
-                    disabled={savingObj}
-                    className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all"
-                  >
-                    {savingObj ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
-                  </button>
-                  <button
-                    onClick={() => setEditingObj(false)}
-                    className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={onClose}
-          className="w-full mt-6 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
-        >
-          Cerrar
-        </button>
-      </div>
-    </div>
   )
 }
 </file>
@@ -6359,6 +5736,949 @@ function CategoryButton({
 }
 </file>
 
+<file path="components/modals/SettingsModal.tsx">
+"use client"
+
+// components/modals/SettingsModal.tsx
+// ─── Fixes en este archivo ────────────────────────────────────────────────────
+// BUG #26: Las categorías de tipo "ambos" aparecían en la sección de presupuestos
+//          junto a las de tipo "gasto", causando confusión porque una categoría
+//          compartida (ej. "Suscripciones") podía ser tanto ingreso como gasto.
+//          FIX: En el tab de Presupuestos solo mostramos categorías cuyo tipo
+//          es EXCLUSIVAMENTE "gasto". Las de tipo "ambos" quedan excluidas
+//          porque no tiene sentido limitar su gasto si también acumula ingresos.
+//          Si el usuario quiere presupuesto en una cat. mixta, debe crear una
+//          específica de gasto.
+
+import { useState, useEffect } from "react"
+import { X, Trash2, Loader2, Plus, Target, PiggyBank, ChevronRight, Shield, Fingerprint } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
+import { encryptData, isBiometricAvailable, hasBiometricKey, saveBiometricKey, clearBiometricKey } from "@/lib/crypto"
+import type { Categoria, Presupuesto, Objetivo } from "@/types"
+
+type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
+
+export default function SettingsModal({
+  isOpen, onClose, categorias, onCategoriesChange,
+  presupuestos, onPresupuestosChange,
+  objetivos, onObjetivosChange,
+  session, userId,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  categorias: Categoria[]
+  onCategoriesChange: (cats: Categoria[]) => void
+  presupuestos: Presupuesto[]
+  onPresupuestosChange: (p: Presupuesto[]) => void
+  objetivos: Objetivo[]
+  onObjetivosChange: (o: Objetivo[]) => void
+  session: Session
+  userId: string
+}) {
+  const [newCatName, setNewCatName] = useState("")
+  const [newCatTipo, setNewCatTipo] = useState<"gasto" | "ingreso" | "ambos">("gasto")
+  const [newCatIcono, setNewCatIcono] = useState("Package")
+  const [savingCat, setSavingCat] = useState(false)
+  const [deletingCat, setDeletingCat] = useState<string | null>(null)
+
+  const [editingPresupuesto, setEditingPresupuesto] = useState<string | null>(null)
+  const [inputPresupuesto, setInputPresupuesto] = useState("")
+  const [savingPres, setSavingPres] = useState(false)
+  const [deletingPres, setDeletingPres] = useState<string | null>(null)
+
+  const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos" | "objetivos" | "seguridad" | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [inputObjetivo, setInputObjetivo] = useState("")
+  const [savingObj, setSavingObj] = useState(false)
+  const [editingObj, setEditingObj] = useState(false)
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioEnabled, setBioEnabled] = useState(false)
+  const [bioLoading, setBioLoading] = useState(false)
+  const [bioError, setBioError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      setNewCatName("")
+      setNewCatIcono("Package")
+      setNewCatTipo("gasto")
+      setError(null)
+      setEditingPresupuesto(null)
+      setInputPresupuesto("")
+      setInputObjetivo("")
+      setEditingObj(false)
+      setActiveTab(null)
+      setBioError(null)
+      isBiometricAvailable().then(available => {
+        setBioAvailable(available)
+        setBioEnabled(hasBiometricKey())
+      })
+    }
+  }, [isOpen])
+
+  // Cerrar con Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getPresupuesto = (catId: string) =>
+    presupuestos.find(p => p.categoria_id === catId)
+
+  // ── CRUD categorías ───────────────────────────────────────────────────────
+  const handleAddCat = async () => {
+    if (!newCatName.trim()) return
+    setSavingCat(true)
+    setError(null)
+
+    const { data, error } = await supabase
+      .from("categorias")
+      .insert({
+        user_id: userId,
+        label: newCatName.trim(),
+        icono: newCatIcono,
+        tipo: newCatTipo,
+        orden: categorias.length,
+      })
+      .select()
+      .single()
+
+    if (error) setError("Error al crear la categoría.")
+    else if (data) {
+      onCategoriesChange([...categorias, data])
+      setNewCatName("")
+      setNewCatIcono("Package")
+    }
+    setSavingCat(false)
+  }
+
+  const handleDeleteCat = async (id: string) => {
+    setDeletingCat(id)
+    const { error } = await supabase.from("categorias").delete().eq("id", id)
+    if (error) setError("No se pudo borrar. Puede que haya movimientos asociados.")
+    else onCategoriesChange(categorias.filter(c => c.id !== id))
+    setDeletingCat(null)
+  }
+
+  // ── CRUD presupuestos ─────────────────────────────────────────────────────
+  const handleSavePresupuesto = async (catId: string) => {
+    const cantidad = parseFloat(inputPresupuesto)
+    if (!cantidad || cantidad <= 0) return
+    setSavingPres(true)
+    setError(null)
+
+    const cantidadCifrada = await encryptData(cantidad)
+    const existing = getPresupuesto(catId)
+    if (existing) {
+      const { data, error } = await supabase
+        .from("presupuestos")
+        .update({ cantidad: cantidadCifrada })
+        .eq("id", existing.id)
+        .select()
+        .single()
+      if (error) setError("Error al actualizar el presupuesto.")
+      else if (data) onPresupuestosChange(presupuestos.map(p => p.id === existing.id ? { ...data, cantidad } : p))
+    } else {
+      const { data, error } = await supabase
+        .from("presupuestos")
+        .insert({ user_id: userId, categoria_id: catId, cantidad: cantidadCifrada })
+        .select()
+        .single()
+      if (error) setError("Error al crear el presupuesto.")
+      else if (data) onPresupuestosChange([...presupuestos, { ...data, cantidad }])
+    }
+
+    setSavingPres(false)
+    setEditingPresupuesto(null)
+    setInputPresupuesto("")
+  }
+
+  const handleDeletePresupuesto = async (presId: string) => {
+    setDeletingPres(presId)
+    const { error } = await supabase.from("presupuestos").delete().eq("id", presId)
+    if (!error) onPresupuestosChange(presupuestos.filter(p => p.id !== presId))
+    setDeletingPres(null)
+  }
+
+  // BUG #26 FIX: solo categorías de tipo "gasto" para presupuestos.
+  // Las de tipo "ambos" se excluyen deliberadamente — un presupuesto de gasto
+  // sobre una categoría mixta daría cifras incorrectas al mezclar ingresos.
+  // ── CRUD objetivos ────────────────────────────────────────────────────────
+  const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
+
+  const handleSaveObjetivo = async () => {
+    const cantidad = parseFloat(inputObjetivo)
+    if (!cantidad || cantidad <= 0) return
+    setSavingObj(true)
+    setError(null)
+    const cantidadCifrada = await encryptData(cantidad)
+
+    if (objetivoAhorro) {
+      const { data, error } = await supabase
+        .from("objetivos")
+        .update({ cantidad: cantidadCifrada, updated_at: new Date().toISOString() })
+        .eq("id", objetivoAhorro.id)
+        .select()
+        .single()
+      if (error) setError("Error al actualizar el objetivo.")
+      else if (data) onObjetivosChange(objetivos.map(o => o.id === objetivoAhorro.id ? { ...data, cantidad } : o))
+    } else {
+      const { data, error } = await supabase
+        .from("objetivos")
+        .insert({ user_id: userId, tipo: "ahorro_mensual", cantidad: cantidadCifrada })
+        .select()
+        .single()
+      if (error) setError("Error al crear el objetivo.")
+      else if (data) onObjetivosChange([...objetivos, { ...data, cantidad }])
+    }
+
+    setSavingObj(false)
+    setEditingObj(false)
+    setInputObjetivo("")
+  }
+
+  const handleDeleteObjetivo = async () => {
+    if (!objetivoAhorro) return
+    const { error } = await supabase.from("objetivos").delete().eq("id", objetivoAhorro.id)
+    if (!error) onObjetivosChange(objetivos.filter(o => o.id !== objetivoAhorro.id))
+  }
+
+  const handleToggleBiometric = async () => {
+    setBioLoading(true)
+    setBioError(null)
+    if (bioEnabled) {
+      clearBiometricKey()
+      setBioEnabled(false)
+    } else {
+      const ok = await saveBiometricKey(userId)
+      if (ok) setBioEnabled(true)
+        else setBioError("No se pudo activar. Inténtalo de nuevo.")
+    }
+    setBioLoading(false)
+  }
+
+  const gastoCats = categorias.filter(c => c.tipo === "gasto")
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
+    >
+      <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+
+        <div className="flex items-center justify-between mb-5">
+          <h2 id="settings-modal-title" className="text-xl font-semibold text-zinc-100">
+            Configuración
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar configuración"
+            className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-5 h-5 text-zinc-400" />
+          </button>
+        </div>
+
+        {/* Lista vertical de secciones */}
+        <div className="space-y-2 mb-4">
+          {([
+            { id: "categorias",   label: "Categorías",   desc: "Gestiona tus categorías",         Icon: ChevronRight },
+            { id: "presupuestos", label: "Presupuestos",  desc: "Límites mensuales por categoría", Icon: ChevronRight },
+            { id: "objetivos",    label: "Objetivos",     desc: "Metas de ahorro mensual",         Icon: ChevronRight },
+            { id: "seguridad",    label: "Seguridad",     desc: "Biometría y acceso",              Icon: Shield       },
+          ] as const).map(({ id, label, desc, Icon }) => (
+            <button
+              key={id}
+              onClick={() => { setActiveTab(activeTab === id ? null : id); setError(null); setBioError(null) }}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all text-left ${
+                activeTab === id
+                  ? "border-emerald-500/40 bg-emerald-950/20"
+                  : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-700"
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${activeTab === id ? "text-zinc-100" : "text-zinc-300"}`}>
+                  {label}
+                </p>
+                <p className="text-xs text-zinc-600 mt-0.5">{desc}</p>
+              </div>
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${activeTab === id ? "text-emerald-400 rotate-90" : "text-zinc-600"}`} />
+            </button>
+          ))}
+        </div>
+
+        {error && (
+          <div role="alert" className="mb-4 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* ── Categorías ───────────────────────────────────────────────────── */}
+        {activeTab === "categorias" && (
+          <div className="space-y-6 mt-2">
+            <p className="text-xs text-zinc-600">
+              Las categorías aparecen en la pestaña <strong className="text-zinc-500">Registrar</strong> para clasificar tus movimientos.
+            </p>
+            {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
+              const cats = categorias.filter(c => c.tipo === tipo)
+              if (cats.length === 0) return null
+              return (
+                <div key={tipo} className="mb-5">
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
+                    {tipo === "gasto" ? "Solo Gastos" : tipo === "ingreso" ? "Solo Ingresos" : "Compartidas (Ambos)"}
+                  </p>
+                  <div className="space-y-2">
+                    {cats.map(cat => {
+                      const CIcon = getIcon(cat.icono)
+                      const isDeleting = deletingCat === cat.id
+                      return (
+                        <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700/50 rounded-xl px-3 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" aria-hidden="true" />
+                            <span className="text-sm text-zinc-200">{cat.label}</span>
+                            {cat.tipo === "ambos" && (
+                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">ambos</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteCat(cat.id)}
+                            disabled={!!isDeleting}
+                            aria-label={`Borrar categoría ${cat.label}`}
+                            className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors"
+                          >
+                            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+            <div className="space-y-3 pt-4 border-t border-zinc-800">
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">Nueva categoría</p>
+              <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700" role="group" aria-label="Tipo de categoría">
+                {(["gasto", "ingreso", "ambos"] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setNewCatTipo(t)}
+                    aria-pressed={newCatTipo === t}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+                  >
+                    {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Ambos"}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCatName}
+                  onChange={e => setNewCatName(e.target.value)}
+                  placeholder="Nombre de la categoría"
+                  aria-label="Nombre de la nueva categoría"
+                  onKeyDown={e => e.key === "Enter" && handleAddCat()}
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                />
+                <button
+                  onClick={handleAddCat}
+                  disabled={savingCat || !newCatName.trim()}
+                  aria-label="Crear categoría"
+                  className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-medium hover:bg-emerald-400 disabled:opacity-50 transition-all"
+                >
+                  {savingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                </button>
+              </div>
+              <div>
+                <p className="text-xs text-zinc-600 mb-2" id="icono-cat-label">Icono</p>
+                <div className="grid grid-cols-7 gap-1.5" role="group" aria-labelledby="icono-cat-label">
+                  {CATEGORIA_ICON_OPTIONS.map(name => {
+                    const Ico = getIcon(name)
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => setNewCatIcono(name)}
+                        aria-label={`Icono ${name}`}
+                        aria-pressed={newCatIcono === name}
+                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name ? "border-emerald-500/60 bg-emerald-950/30" : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"}`}
+                      >
+                        <Ico className="w-4 h-4 text-zinc-300" aria-hidden="true" />
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Presupuestos ─────────────────────────────────────────────────── */}
+        {activeTab === "presupuestos" && (
+          <div className="space-y-3 mt-2">
+            <p className="text-xs text-zinc-600 mb-4">
+              Asigna un límite mensual a tus categorías de{" "}
+              <strong className="text-zinc-500">gasto puro</strong>. El widget de presupuestos
+              en el <strong className="text-zinc-500">Dashboard</strong> muestra el progreso de cada límite.
+            </p>
+            {gastoCats.length === 0 ? (
+              <p className="text-sm text-zinc-600 text-center py-8">No tienes categorías de gasto aún.</p>
+            ) : (
+              gastoCats.map(cat => {
+                const CIcon = getIcon(cat.icono)
+                const pres = getPresupuesto(cat.id)
+                const isEditing = editingPresupuesto === cat.id
+                const isDeleting = deletingPres === pres?.id
+                return (
+                  <div key={cat.id} className="bg-zinc-800 border border-zinc-700/60 rounded-2xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center flex-shrink-0">
+                        <CIcon className="w-4 h-4 text-zinc-300" aria-hidden="true" />
+                      </div>
+                      <p className="text-sm font-medium text-zinc-200 flex-1">{cat.label}</p>
+                      {pres && !isEditing && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-emerald-400 tabular-nums">{Number(pres.cantidad).toFixed(2)}€</span>
+                          <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto(pres.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">Editar</button>
+                          <button onClick={() => handleDeletePresupuesto(pres.id)} disabled={isDeleting} className="text-zinc-600 hover:text-red-400 transition-colors">
+                            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
+                      {!pres && !isEditing && (
+                        <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto("") }} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                          <Target className="w-3.5 h-3.5" aria-hidden="true" /> Añadir límite
+                        </button>
+                      )}
+                    </div>
+                    {isEditing && (
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          type="number" inputMode="decimal" value={inputPresupuesto}
+                          onChange={e => setInputPresupuesto(e.target.value)}
+                          placeholder="Límite mensual (€)" autoFocus
+                          onKeyDown={e => { if (e.key === "Enter") handleSavePresupuesto(cat.id); if (e.key === "Escape") setEditingPresupuesto(null) }}
+                          className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                        />
+                        <button onClick={() => handleSavePresupuesto(cat.id)} disabled={savingPres} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
+                          {savingPres ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
+                        </button>
+                        <button onClick={() => setEditingPresupuesto(null)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {/* ── Objetivos ────────────────────────────────────────────────────── */}
+        {activeTab === "objetivos" && (
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-zinc-600">
+              Define metas de ahorro mensuales. El widget de{" "}
+              <strong className="text-zinc-500">Objetivo de ahorro</strong> en el Dashboard
+              mostrará tu progreso. Los datos se cifran con tu PIN.
+            </p>
+            <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                  <PiggyBank className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-zinc-200 flex-1">Ahorro mensual</p>
+                {objetivoAhorro && !editingObj && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-emerald-400 tabular-nums">{objetivoAhorro.cantidad.toFixed(2)}€</span>
+                    <button onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">Editar</button>
+                    <button onClick={handleDeleteObjetivo} aria-label="Borrar objetivo de ahorro" className="text-zinc-600 hover:text-red-400 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                {!objetivoAhorro && !editingObj && (
+                  <button onClick={() => setEditingObj(true)} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                    <Target className="w-3.5 h-3.5" aria-hidden="true" /> Añadir objetivo
+                  </button>
+                )}
+              </div>
+              {editingObj && (
+                <div className="flex gap-2">
+                  <input
+                    type="number" inputMode="decimal" value={inputObjetivo}
+                    onChange={e => setInputObjetivo(e.target.value)}
+                    placeholder="Objetivo mensual (€)" autoFocus
+                    onKeyDown={e => { if (e.key === "Enter") handleSaveObjetivo(); if (e.key === "Escape") setEditingObj(false) }}
+                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                  <button onClick={handleSaveObjetivo} disabled={savingObj} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
+                    {savingObj ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
+                  </button>
+                  <button onClick={() => setEditingObj(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Seguridad ────────────────────────────────────────────────────── */}
+        {activeTab === "seguridad" && (
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-zinc-600">
+              Configura el acceso biométrico para desbloquear GastOS sin introducir el PIN.
+            </p>
+            {!bioAvailable ? (
+              <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
+                <Fingerprint className="w-5 h-5 text-zinc-600 flex-shrink-0" aria-hidden="true" />
+                <p className="text-sm text-zinc-500">Tu dispositivo no soporta desbloqueo biométrico.</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bioEnabled ? "bg-emerald-500/10" : "bg-zinc-700"}`}>
+                    <Fingerprint className={`w-4 h-4 ${bioEnabled ? "text-emerald-400" : "text-zinc-500"}`} aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">Desbloqueo biométrico</p>
+                    <p className="text-xs text-zinc-600 mt-0.5">
+                    {bioEnabled ? "Activo — biometría del dispositivo" : "Inactivo — solo PIN"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleBiometric}
+                    disabled={bioLoading}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      bioEnabled
+                        ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
+                        : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                    } disabled:opacity-50`}
+                  >
+                    {bioLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : bioEnabled ? "Desactivar" : "Activar"}
+                  </button>
+                </div>
+                {bioError && (
+                  <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-3 py-2">{bioError}</p>
+                )}
+                {bioEnabled && (
+                  <p className="text-xs text-zinc-700">
+                    Si cambias tu PIN via recuperación de correo, deberás reactivar la biometría.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full mt-6 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="lib/crypto.ts">
+// lib/crypto.ts
+// ─── Capa de Encriptación E2EE de GastOS ─────────────────────────────────────
+//
+// CONTRATO:
+//   encryptData(valor)  → string cifrado listo para guardar en Supabase
+//   decryptData(cipher) → string en claro listo para usar en UI
+//
+// ARQUITECTURA:
+//   - Web Crypto API nativa del navegador (sin CryptoJS)
+//   - PBKDF2-SHA256 con 300.000 iteraciones
+//   - AES-GCM (cifrado autenticado — detecta manipulación del ciphertext)
+//   - Salt aleatorio de 16 bytes, generado al crear el vault, guardado en BD
+//   - CryptoKey guardada en memoria del módulo (nunca serializada, se pierde al cerrar pestaña)
+//
+// REGLA DE ORO:
+//   - Nunca guardar en Supabase sin pasar por encryptData()
+//   - Nunca mostrar en UI sin pasar por decryptData()
+//   - Los objetos en el estado React siempre están en CLARO
+
+// ─── Estado interno del módulo ────────────────────────────────────────────────
+// La CryptoKey nativa vive aquí. No se exporta, no va a sessionStorage.
+// Se pierde al cerrar la pestaña → el usuario debe introducir el PIN de nuevo.
+let _masterKey: CryptoKey | null = null
+
+const STORAGE_KEY       = 'gastos_master_vault_key_v2'  // versión nueva, no colisiona con CryptoJS
+const VERIFICATION_TEXT = 'GASTOS_VALID_V2'
+
+// ─── Generación de salt ───────────────────────────────────────────────────────
+// Llamar una sola vez al crear el vault. Devuelve base64 para guardar en BD.
+export function generateSalt(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return btoa(String.fromCharCode(...bytes))
+}
+
+function saltFromBase64(b64: string): Uint8Array {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+}
+
+// ─── Derivación de clave ──────────────────────────────────────────────────────
+// salt: Uint8Array generado con generateSalt() y recuperado de BD.
+// Devuelve una CryptoKey AES-GCM lista para usar.
+export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<CryptoKey> {
+  const enc = new TextEncoder()
+
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(pin),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey'],
+  )
+
+  // Copia con buffer propio: TS infiere Uint8Array<ArrayBufferLike> y no encaja con BufferSource de subtle.
+  const saltBytes = new Uint8Array(salt)
+
+  return crypto.subtle.deriveKey(
+    {
+      name:       'PBKDF2',
+      salt:       saltBytes,
+      iterations: 300_000,
+      hash:       'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,           // exportable — necesario para biometría
+    ['encrypt', 'decrypt'],
+  )
+}
+
+// ─── Gestión de la clave maestra en sesión ────────────────────────────────────
+// saveKey: recibe la CryptoKey derivada y la guarda en el módulo.
+// También guarda un flag en sessionStorage para saber si la sesión está activa
+// (la CryptoKey en sí NO se puede serializar — solo el flag).
+export function saveKey(key: CryptoKey): void {
+  _masterKey = key
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem(STORAGE_KEY, '1')
+  }
+}
+
+export function getMasterKey(): CryptoKey | null {
+  return _masterKey
+}
+
+// Indica si hay una sesión activa (flag en sessionStorage + key en memoria).
+// En recarga de pestaña: sessionStorage tiene '1' pero _masterKey es null → false.
+export function hasActiveSession(): boolean {
+  if (typeof window === 'undefined') return false
+  return _masterKey !== null && sessionStorage.getItem(STORAGE_KEY) === '1'
+}
+
+export function clearKey(): void {
+  _masterKey = null
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem(STORAGE_KEY)
+  }
+}
+
+// ─── Verificación de vault ────────────────────────────────────────────────────
+// Cifra el texto de verificación con la clave derivada.
+// El token resultante se guarda en BD y permite verificar el PIN sin guardar la clave.
+export async function generateVerificationToken(key: CryptoKey): Promise<string> {
+  const enc = new TextEncoder()
+  const iv  = crypto.getRandomValues(new Uint8Array(12))
+
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    enc.encode(VERIFICATION_TEXT),
+  )
+
+  // Formato: base64(iv) + '.' + base64(ciphertext)
+  const ivB64   = btoa(String.fromCharCode(...iv))
+  const ctB64   = btoa(String.fromCharCode(...new Uint8Array(cipherBuffer)))
+  return `${ivB64}.${ctB64}`
+}
+
+export async function isKeyValid(key: CryptoKey, tokenFromDB: string): Promise<boolean> {
+  try {
+    const [ivB64, ctB64] = tokenFromDB.split('.')
+    if (!ivB64 || !ctB64) return false
+
+    const iv         = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
+    const ciphertext = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
+
+    const plainBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext,
+    )
+
+    const dec = new TextDecoder()
+    return dec.decode(plainBuffer) === VERIFICATION_TEXT
+  } catch {
+    return false
+  }
+}
+
+// ─── Cifrado / Descifrado de datos ────────────────────────────────────────────
+//
+// encryptData: acepta string o number, devuelve string cifrado (base64 iv + '.' + base64 ct).
+//   Si no hay clave disponible o el valor es vacío, devuelve '' (fallo silencioso).
+//   SÍNCRONO hacia fuera: usa _masterKey en memoria. Internamente lanza una
+//   micro-task via un truco de sincronización — ver nota abajo.
+//
+// NOTA TÉCNICA: Web Crypto API es async, pero queremos mantener la API síncrona
+// para no tener que convertir en async todos los handlers de IngresoTab, HistorialTab, etc.
+// La solución: usamos XMLHttpRequest síncrono vacío para "drenar" la microtask queue,
+// lo que no es posible en workers pero sí en el main thread de un navegador moderno.
+// Alternativa más limpia si en el futuro se quiere refactorizar: hacer encryptData async
+// y usar Promise.all en los inserts de Supabase.
+//
+// IMPLEMENTACIÓN REAL: dado que XMLHttpRequest síncrono está deprecated y causa
+// warnings, usamos una aproximación diferente: encryptData y decryptData son en
+// realidad async internamente pero exponemos versiones síncronas que operan sobre
+// un buffer de resultados pre-calculados. Esto no es viable en el navegador.
+//
+// DECISIÓN FINAL: mantenemos encryptData/decryptData como funciones que devuelven
+// string directamente usando una implementación XOR+base64 como fallback NO — 
+// La solución correcta es: hacerlas async. El impacto en cascada es mínimo
+// porque los únicos sitios donde se llaman son dentro de funciones async
+// (handleGuardar, handleImport, handleCobrarSub, etc.) que ya usan await.
+// Solo hay que añadir await delante de encryptData/decryptData en esos sitios.
+//
+// Los componentes afectados son: IngresoTab, HistorialTab, CuentasModal,
+// ImportCSVModal, DashboardTab, page.tsx — todos ya tienen funciones async.
+
+export async function encryptData(text: string | number): Promise<string> {
+  const key = _masterKey
+  if (!key || text === null || text === undefined || text === '') return ''
+
+  const enc = new TextEncoder()
+  const iv  = crypto.getRandomValues(new Uint8Array(12))
+
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    enc.encode(text.toString()),
+  )
+
+  const ivB64 = btoa(String.fromCharCode(...iv))
+  const ctB64 = btoa(String.fromCharCode(...new Uint8Array(cipherBuffer)))
+  return `${ivB64}.${ctB64}`
+}
+
+export async function decryptData(cipherText: string | number): Promise<string> {
+  const key = _masterKey
+  if (!key || cipherText === null || cipherText === undefined || cipherText === '') return ''
+
+  const textString = cipherText.toString()
+
+  // Datos legacy de CryptoJS (prefijo antiguo) o datos en claro: devolver tal cual.
+  // Tras el vaciado de BD esto no debería aparecer, pero lo mantenemos como guardia.
+  if (!textString.includes('.') || textString.startsWith('U2FsdGVkX1')) {
+    return textString
+  }
+
+  try {
+    const [ivB64, ctB64] = textString.split('.')
+    if (!ivB64 || !ctB64) return textString
+
+    const iv         = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
+    const ciphertext = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
+
+    const plainBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext,
+    )
+
+    return new TextDecoder().decode(plainBuffer)
+  } catch {
+    // AES-GCM falla si el ciphertext fue manipulado → devolvemos vacío, no el cifrado
+    return ''
+  }
+}
+
+// ─── Biometría (WebAuthn) ─────────────────────────────────────────────────────
+const BIOMETRIC_KEY_STORAGE  = 'gastos_biometric_wrapped_v2'
+const BIOMETRIC_CRED_STORAGE = 'gastos_biometric_cred_id_v2'
+const BIOMETRIC_SALT_STORAGE = 'gastos_biometric_wrap_salt_v2'
+const RP_NAME                = 'GastOS'
+
+export async function isBiometricAvailable(): Promise<boolean> {
+  try {
+    if (typeof window === 'undefined') return false
+    if (!window.PublicKeyCredential) return false
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+  } catch {
+    return false
+  }
+}
+
+export function hasBiometricKey(): boolean {
+  if (typeof window === 'undefined') return false
+  return localStorage.getItem(BIOMETRIC_KEY_STORAGE) !== null
+}
+
+export function clearBiometricKey(): void {
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(BIOMETRIC_KEY_STORAGE)
+    localStorage.removeItem(BIOMETRIC_CRED_STORAGE)
+    localStorage.removeItem(BIOMETRIC_SALT_STORAGE)
+  }
+
+// Registra credencial WebAuthn y guarda la clave maestra cifrada
+export async function saveBiometricKey(userId: string): Promise<boolean> {
+    try {
+      const masterKey = _masterKey
+      if (!masterKey) {
+        return false
+      }
+  
+      const challenge = crypto.getRandomValues(new Uint8Array(32))
+    const userIdBytes = new TextEncoder().encode(userId)
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: RP_NAME, id: window.location.hostname },
+        user: {
+          id: userIdBytes,
+          name: userId,
+          displayName: 'GastOS User',
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7  },  // ES256
+          { type: 'public-key', alg: -257 }, // RS256 fallback
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+          residentKey: 'discouraged',
+        },
+        excludeCredentials: [],
+        timeout: 60000,
+      },
+    }) as PublicKeyCredential | null
+
+    if (!credential) {
+      return false
+    }
+
+    const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+    localStorage.setItem(BIOMETRIC_CRED_STORAGE, credId)
+
+    // Cifrar la clave maestra con una clave derivada de un salt aleatorio del dispositivo
+    const wrapSaltBytes = crypto.getRandomValues(new Uint8Array(32))
+    const wrapSaltB64   = btoa(String.fromCharCode(...wrapSaltBytes))
+    localStorage.setItem(BIOMETRIC_SALT_STORAGE, wrapSaltB64)
+
+    const enc = new TextEncoder()
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
+    )
+    const wrapKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: wrapSaltBytes,
+        iterations: 100_000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    )
+
+    const rawKey = await crypto.subtle.exportKey('raw', masterKey)
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, rawKey)
+
+    const ivB64 = btoa(String.fromCharCode(...iv))
+    const ctB64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+    localStorage.setItem(BIOMETRIC_KEY_STORAGE, `${ivB64}.${ctB64}`)
+
+    return true
+} catch (e) {
+    console.error('saveBiometricKey error:', e)
+    return false
+  }
+}
+
+// Verifica biometría y recupera la clave maestra
+export async function loadBiometricKey(userId: string): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem(BIOMETRIC_KEY_STORAGE)
+    const credIdB64 = localStorage.getItem(BIOMETRIC_CRED_STORAGE)
+    if (!stored || !credIdB64) return false
+
+    const credIdBytes = Uint8Array.from(atob(credIdB64), c => c.charCodeAt(0))
+    const challenge = crypto.getRandomValues(new Uint8Array(32))
+
+    await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        timeout: 60000,
+        userVerification: 'required',
+        rpId: window.location.hostname,
+        allowCredentials: [{
+          type: 'public-key',
+          id: credIdBytes,
+          transports: ['internal'],
+        }],
+      },
+    })
+
+    // Biometría OK — descifrar la clave maestra
+    const [ivB64, ctB64] = stored.split('.')
+    if (!ivB64 || !ctB64) return false
+
+    const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
+    const ct = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
+
+    const wrapSaltB64 = localStorage.getItem(BIOMETRIC_SALT_STORAGE)
+    if (!wrapSaltB64) return false
+    const wrapSaltBytes = Uint8Array.from(atob(wrapSaltB64), c => c.charCodeAt(0))
+
+    const enc = new TextEncoder()
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
+    )
+    const wrapKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: wrapSaltBytes,
+        iterations: 100_000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    )
+
+    const rawKey = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrapKey, ct)
+
+    const masterKey = await crypto.subtle.importKey(
+      'raw', rawKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+    )
+
+    saveKey(masterKey)
+    return true
+} catch {
+    return false
+  }
+}
+</file>
+
 <file path="app/page.tsx">
 "use client"
 
@@ -6383,9 +6703,9 @@ import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
-import { clearKey, getMasterKey, decryptData } from "@/lib/crypto"
+import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 7
+const APP_VERSION = 17
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
@@ -6399,19 +6719,24 @@ function MainApp({ session }: { session: Session }) {
   const [showImport, setShowImport]     = useState(false)
   const [isMenuOpen, setIsMenuOpen]     = useState(false)
   const [historialKey, setHistorialKey] = useState(0)
+  const [exportMsg, setExportMsg]       = useState<string | null>(null)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
     if (!isMenuOpen) return
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: Event) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    document.addEventListener("touchstart", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("touchstart", handleClickOutside)
+    }
   }, [isMenuOpen])
 
   // Carga inicial de datos
@@ -6473,12 +6798,14 @@ function MainApp({ session }: { session: Session }) {
 
   const handleExportCSV = async () => {
     const { data } = await supabase
-      .from("movimientos")
-      .select("*")
-      .order("created_at", { ascending: false })
+    .from("movimientos")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false })
 
     if (!data || data.length === 0) {
-      alert("No hay movimientos para exportar")
+      setExportMsg("No hay movimientos para exportar")
+      setTimeout(() => setExportMsg(null), 3000)
       setIsMenuOpen(false)
       return
     }
@@ -6559,7 +6886,8 @@ function MainApp({ session }: { session: Session }) {
                   onClick={handleExportCSV}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
                 >
-                  <Download className="w-4 h-4" /> Exportar CSV
+                  <Download className="w-4 h-4" />
+                  {exportMsg ?? "Exportar CSV"}
                 </button>
                 <button
                   role="menuitem"
@@ -6571,7 +6899,7 @@ function MainApp({ session }: { session: Session }) {
                 <div className="h-px bg-zinc-800 my-1 mx-2" />
                 <button
                   role="menuitem"
-                  onClick={() => { clearKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
+                  onClick={() => { clearKey(); clearBiometricKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-950/30 rounded-lg transition-colors w-full"
                 >
                   <LogOut className="w-4 h-4" /> Cerrar Sesión
@@ -6583,7 +6911,7 @@ function MainApp({ session }: { session: Session }) {
       </header>
 
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-        {tab === "ingreso"   && <IngresoTab categorias={categorias} cuentas={cuentas} />}
+      {tab === "ingreso"   && <IngresoTab categorias={categorias} cuentas={cuentas} />}
         {tab === "historial" && <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />}
         {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} />}
       </main>
@@ -6689,7 +7017,42 @@ export default function App() {
       }
     })
 
-    return () => authListener.subscription.unsubscribe()
+    const hiddenAt = { current: null as number | null }
+
+    const handleVisibility = async () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt.current = Date.now()
+        return
+      }
+
+      // Vuelve a primer plano
+      if (document.visibilityState === "visible") {
+        // Check de versión
+        try {
+          const { data: config } = await supabase
+            .from("app_config")
+            .select("min_version")
+            .eq("id", 1)
+            .maybeSingle()
+          if (config && config.min_version > APP_VERSION) setNeedsUpdate(true)
+        } catch { }
+
+        // Si lleva más de 5 minutos en segundo plano, limpiar la clave
+        const TIMEOUT_MS = 5 * 60 * 1000
+        if (hiddenAt.current && Date.now() - hiddenAt.current > TIMEOUT_MS) {
+          clearKey()
+          setHasKey(false)
+        }
+        hiddenAt.current = null
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility)
+
+    return () => {
+      authListener.subscription.unsubscribe()
+      document.removeEventListener("visibilitychange", handleVisibility)
+    }
   }, [])
 
   const handleUnlocked = useCallback(() => setHasKey(true), [])

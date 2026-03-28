@@ -11,7 +11,7 @@
 //          gestionando el cambio con un pequeño debounce.
 // ACCESIBILIDAD: HidableAmount añade aria-pressed y aria-label al botón toggle.
 
-import { useState, useEffect, createContext, useContext } from "react"
+import { useState, useEffect, useMemo, createContext, useContext } from "react"
 import { supabase } from "@/lib/supabase"
 import {
   Loader2, Package, ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
@@ -201,16 +201,28 @@ export default function DashboardTab({
     fetchYDesencriptar();
   }, []);
 
-  if (loading) return (
-    <div className="flex-1 flex items-center justify-center py-20">
-      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
-    </div>
-  )
-
   const sm = selectedDate.getMonth()
   const sy = selectedDate.getFullYear()
 
-  const monthMovs = movimientos.filter(m => {
+  const {
+    monthMovs, monthGastos, monthIngresos,
+    totalGastos, totalIngresos, balanceNeto,
+    saldos, patrimonioTotal,
+    categoryTotals, pieData, topCategorias, maxTopVal,
+    last12Months, last6Months,
+    diasEnMes, esMesActual, diaActual, diasRestantes,
+    gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
+    mesAntMovs, totalGastosMesAnt, mediaDiariaAnt, diffMedia, diffPct,
+    ratioAhorro, ratioColor, ratioLabel,
+    gastoPorDia, maxGastoDia, primerDiaSemana, offsetLunes, diasGrid,
+    objetivoAhorro, pctObjetivo,
+    gastoPrevMes, ingPrevMes, diffGastoMes, diffIngMes,
+    diaMasCaro, gastoPorDiaSemana, maxGastoDow, dowData,
+    distribucionPct, rachaDias, rachaTopCat,
+    presupuestosConGasto,
+    monthLabel, DIAS_SEMANA, NOMBRES_DIA,
+  } = useMemo(() => {
+    const monthMovs = movimientos.filter(m => {
     const d = new Date(m.created_at)
     return d.getMonth() === sm && d.getFullYear() === sy
   })
@@ -255,8 +267,6 @@ export default function DashboardTab({
   const last6Months = last12Months.slice(6)
   const topCategorias = pieData.slice(0, 5)
   const maxTopVal = topCategorias[0]?.value ?? 1
-  const monthLabel = selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })
-
   const diasEnMes = new Date(sy, sm + 1, 0).getDate()
   const esMesActual = sm === hoy.getMonth() && sy === hoy.getFullYear()
   const diaActual = esMesActual ? hoy.getDate() : diasEnMes
@@ -305,7 +315,6 @@ export default function DashboardTab({
     ...Array.from({ length: offsetLunes }, () => null),
     ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
   ]
-  const DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"]
 
   // ── Cálculos widgets nuevos ───────────────────────────────────────────────
   const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
@@ -360,8 +369,36 @@ export default function DashboardTab({
     })
     .filter(p => p.cat)
 
+    const monthLabel = selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+    const DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"]
 
-  // ── Definición de widgets ─────────────────────────────────────────────────
+  return {
+    monthMovs, monthGastos, monthIngresos,
+    totalGastos, totalIngresos, balanceNeto,
+    saldos, patrimonioTotal,
+    categoryTotals, pieData, topCategorias, maxTopVal,
+    last12Months, last6Months,
+    diasEnMes, esMesActual, diaActual, diasRestantes,
+    gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
+    mesAntMovs, totalGastosMesAnt, mediaDiariaAnt, diffMedia, diffPct,
+    ratioAhorro, ratioColor, ratioLabel,
+    gastoPorDia, maxGastoDia, primerDiaSemana, offsetLunes, diasGrid,
+    objetivoAhorro, pctObjetivo,
+    gastoPrevMes, ingPrevMes, diffGastoMes, diffIngMes,
+    diaMasCaro, gastoPorDiaSemana, maxGastoDow, dowData,
+    distribucionPct, rachaDias, rachaTopCat,
+    presupuestosConGasto,
+    monthLabel, DIAS_SEMANA, NOMBRES_DIA,
+  }
+}, [movimientos, selectedDate, cuentas, categorias, presupuestos, objetivos])
+
+if (loading) return (
+  <div className="flex-1 flex items-center justify-center py-20">
+    <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+  </div>
+)
+
+// ── Definición de widgets ─────────────────────────────────────────────────
   const widgets: Partial<Record<WidgetId, React.ReactNode>> = {
 
     resumen_mes: (

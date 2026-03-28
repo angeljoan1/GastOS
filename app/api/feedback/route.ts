@@ -33,19 +33,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "El mensaje está vacío" }, { status: 400 });
     }
 
+    const esc = (s: string) => String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+    const safeMsg  = esc(mensaje)
+    const safeTipo = esc(tipo ?? '')
+
     const { data, error } = await resend.emails.send({
       from: 'GastOS App <soporte@angeljoan.com>',
       to: 'ajgamundi@gmail.com',
       subject: `[GastOS ${tipo}] Nuevo ticket recibido`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: ${tipo === 'Bug' ? '#ef4444' : '#10b981'};">
-            Nuevo ticket de tipo: ${tipo}
+          <h2 style="color: ${safeTipo === 'Bug' ? '#ef4444' : '#10b981'};">
+            Nuevo ticket de tipo: ${safeTipo}
           </h2>
           <p><strong>Usuario ID:</strong> ${user.id}</p>
           <p><strong>Email:</strong> ${user.email}</p>
           <hr style="border: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 16px; line-height: 1.5;">${mensaje}</p>
+          <p style="font-size: 16px; line-height: 1.5;">${safeMsg}</p>
         </div>
       `,
     });

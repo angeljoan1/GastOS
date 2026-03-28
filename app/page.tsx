@@ -37,19 +37,24 @@ function MainApp({ session }: { session: Session }) {
   const [showImport, setShowImport]     = useState(false)
   const [isMenuOpen, setIsMenuOpen]     = useState(false)
   const [historialKey, setHistorialKey] = useState(0)
+  const [exportMsg, setExportMsg]       = useState<string | null>(null)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
     if (!isMenuOpen) return
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: Event) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+    document.addEventListener("touchstart", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("touchstart", handleClickOutside)
+    }
   }, [isMenuOpen])
 
   // Carga inicial de datos
@@ -111,12 +116,14 @@ function MainApp({ session }: { session: Session }) {
 
   const handleExportCSV = async () => {
     const { data } = await supabase
-      .from("movimientos")
-      .select("*")
-      .order("created_at", { ascending: false })
+    .from("movimientos")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false })
 
     if (!data || data.length === 0) {
-      alert("No hay movimientos para exportar")
+      setExportMsg("No hay movimientos para exportar")
+      setTimeout(() => setExportMsg(null), 3000)
       setIsMenuOpen(false)
       return
     }
@@ -197,7 +204,8 @@ function MainApp({ session }: { session: Session }) {
                   onClick={handleExportCSV}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
                 >
-                  <Download className="w-4 h-4" /> Exportar CSV
+                  <Download className="w-4 h-4" />
+                  {exportMsg ?? "Exportar CSV"}
                 </button>
                 <button
                   role="menuitem"
@@ -221,7 +229,7 @@ function MainApp({ session }: { session: Session }) {
       </header>
 
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-        {tab === "ingreso"   && <IngresoTab categorias={categorias} cuentas={cuentas} />}
+      {tab === "ingreso"   && <IngresoTab categorias={categorias} cuentas={cuentas} />}
         {tab === "historial" && <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />}
         {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} />}
       </main>
@@ -327,11 +335,11 @@ export default function App() {
       }
     })
 
-    let hiddenAt: number | null = null
+    const hiddenAt = { current: null as number | null }
 
     const handleVisibility = async () => {
       if (document.visibilityState === "hidden") {
-        hiddenAt = Date.now()
+        hiddenAt.current = Date.now()
         return
       }
 
@@ -348,12 +356,12 @@ export default function App() {
         } catch { }
 
         // Si lleva más de 5 minutos en segundo plano, limpiar la clave
-        const TIMEOUT_MS = 1 * 60 * 1000
-        if (hiddenAt && Date.now() - hiddenAt > TIMEOUT_MS) {
+        const TIMEOUT_MS = 5 * 60 * 1000
+        if (hiddenAt.current && Date.now() - hiddenAt.current > TIMEOUT_MS) {
           clearKey()
           setHasKey(false)
         }
-        hiddenAt = null
+        hiddenAt.current = null
       }
     }
 

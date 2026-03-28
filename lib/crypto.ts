@@ -216,8 +216,9 @@ export async function decryptData(cipherText: string | number): Promise<string> 
 }
 
 // ─── Biometría (WebAuthn) ─────────────────────────────────────────────────────
-const BIOMETRIC_KEY_STORAGE  = 'gastos_biometric_wrapped_v1'
-const BIOMETRIC_CRED_STORAGE = 'gastos_biometric_cred_id_v1'
+const BIOMETRIC_KEY_STORAGE  = 'gastos_biometric_wrapped_v2'
+const BIOMETRIC_CRED_STORAGE = 'gastos_biometric_cred_id_v2'
+const BIOMETRIC_SALT_STORAGE = 'gastos_biometric_wrap_salt_v2'
 const RP_NAME                = 'GastOS'
 
 export async function isBiometricAvailable(): Promise<boolean> {
@@ -236,10 +237,11 @@ export function hasBiometricKey(): boolean {
 }
 
 export function clearBiometricKey(): void {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(BIOMETRIC_KEY_STORAGE)
-  localStorage.removeItem(BIOMETRIC_CRED_STORAGE)
-}
+    if (typeof window === 'undefined') return
+    localStorage.removeItem(BIOMETRIC_KEY_STORAGE)
+    localStorage.removeItem(BIOMETRIC_CRED_STORAGE)
+    localStorage.removeItem(BIOMETRIC_SALT_STORAGE)
+  }
 
 // Registra credencial WebAuthn y guarda la clave maestra cifrada
 export async function saveBiometricKey(userId: string): Promise<boolean> {
@@ -267,7 +269,7 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
         ],
         authenticatorSelection: {
           authenticatorAttachment: 'platform',
-          userVerification: 'preferred',
+          userVerification: 'required',
           residentKey: 'discouraged',
         },
         excludeCredentials: [],
@@ -282,7 +284,11 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
     const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
     localStorage.setItem(BIOMETRIC_CRED_STORAGE, credId)
 
-    // Cifrar la clave maestra con una clave derivada del userId
+    // Cifrar la clave maestra con una clave derivada de un salt aleatorio del dispositivo
+    const wrapSaltBytes = crypto.getRandomValues(new Uint8Array(32))
+    const wrapSaltB64   = btoa(String.fromCharCode(...wrapSaltBytes))
+    localStorage.setItem(BIOMETRIC_SALT_STORAGE, wrapSaltB64)
+
     const enc = new TextEncoder()
     const keyMaterial = await crypto.subtle.importKey(
       'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
@@ -290,7 +296,7 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
     const wrapKey = await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: enc.encode('gastos_bio_wrap_' + userId),
+        salt: wrapSaltBytes,
         iterations: 100_000,
         hash: 'SHA-256',
       },
@@ -346,6 +352,10 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
     const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
     const ct = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
 
+    const wrapSaltB64 = localStorage.getItem(BIOMETRIC_SALT_STORAGE)
+    if (!wrapSaltB64) return false
+    const wrapSaltBytes = Uint8Array.from(atob(wrapSaltB64), c => c.charCodeAt(0))
+
     const enc = new TextEncoder()
     const keyMaterial = await crypto.subtle.importKey(
       'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
@@ -353,7 +363,7 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
     const wrapKey = await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: enc.encode('gastos_bio_wrap_' + userId),
+        salt: wrapSaltBytes,
         iterations: 100_000,
         hash: 'SHA-256',
       },
@@ -371,17 +381,7 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
 
     saveKey(masterKey)
     return true
-} catch (e: any) {
-    try {
-      const parts = [
-        'type:' + typeof e,
-        'name:' + e?.name,
-        'msg:' + e?.message,
-        'code:' + e?.code,
-        'str:' + String(e),
-      ]
-      localStorage.setItem('__bioerror', parts.join(' | '))
-    } catch {}
+} catch {
     return false
   }
 }

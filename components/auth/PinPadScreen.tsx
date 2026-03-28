@@ -83,16 +83,12 @@ export default function PinPadScreen({
           const noExpira = vaultCheck?.reset_token_expires_at
             && new Date(vaultCheck.reset_token_expires_at) > ahora
 
-          if (tokenOk && noExpira) {
-            await supabase
-              .from("user_vault")
-              .update({ reset_token: null, reset_token_expires_at: null })
-              .eq("user_id", session.user.id)
-            await supabase
-              .from("user_vault")
-              .delete()
-              .eq("user_id", session.user.id)
-          } else {
+            if (tokenOk && noExpira) {
+                await supabase
+                  .from("user_vault")
+                  .update({ reset_token: null, reset_token_expires_at: null })
+                  .eq("user_id", session.user.id)
+              } else {
             setVaultError("El enlace de recuperación ha caducado o ya fue usado.")
           }
         }
@@ -199,6 +195,11 @@ export default function PinPadScreen({
         const saltBytes  = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0))
         const derivedKey = await deriveKeyFromPin(pin, saltBytes)
         const newToken   = await generateVerificationToken(derivedKey)
+
+        await supabase
+          .from("user_vault")
+          .delete()
+          .eq("user_id", session.user.id)
 
         const { error: dbError } = await supabase
           .from("user_vault")
@@ -503,7 +504,7 @@ export default function PinPadScreen({
           onClick={() => handleKeyPress("0")}
           disabled={isUnlocking}
           aria-label="0"
-          className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 transition-all flex items-center justify-center tabular-nums"
+          className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 active:scale-90 transition-all flex items-center justify-center tabular-nums"
         >
           0
         </button>

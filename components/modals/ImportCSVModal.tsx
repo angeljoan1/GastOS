@@ -24,6 +24,7 @@ interface FilaParseada {
   cantidad: number
   nota: string
   cuenta_id: string | null
+  cuenta_destino_id: string | null
   valida: boolean
   error?: string
 }
@@ -93,7 +94,8 @@ export default function ImportCSVModal({
       const iCat = cabeceras.findIndex(h => h.includes("categor"))
       const iCantidad = cabeceras.findIndex(h => h.includes("cantidad") || h.includes("importe"))
       const iNota = cabeceras.findIndex(h => h.includes("nota") || h.includes("descripci"))
-      const iCuenta = cabeceras.findIndex(h => h.includes("cuenta"))
+      const iCuenta = cabeceras.findIndex(h => h.includes("cuenta") && !h.includes("destino"))
+      const iCuentaDest = cabeceras.findIndex(h => h.includes("destino"))
 
       // Silenciamos iID — solo lo usamos para logging futuro
       void iID
@@ -118,18 +120,22 @@ export default function ImportCSVModal({
           const cuenta = cuentas.find(
             c => c.id === cuentaRaw || c.nombre.toLowerCase() === cuentaRaw.toLowerCase()
           )
+          const cuentaDestRaw = iCuentaDest !== -1 ? (cols[iCuentaDest] ?? "") : ""
+          const cuentaDest = cuentaDestRaw
+            ? cuentas.find(c => c.id === cuentaDestRaw || c.nombre.toLowerCase() === cuentaDestRaw.toLowerCase())
+            : undefined
 
           if (isNaN(cantidad) || cantidad <= 0) {
             return {
               index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
-              cantidad: 0, nota, cuenta_id: null, valida: false,
+              cantidad: 0, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: "Cantidad inválida",
             }
           }
           if (!["gasto", "ingreso", "transferencia"].includes(tipo)) {
             return {
               index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
-              cantidad, nota, cuenta_id: null, valida: false,
+              cantidad, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: `Tipo desconocido: "${tipo}"`,
             }
           }
@@ -140,6 +146,9 @@ export default function ImportCSVModal({
             if (!isNaN(d.getTime())) fechaISO = d.toISOString()
           }
 
+          const esTransferencia = tipo === "transferencia"
+          const sinCuentaDest = esTransferencia && !cuentaDest
+
           return {
             index: idx + 2,
             fecha: fechaISO,
@@ -148,7 +157,9 @@ export default function ImportCSVModal({
             cantidad,
             nota,
             cuenta_id: cuenta?.id ?? null,
-            valida: true,
+            cuenta_destino_id: cuentaDest?.id ?? null,
+            valida: !sinCuentaDest,
+            error: sinCuentaDest ? "Transferencia sin cuenta destino válida" : undefined,
           }
         })
         // ignorar líneas completamente vacías
@@ -178,6 +189,7 @@ export default function ImportCSVModal({
         nota: f.nota ? await encryptData(f.nota) : null,
         tipo: f.tipo,
         cuenta_id: f.cuenta_id,
+        cuenta_destino_id: f.cuenta_destino_id,
         created_at: f.fecha,
         is_recurring: false,
       }))
@@ -240,7 +252,7 @@ export default function ImportCSVModal({
               <p className="text-xs text-zinc-500">
                 CSV con columnas:{" "}
                 <span className="text-zinc-300 font-mono">
-                  Fecha, Tipo, Categoria, Cantidad, Nota, Cuenta
+                  Fecha, Tipo, Categoria, Cantidad, Nota, Cuenta, Cuenta destino
                 </span>
               </p>
               <p className="text-xs text-zinc-500">

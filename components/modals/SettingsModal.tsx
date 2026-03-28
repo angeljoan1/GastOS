@@ -220,7 +220,7 @@ export default function SettingsModal({
     } else {
       const ok = await saveBiometricKey(userId)
       if (ok) setBioEnabled(true)
-      else setBioError("No se pudo activar. Inténtalo de nuevo.")
+        else setBioError(`Error: ${(window as any).__lastBioError ?? "desconocido"}`)
     }
     setBioLoading(false)
   }

@@ -367,7 +367,10 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
 
     saveKey(masterKey)
     return true
-  } catch {
+} catch (e) {
+    if (typeof window !== 'undefined') {
+      (window as any).__lastBioError = e instanceof Error ? e.message : String(e)
+    }
     return false
   }
 }

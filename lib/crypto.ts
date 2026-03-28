@@ -305,7 +305,8 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
     localStorage.setItem(BIOMETRIC_KEY_STORAGE, `${ivB64}.${ctB64}`)
 
     return true
-  } catch {
+} catch (e) {
+    console.error('saveBiometricKey error:', e)
     return false
   }
 }

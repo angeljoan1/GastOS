@@ -283,9 +283,10 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
       return false
     }
 
-    // Guardar el credentialId para usarlo en el get posterior
+    localStorage.setItem('__bioerror', 'STEP4_SAVING_CREDID')
     const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
     localStorage.setItem(BIOMETRIC_CRED_STORAGE, credId)
+    localStorage.setItem('__bioerror', 'STEP5_DERIVING_KEY')
 
     // Cifrar la clave maestra con una clave derivada del userId
     const enc = new TextEncoder()
@@ -305,9 +306,12 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
       ['encrypt', 'decrypt'],
     )
 
+    localStorage.setItem('__bioerror', 'STEP6_EXPORTING_KEY')
     const rawKey = await crypto.subtle.exportKey('raw', masterKey)
+    localStorage.setItem('__bioerror', 'STEP7_ENCRYPTING')
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, rawKey)
+    localStorage.setItem('__bioerror', 'STEP8_SAVING')
 
     const ivB64 = btoa(String.fromCharCode(...iv))
     const ctB64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)))

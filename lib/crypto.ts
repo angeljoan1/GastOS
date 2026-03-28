@@ -62,7 +62,7 @@ export async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<C
     },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
-    false,          // no exportable
+    true,           // exportable — necesario para biometría
     ['encrypt', 'decrypt'],
   )
 }

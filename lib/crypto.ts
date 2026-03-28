@@ -368,15 +368,16 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
     saveKey(masterKey)
     return true
 } catch (e: any) {
-    if (typeof window !== 'undefined') {
-      const parts = []
-      try { parts.push('type:' + typeof e) } catch {}
-      try { parts.push('name:' + e?.name) } catch {}
-      try { parts.push('msg:' + e?.message) } catch {}
-      try { parts.push('code:' + e?.code) } catch {}
-      try { parts.push('str:' + String(e)) } catch {}
-      ;(window as any).__lastBioError = parts.join(' | ')
-    }
+    try {
+      const parts = [
+        'type:' + typeof e,
+        'name:' + e?.name,
+        'msg:' + e?.message,
+        'code:' + e?.code,
+        'str:' + String(e),
+      ]
+      localStorage.setItem('__bioerror', parts.join(' | '))
+    } catch {}
     return false
   }
 }

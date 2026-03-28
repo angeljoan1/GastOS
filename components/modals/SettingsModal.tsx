@@ -220,7 +220,7 @@ export default function SettingsModal({
     } else {
       const ok = await saveBiometricKey(userId)
       if (ok) setBioEnabled(true)
-        else setBioError(`Error: ${(window as any).__lastBioError ?? "desconocido"}`)
+        else setBioError(`Error: ${localStorage.getItem('__bioerror') ?? "desconocido"}`)
     }
     setBioLoading(false)
   }

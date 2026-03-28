@@ -367,13 +367,15 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
 
     saveKey(masterKey)
     return true
-} catch (e) {
+} catch (e: any) {
     if (typeof window !== 'undefined') {
-      try {
-        (window as any).__lastBioError = JSON.stringify(e) || String(e) || typeof e
-      } catch {
-        (window as any).__lastBioError = typeof e + ' / ' + Object.keys(e as any).join(',')
-      }
+      const parts = []
+      try { parts.push('type:' + typeof e) } catch {}
+      try { parts.push('name:' + e?.name) } catch {}
+      try { parts.push('msg:' + e?.message) } catch {}
+      try { parts.push('code:' + e?.code) } catch {}
+      try { parts.push('str:' + String(e)) } catch {}
+      ;(window as any).__lastBioError = parts.join(' | ')
     }
     return false
   }

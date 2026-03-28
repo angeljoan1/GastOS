@@ -369,7 +369,11 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
     return true
 } catch (e) {
     if (typeof window !== 'undefined') {
-      (window as any).__lastBioError = e instanceof Error ? e.message : String(e)
+      try {
+        (window as any).__lastBioError = JSON.stringify(e) || String(e) || typeof e
+      } catch {
+        (window as any).__lastBioError = typeof e + ' / ' + Object.keys(e as any).join(',')
+      }
     }
     return false
   }

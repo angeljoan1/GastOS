@@ -243,11 +243,16 @@ export function clearBiometricKey(): void {
 
 // Registra credencial WebAuthn y guarda la clave maestra cifrada
 export async function saveBiometricKey(userId: string): Promise<boolean> {
-  try {
-    const masterKey = _masterKey
-    if (!masterKey) return false
-
-    const challenge = crypto.getRandomValues(new Uint8Array(32))
+    try {
+      const masterKey = _masterKey
+      if (!masterKey) {
+        localStorage.setItem('__bioerror', 'NO_MASTER_KEY')
+        return false
+      }
+  
+      localStorage.setItem('__bioerror', 'STEP1_EXPORT')
+      const challenge = crypto.getRandomValues(new Uint8Array(32))
+      localStorage.setItem('__bioerror', 'STEP2_CHALLENGE')
     const userIdBytes = new TextEncoder().encode(userId)
 
     const credential = await navigator.credentials.create({
@@ -272,7 +277,11 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
       },
     }) as PublicKeyCredential | null
 
-    if (!credential) return false
+    localStorage.setItem('__bioerror', 'STEP3_CREDENTIAL_DONE')
+    if (!credential) {
+      localStorage.setItem('__bioerror', 'STEP3_NULL_CREDENTIAL')
+      return false
+    }
 
     // Guardar el credentialId para usarlo en el get posterior
     const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))

@@ -106,7 +106,13 @@ export default function BottomSheet({
                 onClick={() => { onChange(opt.value); onClose() }}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all text-left ${
                   selected
-                    ? "border-emerald-500/50 bg-emerald-950/30"
+                    ? opt.tipo === "gasto"
+                      ? "border-red-500/50 bg-zinc-800"
+                      : opt.tipo === "ingreso"
+                        ? "border-emerald-500/50 bg-zinc-800"
+                        : opt.tipo === "transferencia"
+                          ? "border-blue-500/50 bg-zinc-800"
+                          : "border-emerald-500/50 bg-zinc-800"
                     : "border-zinc-800 bg-zinc-800/50 hover:border-zinc-600 hover:bg-zinc-800"
                 }`}
               >
@@ -119,7 +125,7 @@ export default function BottomSheet({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${selected ? "text-emerald-400" : "text-zinc-200"}`}>
+                <p className={`text-sm font-medium ${selected ? opt.tipo === "gasto" ? "text-red-400" : opt.tipo === "transferencia" ? "text-blue-400" : "text-emerald-400" : "text-zinc-200"}`}>
                     {opt.label}
                   </p>
                   {opt.sublabel && (
@@ -127,7 +133,7 @@ export default function BottomSheet({
                   )}
                 </div>
                 {selected && (
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" aria-hidden="true" />
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${opt.tipo === "gasto" ? "bg-red-400" : opt.tipo === "transferencia" ? "bg-blue-400" : "bg-emerald-400"}`} aria-hidden="true" />
                 )}
               </button>
             )
@@ -159,15 +165,20 @@ export function SheetTrigger({
     >
       {Icon && label && (
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: (color ?? "#10b981") + "22" }}
+          className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: (color ?? "#71717a") + "22" }}
         >
-          <Icon className="w-4 h-4" style={{ color: color ?? "#10b981" }} aria-hidden="true" />
+          <Icon className="w-3 h-3" style={{ color: color ?? "#71717a" }} aria-hidden="true" />
         </div>
       )}
-      <span className={`flex-1 text-sm ${label ? "text-zinc-200" : "text-zinc-500"}`}>
-        {label ?? placeholder}
-      </span>
+      <div className="flex-1 overflow-hidden min-w-0">
+        <span
+          className={`text-sm whitespace-nowrap inline-block ${label ? "text-zinc-200" : "text-zinc-500"}`}
+          style={label && label.length > 10 ? { animation: "marquee 3s ease-in-out infinite alternate" } : undefined}
+        >
+          {label ?? placeholder}
+        </span>
+      </div>
       <svg
         className="w-4 h-4 text-zinc-500"
         fill="none"

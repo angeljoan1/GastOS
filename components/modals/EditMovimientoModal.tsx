@@ -95,6 +95,7 @@ export default function EditMovimientoModal({
       aria-labelledby="edit-modal-title"
     >
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
         <div className="flex items-center justify-between mb-6">
           <h2 id="edit-modal-title" className="text-xl font-semibold text-zinc-100">
             Editar {esTransfer ? "Transferencia" : movimiento.tipo === "ingreso" ? "Ingreso" : "Gasto"}
@@ -102,7 +103,7 @@ export default function EditMovimientoModal({
           <button
             onClick={onClose}
             aria-label="Cerrar modal de edición"
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
+            className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
           </button>

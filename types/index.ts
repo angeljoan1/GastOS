@@ -29,7 +29,7 @@ export interface Presupuesto {
   id:           string
   user_id:      string
   categoria_id: string
-  cantidad:     number      // en claro en memoria [E2EE en BD: NO — cantidad de presupuesto no se cifra]
+  cantidad:     number      // [E2EE] cifrado en BD, en claro en memoria
   created_at:   string
 }
 
@@ -67,4 +67,16 @@ export interface Movimiento {
 export interface SaldoCuenta {
   cuenta:       Cuenta
   saldo_actual: number
+}
+
+// ─── Objetivo de ahorro ──────────────────────────────────────
+// cantidad se cifra en BD [E2EE]
+// En memoria siempre está en claro
+export interface Objetivo {
+  id:         string
+  user_id:    string
+  tipo:       string        // 'ahorro_mensual' por ahora
+  cantidad:   number        // [E2EE] cifrado en BD, en claro en memoria
+  created_at: string
+  updated_at: string
 }

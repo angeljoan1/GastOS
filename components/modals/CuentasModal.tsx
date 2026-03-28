@@ -53,8 +53,8 @@ export default function CuentasModal({
     const saldoRaw = parseFloat(saldoInicial) || 0
 
     // BUG #1 FIX: ahora sí ciframos antes de insertar en Supabase
-    const nombreCifrado = encryptData(nombreRaw)
-    const saldoCifrado = encryptData(saldoRaw)
+    const nombreCifrado = await encryptData(nombreRaw)
+    const saldoCifrado = await encryptData(saldoRaw)
 
     const { data, error } = await supabase
       .from("cuentas")
@@ -107,13 +107,14 @@ export default function CuentasModal({
       aria-labelledby="cuentas-modal-title"
     >
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center justify-between mb-6">
           <h2 id="cuentas-modal-title" className="text-xl font-semibold text-zinc-100">Mis Cuentas</h2>
           <button
             onClick={onClose}
             aria-label="Cerrar panel de cuentas"
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
+            className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
           </button>
@@ -131,7 +132,7 @@ export default function CuentasModal({
               return (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 bg-zinc-800 border border-zinc-700/60 rounded-xl px-4 py-3"
+                  className="flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3"
                 >
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

@@ -95,8 +95,9 @@ export default function EncryptionBadge() {
         onClick={() => setShowInfo(true)}
         aria-label="Ver información de seguridad E2EE"
         aria-haspopup="dialog"
-        className="flex items-center gap-1 text-zinc-700 hover:text-zinc-500 transition-colors opacity-60 hover:opacity-100"
+        className="flex items-center gap-1.5 text-zinc-700 hover:text-zinc-500 transition-colors opacity-60 hover:opacity-100"
       >
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" aria-hidden="true" />
         <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
         <span className="text-[10px] font-medium tracking-wide hidden sm:inline">E2EE</span>
       </button>

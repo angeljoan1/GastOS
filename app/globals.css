@@ -37,3 +37,10 @@
         La fuente la hereda correctamente desde la variable --font-geist-sans
         aplicada en el elemento <html> por layout.tsx */
    }
+
+   @keyframes marquee {
+    0%    { transform: translateX(0); }
+    30%   { transform: translateX(0); }
+    70%   { transform: translateX(calc(-100% + 70px)); }
+    100%  { transform: translateX(calc(-100% + 70px)); }
+  }

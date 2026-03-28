@@ -12,16 +12,18 @@
 //          específica de gasto.
 
 import { useState, useEffect } from "react"
-import { X, Trash2, Loader2, Plus, Target } from "lucide-react"
+import { X, Trash2, Loader2, Plus, Target, PiggyBank } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
-import type { Categoria, Presupuesto } from "@/types"
+import { encryptData } from "@/lib/crypto"
+import type { Categoria, Presupuesto, Objetivo } from "@/types"
 
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
 
 export default function SettingsModal({
   isOpen, onClose, categorias, onCategoriesChange,
   presupuestos, onPresupuestosChange,
+  objetivos, onObjetivosChange,
   session, userId,
 }: {
   isOpen: boolean
@@ -30,6 +32,8 @@ export default function SettingsModal({
   onCategoriesChange: (cats: Categoria[]) => void
   presupuestos: Presupuesto[]
   onPresupuestosChange: (p: Presupuesto[]) => void
+  objetivos: Objetivo[]
+  onObjetivosChange: (o: Objetivo[]) => void
   session: Session
   userId: string
 }) {
@@ -44,8 +48,11 @@ export default function SettingsModal({
   const [savingPres, setSavingPres] = useState(false)
   const [deletingPres, setDeletingPres] = useState<string | null>(null)
 
-  const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos">("categorias")
+  const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos" | "objetivos">("categorias")
   const [error, setError] = useState<string | null>(null)
+  const [inputObjetivo, setInputObjetivo] = useState("")
+  const [savingObj, setSavingObj] = useState(false)
+  const [editingObj, setEditingObj] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -55,6 +62,8 @@ export default function SettingsModal({
       setError(null)
       setEditingPresupuesto(null)
       setInputPresupuesto("")
+      setInputObjetivo("")
+      setEditingObj(false)
     }
   }, [isOpen])
 
@@ -116,24 +125,25 @@ export default function SettingsModal({
     setSavingPres(true)
     setError(null)
 
+    const cantidadCifrada = await encryptData(cantidad)
     const existing = getPresupuesto(catId)
     if (existing) {
       const { data, error } = await supabase
         .from("presupuestos")
-        .update({ cantidad })
+        .update({ cantidad: cantidadCifrada })
         .eq("id", existing.id)
         .select()
         .single()
       if (error) setError("Error al actualizar el presupuesto.")
-      else if (data) onPresupuestosChange(presupuestos.map(p => p.id === existing.id ? data : p))
+      else if (data) onPresupuestosChange(presupuestos.map(p => p.id === existing.id ? { ...data, cantidad } : p))
     } else {
       const { data, error } = await supabase
         .from("presupuestos")
-        .insert({ user_id: userId, categoria_id: catId, cantidad })
+        .insert({ user_id: userId, categoria_id: catId, cantidad: cantidadCifrada })
         .select()
         .single()
       if (error) setError("Error al crear el presupuesto.")
-      else if (data) onPresupuestosChange([...presupuestos, data])
+      else if (data) onPresupuestosChange([...presupuestos, { ...data, cantidad }])
     }
 
     setSavingPres(false)
@@ -151,6 +161,46 @@ export default function SettingsModal({
   // BUG #26 FIX: solo categorías de tipo "gasto" para presupuestos.
   // Las de tipo "ambos" se excluyen deliberadamente — un presupuesto de gasto
   // sobre una categoría mixta daría cifras incorrectas al mezclar ingresos.
+  // ── CRUD objetivos ────────────────────────────────────────────────────────
+  const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
+
+  const handleSaveObjetivo = async () => {
+    const cantidad = parseFloat(inputObjetivo)
+    if (!cantidad || cantidad <= 0) return
+    setSavingObj(true)
+    setError(null)
+    const cantidadCifrada = await encryptData(cantidad)
+
+    if (objetivoAhorro) {
+      const { data, error } = await supabase
+        .from("objetivos")
+        .update({ cantidad: cantidadCifrada, updated_at: new Date().toISOString() })
+        .eq("id", objetivoAhorro.id)
+        .select()
+        .single()
+      if (error) setError("Error al actualizar el objetivo.")
+      else if (data) onObjetivosChange(objetivos.map(o => o.id === objetivoAhorro.id ? { ...data, cantidad } : o))
+    } else {
+      const { data, error } = await supabase
+        .from("objetivos")
+        .insert({ user_id: userId, tipo: "ahorro_mensual", cantidad: cantidadCifrada })
+        .select()
+        .single()
+      if (error) setError("Error al crear el objetivo.")
+      else if (data) onObjetivosChange([...objetivos, { ...data, cantidad }])
+    }
+
+    setSavingObj(false)
+    setEditingObj(false)
+    setInputObjetivo("")
+  }
+
+  const handleDeleteObjetivo = async () => {
+    if (!objetivoAhorro) return
+    const { error } = await supabase.from("objetivos").delete().eq("id", objetivoAhorro.id)
+    if (!error) onObjetivosChange(objetivos.filter(o => o.id !== objetivoAhorro.id))
+  }
+
   const gastoCats = categorias.filter(c => c.tipo === "gasto")
 
   return (
@@ -161,6 +211,7 @@ export default function SettingsModal({
       aria-labelledby="settings-modal-title"
     >
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center justify-between mb-5">
           <h2 id="settings-modal-title" className="text-xl font-semibold text-zinc-100">
@@ -169,7 +220,7 @@ export default function SettingsModal({
           <button
             onClick={onClose}
             aria-label="Cerrar configuración"
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
+            className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
           </button>
@@ -184,6 +235,7 @@ export default function SettingsModal({
           {([
             { id: "categorias", label: "Categorías" },
             { id: "presupuestos", label: "Presupuestos" },
+            { id: "objetivos", label: "Objetivos" },
           ] as const).map(t => (
             <button
               key={t.id}
@@ -209,6 +261,9 @@ export default function SettingsModal({
         {/* ── TAB: Categorías ──────────────────────────────────────────────── */}
         {activeTab === "categorias" && (
           <div className="space-y-6">
+            <p className="text-xs text-zinc-600">
+              Las categorías aparecen en la pestaña <strong className="text-zinc-500">Registrar</strong> para clasificar tus movimientos.
+            </p>
             {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
               const cats = categorias.filter(c => c.tipo === tipo)
               if (cats.length === 0) return null
@@ -230,7 +285,7 @@ export default function SettingsModal({
                       return (
                         <div
                           key={cat.id}
-                          className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5"
+                          className="flex items-center justify-between bg-zinc-800 border border-zinc-700/50 rounded-xl px-3 py-2.5"
                         >
                           <div className="flex items-center gap-2.5">
                             <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" aria-hidden="true" />
@@ -339,8 +394,8 @@ export default function SettingsModal({
             {/* BUG #26 FIX: nota informativa sobre el alcance de los presupuestos */}
             <p className="text-xs text-zinc-600 mb-4">
               Asigna un límite mensual a tus categorías de{" "}
-              <strong className="text-zinc-500">gasto puro</strong>. Las categorías
-              compartidas (tipo "ambos") no aparecen aquí para evitar cifras mixtas.
+              <strong className="text-zinc-500">gasto puro</strong>. El widget de presupuestos
+              en el <strong className="text-zinc-500">Dashboard</strong> muestra el progreso de cada límite.
             </p>
 
             {gastoCats.length === 0 ? (
@@ -447,6 +502,88 @@ export default function SettingsModal({
                 )
               })
             )}
+          </div>
+        )}
+
+        {/* ── TAB: Objetivos ───────────────────────────────────────────────── */}
+        {activeTab === "objetivos" && (
+          <div className="space-y-4">
+            <p className="text-xs text-zinc-600">
+              Define metas de ahorro mensuales. El widget de{" "}
+              <strong className="text-zinc-500">Objetivo de ahorro</strong> en el Dashboard
+              mostrará tu progreso. Los datos se cifran con tu PIN.
+            </p>
+
+            <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                  <PiggyBank className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-zinc-200 flex-1">Ahorro mensual</p>
+
+                {objetivoAhorro && !editingObj && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-emerald-400 tabular-nums">
+                      {objetivoAhorro.cantidad.toFixed(2)}€
+                    </span>
+                    <button
+                      onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }}
+                      className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={handleDeleteObjetivo}
+                      aria-label="Borrar objetivo de ahorro"
+                      className="text-zinc-600 hover:text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {!objetivoAhorro && !editingObj && (
+                  <button
+                    onClick={() => setEditingObj(true)}
+                    className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
+                  >
+                    <Target className="w-3.5 h-3.5" aria-hidden="true" />
+                    Añadir objetivo
+                  </button>
+                )}
+              </div>
+
+              {editingObj && (
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={inputObjetivo}
+                    onChange={e => setInputObjetivo(e.target.value)}
+                    placeholder="Objetivo mensual (€)"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === "Enter") handleSaveObjetivo()
+                      if (e.key === "Escape") setEditingObj(false)
+                    }}
+                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                  <button
+                    onClick={handleSaveObjetivo}
+                    disabled={savingObj}
+                    className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all"
+                  >
+                    {savingObj ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
+                  </button>
+                  <button
+                    onClick={() => setEditingObj(false)}
+                    className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

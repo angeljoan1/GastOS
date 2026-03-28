@@ -170,15 +170,18 @@ export default function ImportCSVModal({
     setImporting(true)
     setErrorGlobal(null)
 
-    const rows = validas.map(f => ({
-      cantidad: encryptData(f.cantidad) as string,
-      categoria: f.categoria || "Otros",
-      nota: f.nota ? encryptData(f.nota) : null,
-      tipo: f.tipo,
-      cuenta_id: f.cuenta_id,
-      created_at: f.fecha,
-      is_recurring: false,
-    }))
+    // El Coordinador (Promise.all) espera a que todos terminen
+    const rows = await Promise.all(
+      validas.map(async (f) => ({
+        cantidad: await encryptData(f.cantidad) as string,
+        categoria: f.categoria || "Otros",
+        nota: f.nota ? await encryptData(f.nota) : null,
+        tipo: f.tipo,
+        cuenta_id: f.cuenta_id,
+        created_at: f.fecha,
+        is_recurring: false,
+      }))
+    );
 
     const BATCH = 50
     let errorOcurrido = false
@@ -212,6 +215,7 @@ export default function ImportCSVModal({
       aria-labelledby="import-modal-title"
     >
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center justify-between mb-6">
           <h2 id="import-modal-title" className="text-xl font-semibold text-zinc-100">
@@ -282,8 +286,8 @@ export default function ImportCSVModal({
                 <p className="text-xs text-zinc-500 mt-0.5">filas válidas</p>
               </div>
               <div className={`rounded-xl p-3 text-center border ${invalidas.length > 0
-                  ? "bg-red-950/30 border-red-900/40"
-                  : "bg-zinc-800/50 border-zinc-700/40"
+                ? "bg-red-950/30 border-red-900/40"
+                : "bg-zinc-800/50 border-zinc-700/40"
                 }`}>
                 <p className={`text-2xl font-light ${invalidas.length > 0 ? "text-red-400" : "text-zinc-600"
                   }`}>
@@ -305,17 +309,17 @@ export default function ImportCSVModal({
                   key={f.index}
                   role="listitem"
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border text-xs ${f.valida
-                      ? "bg-zinc-800/60 border-zinc-700/50"
-                      : "bg-red-950/20 border-red-900/40"
+                    ? "bg-zinc-800/60 border-zinc-700/50"
+                    : "bg-red-950/20 border-red-900/40"
                     }`}
                 >
                   <div className="flex-1 min-w-0 space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`font-semibold px-1.5 py-0.5 rounded ${f.tipo === "ingreso"
-                          ? "bg-emerald-500/15 text-emerald-400"
-                          : f.tipo === "transferencia"
-                            ? "bg-blue-500/15 text-blue-400"
-                            : "bg-red-500/15 text-red-400"
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : f.tipo === "transferencia"
+                          ? "bg-blue-500/15 text-blue-400"
+                          : "bg-red-500/15 text-red-400"
                         }`}>
                         {f.tipo}
                       </span>
@@ -334,7 +338,7 @@ export default function ImportCSVModal({
                   <button
                     onClick={() => eliminarFila(f.index)}
                     aria-label={`Eliminar fila ${f.index}`}
-                    className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-zinc-800 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

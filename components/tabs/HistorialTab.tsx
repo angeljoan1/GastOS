@@ -50,6 +50,7 @@ export default function HistorialTab({
   const [hasMore, setHasMore] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [showCatSheet, setShowCatSheet] = useState(false)
+  const [showTipoSheet, setShowTipoSheet] = useState(false)
 
   // Carga desde BD y desencripta. No filtra por nota porque está cifrada en BD.
   const fetchMovimientos = useCallback(async (
@@ -76,11 +77,14 @@ export default function HistorialTab({
     if (error) {
       console.error("Error en la búsqueda:", error.message)
     } else if (data) {
-      const decryptedData = data.map(m => ({
-        ...m,
-        cantidad: parseFloat(decryptData(m.cantidad)) || 0,
-        nota: m.nota ? decryptData(m.nota) : null,
-      }))
+      // Aplicamos el coordinador
+      const decryptedData = await Promise.all(
+        data.map(async (m) => ({
+          ...m,
+          cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
+          nota: m.nota ? await decryptData(m.nota) : null,
+        }))
+      );
 
       if (isNew) setMovimientos(decryptedData)
       else setMovimientos(prev => [...prev, ...decryptedData])
@@ -161,8 +165,8 @@ export default function HistorialTab({
   async function handleUpdateMovimiento(updated: Movimiento) {
     const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
 
-    const cantidadEncriptada = encryptData(updated.cantidad)
-    const notaEncriptada = notaRaw ? encryptData(notaRaw) : null
+    const cantidadEncriptada = await encryptData(updated.cantidad)
+    const notaEncriptada = notaRaw ? await encryptData(notaRaw) : null
 
     const { data, error } = await supabase
       .from("movimientos")
@@ -219,7 +223,7 @@ export default function HistorialTab({
   ]
 
   return (
-    <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-8 duration-500">
+    <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* Header filtros */}
       <div className="flex flex-col gap-3 px-4 pt-4 pb-3 border-b border-zinc-800/60 bg-zinc-950">
@@ -242,44 +246,39 @@ export default function HistorialTab({
 
         {/* Filtros: categoría + tipo */}
         <div className="flex gap-2 w-full">
-          <div className="w-[110px] flex-shrink-0">
+        <div className="w-[48%]">
             {(() => {
               const cat = categorias.find(c => c.id === selectedCategory)
               return (
                 <SheetTrigger
                   onClick={() => setShowCatSheet(true)}
-                  placeholder="Todas"
+                  placeholder="Categoría"
                   label={cat?.label}
                   icono={cat?.icono}
+                  color={cat?.tipo === "ingreso" ? "#10b981" : cat?.tipo === "gasto" ? "#ef4444" : undefined}
                 />
               )
             })()}
           </div>
-
-          <div
-            className="flex flex-1 rounded-xl bg-zinc-900 p-1 border border-zinc-800 overflow-x-auto"
-            role="group"
-            aria-label="Filtrar por tipo de movimiento"
-          >
-            {([
-              { id: "todos", label: "Todos", activeClass: "bg-zinc-700 text-zinc-100", Icon: undefined },
-              { id: "gasto", label: "Gastos", activeClass: "bg-red-500/15 text-red-400 border border-red-500/30", Icon: TrendingDown },
-              { id: "ingreso", label: "Ingresos", activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30", Icon: TrendingUp },
-              { id: "transferencia", label: "Transfer.", activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30", Icon: ArrowLeftRight },
-            ] as const satisfies { id: TipoFilter; label: string; activeClass: string; Icon: any }[]).map(
-              ({ id, label, activeClass, Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setTipoFilter(id)}
-                  aria-pressed={tipoFilter === id}
-                  className={`flex-1 flex items-center justify-center gap-1 px-1 py-2 text-[11px] font-semibold rounded-lg transition-all duration-200 whitespace-nowrap ${tipoFilter === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
-                    }`}
-                >
-                  {Icon && <Icon className="w-3 h-3" aria-hidden="true" />}
-                  {label}
-                </button>
+          <div className="w-[48%]">
+            {(() => {
+              const tipoOpts = [
+                { id: "todos", label: "Todos", color: undefined, icono: undefined },
+                { id: "gasto", label: "Gastos", color: "#ef4444", icono: "TrendingDown" },
+                { id: "ingreso", label: "Ingresos", color: "#10b981", icono: "TrendingUp" },
+                { id: "transferencia", label: "Transfer.", color: "#3b82f6", icono: "ArrowLeftRight" },
+              ]
+              const sel = tipoOpts.find(t => t.id === tipoFilter)
+              return (
+                <SheetTrigger
+                  onClick={() => setShowTipoSheet(true)}
+                  placeholder="Tipo"
+                  label={sel?.label}
+                  icono={sel?.icono}
+                  color={sel?.color}
+                />
               )
-            )}
+            })()}
           </div>
         </div>
       </div>
@@ -328,13 +327,13 @@ export default function HistorialTab({
               return (
                 <div
                   key={m.id}
-                  className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 transition-all duration-200`}
+                  className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 transition-all duration-200 hover:bg-zinc-800/50 cursor-pointer`}
                   style={{ opacity: isDeleting ? 0.5 : 1 }}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center flex-shrink-0">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${esTransfer ? "bg-blue-500/10" : esIngreso ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
                     {esTransfer
                       ? <ArrowLeftRight className="w-4 h-4 text-blue-400" aria-hidden="true" />
-                      : <CatIcon className="w-4 h-4 text-zinc-400" aria-hidden="true" />
+                      : <CatIcon className={`w-4 h-4 ${esTransfer ? "text-blue-400" : esIngreso ? "text-emerald-400" : "text-red-400"}`} aria-hidden="true" />
                     }
                   </div>
 
@@ -450,7 +449,7 @@ export default function HistorialTab({
               <button
                 onClick={() => handleDelete(confirmarBorrado!)}
                 aria-label={`Confirmar borrado de ${movABorrar?.tipo === "ingreso" ? "ingreso" : movABorrar?.tipo === "transferencia" ? "transferencia" : "gasto"} de ${movABorrar?.cantidad.toFixed(2)}€`}
-                className="flex-1 py-2 text-sm bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-all"
+                className="flex-1 py-2 text-sm bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all"
               >
                 Borrar
               </button>
@@ -466,6 +465,20 @@ export default function HistorialTab({
         categorias={categorias}
         cuentas={cuentas}
         onSave={handleUpdateMovimiento}
+      />
+
+      <BottomSheet
+        isOpen={showTipoSheet}
+        onClose={() => setShowTipoSheet(false)}
+        title="Filtrar por tipo"
+        value={tipoFilter}
+        onChange={v => setTipoFilter(v as TipoFilter)}
+        options={[
+          { value: "todos", label: "Todos" },
+          { value: "gasto", label: "Gastos", icono: "TrendingDown", tipo: "gasto" },
+          { value: "ingreso", label: "Ingresos", icono: "TrendingUp", tipo: "ingreso" },
+          { value: "transferencia", label: "Transferencias", icono: "ArrowLeftRight", tipo: "transferencia" },
+        ]}
       />
 
       <BottomSheet

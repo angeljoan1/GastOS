@@ -12,6 +12,7 @@
 //          panel del formulario. Así el estado de posición (pos) persiste.
 
 import { useState, useRef } from "react"
+import { supabase } from "@/lib/supabase"
 
 export default function FeedbackWidget({ userId }: { userId: string }) {
   const [isOpen,       setIsOpen]       = useState(false)
@@ -32,9 +33,10 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     if (!mensaje.trim()) return
     setIsSubmitting(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch("/api/feedback", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token ?? ""}` },
         body:    JSON.stringify({ userId, tipo, mensaje }),
       })
       if (response.ok) {
@@ -133,7 +135,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
             <button
               onClick={() => setIsOpen(false)}
               aria-label="Cerrar buzón de sugerencias"
-              className="text-zinc-400 hover:text-zinc-100 transition-colors"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -216,7 +218,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? "Enviando..." : "Enviar ticket"}
               </button>

@@ -23,7 +23,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 15
+const APP_VERSION = 16
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
@@ -327,16 +327,35 @@ export default function App() {
       }
     })
 
+    let hiddenAt: number | null = null
+
     const handleVisibility = async () => {
-      if (document.visibilityState !== "visible") return
-      try {
-        const { data: config } = await supabase
-          .from("app_config")
-          .select("min_version")
-          .eq("id", 1)
-          .maybeSingle()
-        if (config && config.min_version > APP_VERSION) setNeedsUpdate(true)
-      } catch { }
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now()
+        return
+      }
+
+      // Vuelve a primer plano
+      if (document.visibilityState === "visible") {
+        // Check de versión
+        try {
+          const { data: config } = await supabase
+            .from("app_config")
+            .select("min_version")
+            .eq("id", 1)
+            .maybeSingle()
+          if (config && config.min_version > APP_VERSION) setNeedsUpdate(true)
+        } catch { }
+
+        // Si lleva más de 5 minutos en segundo plano, limpiar la clave
+        const TIMEOUT_MS = 1 * 60 * 1000
+        if (hiddenAt && Date.now() - hiddenAt > TIMEOUT_MS) {
+          clearKey()
+          clearBiometricKey()
+          setHasKey(false)
+        }
+        hiddenAt = null
+      }
     }
 
     document.addEventListener("visibilitychange", handleVisibility)

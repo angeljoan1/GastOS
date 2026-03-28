@@ -269,10 +269,11 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
           { type: 'public-key', alg: -257 }, // RS256 fallback
         ],
         authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'required',
-          residentKey: 'preferred',
-        },
+            authenticatorAttachment: 'platform',
+            userVerification: 'preferred',
+            residentKey: 'discouraged',
+          },
+          excludeCredentials: [],
         timeout: 60000,
       },
     }) as PublicKeyCredential | null

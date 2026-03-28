@@ -21,7 +21,7 @@ import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
-import { clearKey, getMasterKey, decryptData } from "@/lib/crypto"
+import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
 const APP_VERSION = 8
 
@@ -209,7 +209,7 @@ function MainApp({ session }: { session: Session }) {
                 <div className="h-px bg-zinc-800 my-1 mx-2" />
                 <button
                   role="menuitem"
-                  onClick={() => { clearKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
+                  onClick={() => { clearKey(); clearBiometricKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-950/30 rounded-lg transition-colors w-full"
                 >
                   <LogOut className="w-4 h-4" /> Cerrar Sesión

@@ -214,3 +214,159 @@ export async function decryptData(cipherText: string | number): Promise<string> 
     return ''
   }
 }
+
+// ─── Biometría (WebAuthn) ─────────────────────────────────────────────────────
+const BIOMETRIC_KEY_STORAGE  = 'gastos_biometric_wrapped_v1'
+const BIOMETRIC_CRED_STORAGE = 'gastos_biometric_cred_id_v1'
+const RP_NAME                = 'GastOS'
+
+export async function isBiometricAvailable(): Promise<boolean> {
+  try {
+    if (typeof window === 'undefined') return false
+    if (!window.PublicKeyCredential) return false
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+  } catch {
+    return false
+  }
+}
+
+export function hasBiometricKey(): boolean {
+  if (typeof window === 'undefined') return false
+  return localStorage.getItem(BIOMETRIC_KEY_STORAGE) !== null
+}
+
+export function clearBiometricKey(): void {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(BIOMETRIC_KEY_STORAGE)
+  localStorage.removeItem(BIOMETRIC_CRED_STORAGE)
+}
+
+// Registra credencial WebAuthn y guarda la clave maestra cifrada
+export async function saveBiometricKey(userId: string): Promise<boolean> {
+  try {
+    const masterKey = _masterKey
+    if (!masterKey) return false
+
+    const challenge = crypto.getRandomValues(new Uint8Array(32))
+    const userIdBytes = new TextEncoder().encode(userId)
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: RP_NAME, id: window.location.hostname },
+        user: {
+          id: userIdBytes,
+          name: userId,
+          displayName: 'GastOS User',
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7  },  // ES256
+          { type: 'public-key', alg: -257 }, // RS256 fallback
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+          residentKey: 'preferred',
+        },
+        timeout: 60000,
+      },
+    }) as PublicKeyCredential | null
+
+    if (!credential) return false
+
+    // Guardar el credentialId para usarlo en el get posterior
+    const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+    localStorage.setItem(BIOMETRIC_CRED_STORAGE, credId)
+
+    // Cifrar la clave maestra con una clave derivada del userId
+    const enc = new TextEncoder()
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
+    )
+    const wrapKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: enc.encode('gastos_bio_wrap_' + userId),
+        iterations: 100_000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    )
+
+    const rawKey = await crypto.subtle.exportKey('raw', masterKey)
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, wrapKey, rawKey)
+
+    const ivB64 = btoa(String.fromCharCode(...iv))
+    const ctB64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+    localStorage.setItem(BIOMETRIC_KEY_STORAGE, `${ivB64}.${ctB64}`)
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Verifica biometría y recupera la clave maestra
+export async function loadBiometricKey(userId: string): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem(BIOMETRIC_KEY_STORAGE)
+    const credIdB64 = localStorage.getItem(BIOMETRIC_CRED_STORAGE)
+    if (!stored || !credIdB64) return false
+
+    const credIdBytes = Uint8Array.from(atob(credIdB64), c => c.charCodeAt(0))
+    const challenge = crypto.getRandomValues(new Uint8Array(32))
+
+    await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        timeout: 60000,
+        userVerification: 'required',
+        rpId: window.location.hostname,
+        allowCredentials: [{
+          type: 'public-key',
+          id: credIdBytes,
+          transports: ['internal'],
+        }],
+      },
+    })
+
+    // Biometría OK — descifrar la clave maestra
+    const [ivB64, ctB64] = stored.split('.')
+    if (!ivB64 || !ctB64) return false
+
+    const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
+    const ct = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
+
+    const enc = new TextEncoder()
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
+    )
+    const wrapKey = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: enc.encode('gastos_bio_wrap_' + userId),
+        iterations: 100_000,
+        hash: 'SHA-256',
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt'],
+    )
+
+    const rawKey = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrapKey, ct)
+
+    const masterKey = await crypto.subtle.importKey(
+      'raw', rawKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+    )
+
+    saveKey(masterKey)
+    return true
+  } catch {
+    return false
+  }
+}

@@ -12,10 +12,10 @@
 //          específica de gasto.
 
 import { useState, useEffect } from "react"
-import { X, Trash2, Loader2, Plus, Target, PiggyBank } from "lucide-react"
+import { X, Trash2, Loader2, Plus, Target, PiggyBank, ChevronRight, Shield, Fingerprint } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
-import { encryptData } from "@/lib/crypto"
+import { encryptData, isBiometricAvailable, hasBiometricKey, saveBiometricKey, clearBiometricKey } from "@/lib/crypto"
 import type { Categoria, Presupuesto, Objetivo } from "@/types"
 
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
@@ -48,11 +48,15 @@ export default function SettingsModal({
   const [savingPres, setSavingPres] = useState(false)
   const [deletingPres, setDeletingPres] = useState<string | null>(null)
 
-  const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos" | "objetivos">("categorias")
+  const [activeTab, setActiveTab] = useState<"categorias" | "presupuestos" | "objetivos" | "seguridad" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [inputObjetivo, setInputObjetivo] = useState("")
   const [savingObj, setSavingObj] = useState(false)
   const [editingObj, setEditingObj] = useState(false)
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioEnabled, setBioEnabled] = useState(false)
+  const [bioLoading, setBioLoading] = useState(false)
+  const [bioError, setBioError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -64,6 +68,12 @@ export default function SettingsModal({
       setInputPresupuesto("")
       setInputObjetivo("")
       setEditingObj(false)
+      setActiveTab(null)
+      setBioError(null)
+      isBiometricAvailable().then(available => {
+        setBioAvailable(available)
+        setBioEnabled(hasBiometricKey())
+      })
     }
   }, [isOpen])
 
@@ -201,6 +211,20 @@ export default function SettingsModal({
     if (!error) onObjetivosChange(objetivos.filter(o => o.id !== objetivoAhorro.id))
   }
 
+  const handleToggleBiometric = async () => {
+    setBioLoading(true)
+    setBioError(null)
+    if (bioEnabled) {
+      clearBiometricKey()
+      setBioEnabled(false)
+    } else {
+      const ok = await saveBiometricKey(userId)
+      if (ok) setBioEnabled(true)
+      else setBioError("No se pudo activar. Inténtalo de nuevo.")
+    }
+    setBioLoading(false)
+  }
+
   const gastoCats = categorias.filter(c => c.tipo === "gasto")
 
   return (
@@ -226,28 +250,30 @@ export default function SettingsModal({
           </button>
         </div>
 
-        {/* Tabs */}
-        <div
-          className="flex rounded-xl bg-zinc-800 p-1 border border-zinc-700/60 mb-6"
-          role="tablist"
-          aria-label="Secciones de configuración"
-        >
+        {/* Lista vertical de secciones */}
+        <div className="space-y-2 mb-4">
           {([
-            { id: "categorias", label: "Categorías" },
-            { id: "presupuestos", label: "Presupuestos" },
-            { id: "objetivos", label: "Objetivos" },
-          ] as const).map(t => (
+            { id: "categorias",   label: "Categorías",   desc: "Gestiona tus categorías",         Icon: ChevronRight },
+            { id: "presupuestos", label: "Presupuestos",  desc: "Límites mensuales por categoría", Icon: ChevronRight },
+            { id: "objetivos",    label: "Objetivos",     desc: "Metas de ahorro mensual",         Icon: ChevronRight },
+            { id: "seguridad",    label: "Seguridad",     desc: "Biometría y acceso",              Icon: Shield       },
+          ] as const).map(({ id, label, desc, Icon }) => (
             <button
-              key={t.id}
-              role="tab"
-              aria-selected={activeTab === t.id}
-              onClick={() => { setActiveTab(t.id); setError(null) }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === t.id
-                  ? "bg-zinc-600 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-300"
-                }`}
+              key={id}
+              onClick={() => { setActiveTab(activeTab === id ? null : id); setError(null); setBioError(null) }}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all text-left ${
+                activeTab === id
+                  ? "border-emerald-500/40 bg-emerald-950/20"
+                  : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-700"
+              }`}
             >
-              {t.label}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${activeTab === id ? "text-zinc-100" : "text-zinc-300"}`}>
+                  {label}
+                </p>
+                <p className="text-xs text-zinc-600 mt-0.5">{desc}</p>
+              </div>
+              <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${activeTab === id ? "text-emerald-400 rotate-90" : "text-zinc-600"}`} />
             </button>
           ))}
         </div>
@@ -258,42 +284,31 @@ export default function SettingsModal({
           </div>
         )}
 
-        {/* ── TAB: Categorías ──────────────────────────────────────────────── */}
+        {/* ── Categorías ───────────────────────────────────────────────────── */}
         {activeTab === "categorias" && (
-          <div className="space-y-6">
+          <div className="space-y-6 mt-2">
             <p className="text-xs text-zinc-600">
               Las categorías aparecen en la pestaña <strong className="text-zinc-500">Registrar</strong> para clasificar tus movimientos.
             </p>
             {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
               const cats = categorias.filter(c => c.tipo === tipo)
               if (cats.length === 0) return null
-
               return (
                 <div key={tipo} className="mb-5">
                   <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
-                    {tipo === "gasto"
-                      ? "Solo Gastos"
-                      : tipo === "ingreso"
-                        ? "Solo Ingresos"
-                        : "Compartidas (Ambos)"
-                    }
+                    {tipo === "gasto" ? "Solo Gastos" : tipo === "ingreso" ? "Solo Ingresos" : "Compartidas (Ambos)"}
                   </p>
                   <div className="space-y-2">
                     {cats.map(cat => {
                       const CIcon = getIcon(cat.icono)
                       const isDeleting = deletingCat === cat.id
                       return (
-                        <div
-                          key={cat.id}
-                          className="flex items-center justify-between bg-zinc-800 border border-zinc-700/50 rounded-xl px-3 py-2.5"
-                        >
+                        <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700/50 rounded-xl px-3 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" aria-hidden="true" />
                             <span className="text-sm text-zinc-200">{cat.label}</span>
                             {cat.tipo === "ambos" && (
-                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">
-                                ambos
-                              </span>
+                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">ambos</span>
                             )}
                           </div>
                           <button
@@ -302,10 +317,7 @@ export default function SettingsModal({
                             aria-label={`Borrar categoría ${cat.label}`}
                             className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors"
                           >
-                            {isDeleting
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <Trash2 className="w-3.5 h-3.5" />
-                            }
+                            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       )
@@ -314,31 +326,20 @@ export default function SettingsModal({
                 </div>
               )
             })}
-
-            {/* Nueva categoría */}
             <div className="space-y-3 pt-4 border-t border-zinc-800">
               <p className="text-xs text-zinc-500 uppercase tracking-widest">Nueva categoría</p>
-
-              <div
-                className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700"
-                role="group"
-                aria-label="Tipo de categoría"
-              >
+              <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700" role="group" aria-label="Tipo de categoría">
                 {(["gasto", "ingreso", "ambos"] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => setNewCatTipo(t)}
                     aria-pressed={newCatTipo === t}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t
-                        ? "bg-zinc-600 text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-300"
-                      }`}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
                   >
                     {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Ambos"}
                   </button>
                 ))}
               </div>
-
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -355,13 +356,9 @@ export default function SettingsModal({
                   aria-label="Crear categoría"
                   className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-medium hover:bg-emerald-400 disabled:opacity-50 transition-all"
                 >
-                  {savingCat
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <Plus className="w-4 h-4" />
-                  }
+                  {savingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
               </div>
-
               <div>
                 <p className="text-xs text-zinc-600 mb-2" id="icono-cat-label">Icono</p>
                 <div className="grid grid-cols-7 gap-1.5" role="group" aria-labelledby="icono-cat-label">
@@ -373,10 +370,7 @@ export default function SettingsModal({
                         onClick={() => setNewCatIcono(name)}
                         aria-label={`Icono ${name}`}
                         aria-pressed={newCatIcono === name}
-                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name
-                            ? "border-emerald-500/60 bg-emerald-950/30"
-                            : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"
-                          }`}
+                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name ? "border-emerald-500/60 bg-emerald-950/30" : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"}`}
                       >
                         <Ico className="w-4 h-4 text-zinc-300" aria-hidden="true" />
                       </button>
@@ -388,27 +382,22 @@ export default function SettingsModal({
           </div>
         )}
 
-        {/* ── TAB: Presupuestos ─────────────────────────────────────────────── */}
+        {/* ── Presupuestos ─────────────────────────────────────────────────── */}
         {activeTab === "presupuestos" && (
-          <div className="space-y-3">
-            {/* BUG #26 FIX: nota informativa sobre el alcance de los presupuestos */}
+          <div className="space-y-3 mt-2">
             <p className="text-xs text-zinc-600 mb-4">
               Asigna un límite mensual a tus categorías de{" "}
               <strong className="text-zinc-500">gasto puro</strong>. El widget de presupuestos
               en el <strong className="text-zinc-500">Dashboard</strong> muestra el progreso de cada límite.
             </p>
-
             {gastoCats.length === 0 ? (
-              <p className="text-sm text-zinc-600 text-center py-8">
-                No tienes categorías de gasto aún.
-              </p>
+              <p className="text-sm text-zinc-600 text-center py-8">No tienes categorías de gasto aún.</p>
             ) : (
               gastoCats.map(cat => {
                 const CIcon = getIcon(cat.icono)
                 const pres = getPresupuesto(cat.id)
                 const isEditing = editingPresupuesto === cat.id
                 const isDeleting = deletingPres === pres?.id
-
                 return (
                   <div key={cat.id} className="bg-zinc-800 border border-zinc-700/60 rounded-2xl p-4">
                     <div className="flex items-center gap-3 mb-3">
@@ -416,86 +405,34 @@ export default function SettingsModal({
                         <CIcon className="w-4 h-4 text-zinc-300" aria-hidden="true" />
                       </div>
                       <p className="text-sm font-medium text-zinc-200 flex-1">{cat.label}</p>
-
                       {pres && !isEditing && (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-emerald-400 tabular-nums">
-                            {pres.cantidad.toFixed(2)}€
-                          </span>
-                          <button
-                            onClick={() => {
-                              setEditingPresupuesto(cat.id)
-                              setInputPresupuesto(pres.cantidad.toString())
-                            }}
-                            aria-label={`Editar presupuesto de ${cat.label}`}
-                            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDeletePresupuesto(pres.id)}
-                            disabled={isDeleting}
-                            aria-label={`Borrar presupuesto de ${cat.label}`}
-                            className="text-zinc-600 hover:text-red-400 transition-colors"
-                          >
-                            {isDeleting
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <Trash2 className="w-3.5 h-3.5" />
-                            }
+                          <span className="text-sm font-semibold text-emerald-400 tabular-nums">{Number(pres.cantidad).toFixed(2)}€</span>
+                          <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto(pres.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">Editar</button>
+                          <button onClick={() => handleDeletePresupuesto(pres.id)} disabled={isDeleting} className="text-zinc-600 hover:text-red-400 transition-colors">
+                            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       )}
-
                       {!pres && !isEditing && (
-                        <button
-                          onClick={() => {
-                            setEditingPresupuesto(cat.id)
-                            setInputPresupuesto("")
-                          }}
-                          aria-label={`Añadir límite de presupuesto para ${cat.label}`}
-                          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                        >
-                          <Target className="w-3.5 h-3.5" aria-hidden="true" />
-                          Añadir límite
+                        <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto("") }} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                          <Target className="w-3.5 h-3.5" aria-hidden="true" /> Añadir límite
                         </button>
                       )}
                     </div>
-
-                    {/* Formulario inline de edición */}
                     {isEditing && (
                       <div className="flex gap-2 mt-1">
                         <input
-                          type="number"
-                          inputMode="decimal"
-                          value={inputPresupuesto}
+                          type="number" inputMode="decimal" value={inputPresupuesto}
                           onChange={e => setInputPresupuesto(e.target.value)}
-                          placeholder="Límite mensual (€)"
-                          aria-label={`Límite mensual para ${cat.label}`}
-                          autoFocus
-                          onKeyDown={e => {
-                            if (e.key === "Enter") handleSavePresupuesto(cat.id)
-                            if (e.key === "Escape") setEditingPresupuesto(null)
-                          }}
+                          placeholder="Límite mensual (€)" autoFocus
+                          onKeyDown={e => { if (e.key === "Enter") handleSavePresupuesto(cat.id); if (e.key === "Escape") setEditingPresupuesto(null) }}
                           className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                         />
-                        <button
-                          onClick={() => handleSavePresupuesto(cat.id)}
-                          disabled={savingPres}
-                          aria-label="Guardar presupuesto"
-                          className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all"
-                        >
-                          {savingPres
-                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                            : "OK"
-                          }
+                        <button onClick={() => handleSavePresupuesto(cat.id)} disabled={savingPres} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
+                          {savingPres ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
                         </button>
-                        <button
-                          onClick={() => setEditingPresupuesto(null)}
-                          aria-label="Cancelar edición"
-                          className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm"
-                        >
-                          ✕
-                        </button>
+                        <button onClick={() => setEditingPresupuesto(null)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
                       </div>
                     )}
                   </div>
@@ -505,85 +442,99 @@ export default function SettingsModal({
           </div>
         )}
 
-        {/* ── TAB: Objetivos ───────────────────────────────────────────────── */}
+        {/* ── Objetivos ────────────────────────────────────────────────────── */}
         {activeTab === "objetivos" && (
-          <div className="space-y-4">
+          <div className="space-y-4 mt-2">
             <p className="text-xs text-zinc-600">
               Define metas de ahorro mensuales. El widget de{" "}
               <strong className="text-zinc-500">Objetivo de ahorro</strong> en el Dashboard
               mostrará tu progreso. Los datos se cifran con tu PIN.
             </p>
-
             <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                   <PiggyBank className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                 </div>
                 <p className="text-sm font-medium text-zinc-200 flex-1">Ahorro mensual</p>
-
                 {objetivoAhorro && !editingObj && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-emerald-400 tabular-nums">
-                      {objetivoAhorro.cantidad.toFixed(2)}€
-                    </span>
-                    <button
-                      onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }}
-                      className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={handleDeleteObjetivo}
-                      aria-label="Borrar objetivo de ahorro"
-                      className="text-zinc-600 hover:text-red-400 transition-colors"
-                    >
+                    <span className="text-sm font-semibold text-emerald-400 tabular-nums">{objetivoAhorro.cantidad.toFixed(2)}€</span>
+                    <button onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">Editar</button>
+                    <button onClick={handleDeleteObjetivo} aria-label="Borrar objetivo de ahorro" className="text-zinc-600 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
-
                 {!objetivoAhorro && !editingObj && (
-                  <button
-                    onClick={() => setEditingObj(true)}
-                    className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700"
-                  >
-                    <Target className="w-3.5 h-3.5" aria-hidden="true" />
-                    Añadir objetivo
+                  <button onClick={() => setEditingObj(true)} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                    <Target className="w-3.5 h-3.5" aria-hidden="true" /> Añadir objetivo
                   </button>
                 )}
               </div>
-
               {editingObj && (
                 <div className="flex gap-2">
                   <input
-                    type="number"
-                    inputMode="decimal"
-                    value={inputObjetivo}
+                    type="number" inputMode="decimal" value={inputObjetivo}
                     onChange={e => setInputObjetivo(e.target.value)}
-                    placeholder="Objetivo mensual (€)"
-                    autoFocus
-                    onKeyDown={e => {
-                      if (e.key === "Enter") handleSaveObjetivo()
-                      if (e.key === "Escape") setEditingObj(false)
-                    }}
+                    placeholder="Objetivo mensual (€)" autoFocus
+                    onKeyDown={e => { if (e.key === "Enter") handleSaveObjetivo(); if (e.key === "Escape") setEditingObj(false) }}
                     className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
-                  <button
-                    onClick={handleSaveObjetivo}
-                    disabled={savingObj}
-                    className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all"
-                  >
+                  <button onClick={handleSaveObjetivo} disabled={savingObj} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
                     {savingObj ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
                   </button>
-                  <button
-                    onClick={() => setEditingObj(false)}
-                    className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => setEditingObj(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Seguridad ────────────────────────────────────────────────────── */}
+        {activeTab === "seguridad" && (
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-zinc-600">
+              Configura el acceso biométrico para desbloquear GastOS sin introducir el PIN.
+            </p>
+            {!bioAvailable ? (
+              <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
+                <Fingerprint className="w-5 h-5 text-zinc-600 flex-shrink-0" aria-hidden="true" />
+                <p className="text-sm text-zinc-500">Tu dispositivo no soporta desbloqueo biométrico.</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bioEnabled ? "bg-emerald-500/10" : "bg-zinc-700"}`}>
+                    <Fingerprint className={`w-4 h-4 ${bioEnabled ? "text-emerald-400" : "text-zinc-500"}`} aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">Desbloqueo biométrico</p>
+                    <p className="text-xs text-zinc-600 mt-0.5">
+                      {bioEnabled ? "Activo — huella o Face ID" : "Inactivo — solo PIN"}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleBiometric}
+                    disabled={bioLoading}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                      bioEnabled
+                        ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
+                        : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                    } disabled:opacity-50`}
+                  >
+                    {bioLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : bioEnabled ? "Desactivar" : "Activar"}
+                  </button>
+                </div>
+                {bioError && (
+                  <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-3 py-2">{bioError}</p>
+                )}
+                {bioEnabled && (
+                  <p className="text-xs text-zinc-700">
+                    Si cambias tu PIN via recuperación de correo, deberás reactivar la biometría.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

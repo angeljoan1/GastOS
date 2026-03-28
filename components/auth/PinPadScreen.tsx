@@ -18,12 +18,17 @@ import { Loader2, Lock, Delete, KeyRound } from "lucide-react"
 import type { Session } from "@supabase/supabase-js"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import {
-  deriveKeyFromPin,
-  saveKey,
-  generateSalt,
-  generateVerificationToken,
-  isKeyValid,
-} from "@/lib/crypto"
+    deriveKeyFromPin,
+    saveKey,
+    generateSalt,
+    generateVerificationToken,
+    isKeyValid,
+    isBiometricAvailable,
+    hasBiometricKey,
+    loadBiometricKey,
+    saveBiometricKey,
+    clearBiometricKey,
+  } from "@/lib/crypto"
 
 function triggerHaptic(duration?: number | number[]) {
   if (!navigator.vibrate) return
@@ -47,7 +52,12 @@ export default function PinPadScreen({
   const [isUnlocking, setIsUnlocking]     = useState(false)
   const [showRecovery, setShowRecovery]   = useState(false)
   const [recoveryLoading, setRecoveryLoading] = useState(false)
-  const [recoverySuccess, setRecoverySuccess] = useState(false)
+  const [recoverySuccess, setRecoverySuccess]   = useState(false)
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricEnabled, setBiometricEnabled]     = useState(false)
+  const [biometricLoading, setBiometricLoading]     = useState(false)
+  const [showBiometricOffer, setShowBiometricOffer] = useState(false)
+  const [biometricError, setBiometricError]         = useState<string | null>(null)
 
   // ─── Carga del vault ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -110,7 +120,29 @@ export default function PinPadScreen({
     }
 
     loadVault()
+
+    // Comprobar soporte biométrico
+    isBiometricAvailable().then(available => {
+      setBiometricAvailable(available)
+      setBiometricEnabled(hasBiometricKey())
+    })
   }, [session])
+
+  // ─── Intento biométrico automático ──────────────────────────────────────────
+  useEffect(() => {
+    if (isFirstTime !== false) return   // solo si vault ya existe
+    if (!hasBiometricKey()) return      // solo si biometría activada
+
+    async function tryBiometric() {
+      setBiometricLoading(true)
+      const ok = await loadBiometricKey(session.user.id)
+      setBiometricLoading(false)
+      if (ok) onUnlocked()
+      // si falla, simplemente muestra el PIN — no hacer nada más
+    }
+
+    tryBiometric()
+  }, [isFirstTime, session.user.id, onUnlocked])
 
   // ─── Teclado ────────────────────────────────────────────────────────────────
   const handleKeyPress = (num: string) => {
@@ -198,7 +230,11 @@ export default function PinPadScreen({
         }
 
         saveKey(derivedKey)
-        onUnlocked()
+        if (biometricAvailable && !biometricEnabled) {
+          setShowBiometricOffer(true)
+        } else {
+          onUnlocked()
+        }
 
       } else if (vaultToken) {
         if (!vaultSalt) {
@@ -211,9 +247,9 @@ export default function PinPadScreen({
         const valid      = await isKeyValid(derivedKey, vaultToken)
 
         if (valid) {
-          saveKey(derivedKey)
-          onUnlocked()
-        } else {
+            saveKey(derivedKey)
+            onUnlocked()
+          } else {
           triggerHaptic([50, 50, 50])
           setVaultError("PIN incorrecto. Inténtalo de nuevo.")
           setPinInput("")
@@ -258,6 +294,29 @@ export default function PinPadScreen({
     setRecoveryLoading(false)
     if (!error) setRecoverySuccess(true)
     else setVaultError("Error al enviar el correo. Inténtalo más tarde.")
+  }
+
+  // ─── Biometría ───────────────────────────────────────────────────────────────
+  const handleActivateBiometric = async () => {
+    setBiometricLoading(true)
+    setBiometricError(null)
+    const ok = await saveBiometricKey(session.user.id)
+    setBiometricLoading(false)
+    if (ok) {
+      setBiometricEnabled(true)
+      onUnlocked()
+    } else {
+      setBiometricError("No se pudo activar. Inténtalo de nuevo.")
+    }
+  }
+
+  const handleRetryBiometric = async () => {
+    setBiometricLoading(true)
+    setBiometricError(null)
+    const ok = await loadBiometricKey(session.user.id)
+    setBiometricLoading(false)
+    if (ok) onUnlocked()
+    else setBiometricError("Biometría fallida. Usa tu PIN.")
   }
 
   // ─── Renders ────────────────────────────────────────────────────────────────
@@ -337,6 +396,57 @@ export default function PinPadScreen({
     )
   }
 
+  if (showBiometricOffer) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center py-12 px-8 text-center gap-6">
+        <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+          <Lock className="w-7 h-7 text-emerald-400" />
+        </div>
+        <div className="space-y-2 max-w-xs">
+          <h2 className="text-xl font-bold text-zinc-100">Desbloqueo rápido</h2>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            ¿Quieres usar tu huella o Face ID para desbloquear GastOS en lugar del PIN?
+          </p>
+        </div>
+        {biometricError && (
+          <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-4 py-3 max-w-xs">
+            {biometricError}
+          </p>
+        )}
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button
+            onClick={handleActivateBiometric}
+            disabled={biometricLoading}
+            className="w-full py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {biometricLoading
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : "Activar desbloqueo biométrico"
+            }
+          </button>
+          <button
+            onClick={onUnlocked}
+            className="w-full py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700 transition-all"
+          >
+            Ahora no
+          </button>
+        </div>
+        <p className="text-[10px] text-zinc-700 max-w-xs">
+          Puedes activarlo o desactivarlo más adelante en Ajustes → Seguridad
+        </p>
+      </div>
+    )
+  }
+
+  if (biometricLoading && isFirstTime === false) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+        <p className="text-sm text-zinc-500">Verificando identidad...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-between py-12 px-8 text-center select-none overflow-hidden">
       <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-700">
@@ -409,6 +519,18 @@ export default function PinPadScreen({
 
       <div className="mt-8 flex flex-col items-center gap-4">
         <EncryptionBadge />
+        {!isFirstTime && biometricEnabled && (
+          <button
+            onClick={handleRetryBiometric}
+            disabled={biometricLoading}
+            className="text-[10px] text-zinc-500 uppercase tracking-[0.15em] hover:text-zinc-300 transition-colors"
+          >
+            {biometricLoading ? "Verificando..." : "Usar biometría"}
+          </button>
+        )}
+        {biometricError && (
+          <p className="text-xs text-red-400">{biometricError}</p>
+        )}
         {!isFirstTime && (
           <button
             onClick={() => setShowRecovery(true)}

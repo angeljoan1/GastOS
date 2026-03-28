@@ -223,9 +223,10 @@ export default function DashboardTab({
     monthLabel, DIAS_SEMANA, NOMBRES_DIA,
   } = useMemo(() => {
     const monthMovs = movimientos.filter(m => {
-    const d = new Date(m.created_at)
-    return d.getMonth() === sm && d.getFullYear() === sy
-  })
+      const d = new Date(m.created_at)
+      const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      return localD.getUTCMonth() === sm && localD.getUTCFullYear() === sy
+    })
   const monthGastos = monthMovs.filter(m => (m.tipo ?? "gasto") === "gasto")
   const monthIngresos = monthMovs.filter(m => m.tipo === "ingreso")
   const totalGastos = monthGastos.reduce((a, m) => a + m.cantidad, 0)
@@ -239,7 +240,11 @@ export default function DashboardTab({
   const patrimonioTotal = saldos.reduce((a, s) => a + s.saldo_actual, 0)
 
   const categoryTotals = monthGastos.reduce((acc, m) => {
-    acc[m.categoria] = (acc[m.categoria] || 0) + m.cantidad
+    // Normalizar: si categoria es un ID conocido úsalo, si no buscar por label
+    const catById = categorias.find(c => c.id === m.categoria)
+    const catByLabel = categorias.find(c => c.label.toLowerCase() === m.categoria?.toLowerCase())
+    const key = catById?.id ?? catByLabel?.id ?? m.categoria
+    acc[key] = (acc[key] || 0) + m.cantidad
     return acc
   }, {} as Record<string, number>)
 
@@ -251,7 +256,8 @@ export default function DashboardTab({
     const d = new Date(sy, sm - (11 - i), 1)
     const movs = movimientos.filter(m => {
       const md = new Date(m.created_at)
-      return md.getMonth() === d.getMonth() && md.getFullYear() === d.getFullYear()
+      const localMd = new Date(md.getTime() - md.getTimezoneOffset() * 60000)
+      return localMd.getUTCMonth() === d.getMonth() && localMd.getUTCFullYear() === d.getFullYear()
     })
     const label = d.toLocaleDateString("es-ES", { month: "short" })
     const g = Math.round(movs.filter(m => (m.tipo ?? "gasto") === "gasto").reduce((a, m) => a + m.cantidad, 0) * 100) / 100
@@ -279,7 +285,8 @@ export default function DashboardTab({
   const mesAntDate = new Date(sy, sm - 1, 1)
   const mesAntMovs = movimientos.filter(m => {
     const d = new Date(m.created_at)
-    return d.getMonth() === mesAntDate.getMonth() && d.getFullYear() === mesAntDate.getFullYear()
+    const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    return localD.getUTCMonth() === mesAntDate.getMonth() && localD.getUTCFullYear() === mesAntDate.getFullYear()
   })
   const totalGastosMesAnt = mesAntMovs.filter(m => (m.tipo ?? "gasto") === "gasto").reduce((a, m) => a + m.cantidad, 0)
   const diasMesAnt = new Date(sy, sm, 0).getDate()
@@ -304,7 +311,9 @@ export default function DashboardTab({
 
   const gastoPorDia: Record<number, number> = {}
   monthGastos.forEach(m => {
-    const dia = new Date(m.created_at).getDate()
+    const d = new Date(m.created_at)
+    const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    const dia = localD.getUTCDate()
     gastoPorDia[dia] = (gastoPorDia[dia] ?? 0) + m.cantidad
   })
   const maxGastoDia = Math.max(...Object.values(gastoPorDia), 0.01)
@@ -333,7 +342,9 @@ export default function DashboardTab({
   const NOMBRES_DIA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
   const gastoPorDiaSemana: Record<number, number> = {}
   monthGastos.forEach(m => {
-    const dow = new Date(m.created_at).getDay()
+    const d = new Date(m.created_at)
+    const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    const dow = localD.getUTCDay()
     gastoPorDiaSemana[dow] = (gastoPorDiaSemana[dow] ?? 0) + m.cantidad
   })
   const maxGastoDow = Math.max(...Object.values(gastoPorDiaSemana), 0.01)

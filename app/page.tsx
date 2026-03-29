@@ -23,7 +23,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 18
+const APP_VERSION = 19
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
@@ -160,7 +160,7 @@ function MainApp({ session }: { session: Session }) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
+    <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
       <header className="flex items-center justify-between px-4 pt-safe-top pb-0.5 min-h-10 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm relative z-20">
         <div className="flex items-center gap-2">
         <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-lg" />
@@ -234,7 +234,7 @@ function MainApp({ session }: { session: Session }) {
         {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} />}
       </main>
 
-      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1">
+      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1 pb-safe-bottom">
         <div className="flex items-end justify-around">
           {[
             { id: "ingreso",    Icon: WalletCards, label: "Registrar"  },

@@ -46,6 +46,15 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   
+  @layer utilities {
+    .pt-safe-top {
+      padding-top: env(safe-area-inset-top);
+    }
+    .pb-safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+  
   @keyframes marquee {
     0%    { transform: translateX(0); }
     30%   { transform: translateX(0); }

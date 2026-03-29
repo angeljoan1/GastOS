@@ -10,6 +10,7 @@
 
 
 import { X, Plus, Loader2, Trash2, Check } from "lucide-react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import { getIcon, CUENTA_COLORS, CUENTA_ICON_OPTIONS } from "@/lib/icons"
 import type { Cuenta } from "@/types"
@@ -24,6 +25,7 @@ export default function CuentasModal({
   cuentas: Cuenta[]
   onCuentasChange: (cuentas: Cuenta[]) => void
 }) {
+  const t = useTranslations()
   const [nombre, setNombre] = useState("")
   const [saldoInicial, setSaldoInicial] = useState("")
   const [icono, setIcono] = useState("Landmark")
@@ -99,6 +101,17 @@ export default function CuentasModal({
 
   if (!isOpen) return null
 
+  const iconKeyMap: Record<string, string> = {
+    Landmark:   t("cuentas.iconBanco"),
+    Wallet:     t("cuentas.iconEfectivo"),
+    CreditCard: t("cuentas.iconTarjeta"),
+    TrendingUp: t("cuentas.iconInversion"),
+    Coins:      t("cuentas.iconMonedas"),
+    Banknote:   t("cuentas.iconBilletes"),
+    Building2:  t("cuentas.iconEntidad"),
+    Package:    t("cuentas.iconOtro"),
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end"
@@ -109,11 +122,11 @@ export default function CuentasModal({
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
       <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
-        <div className="flex items-center justify-between mb-6">
-          <h2 id="cuentas-modal-title" className="text-xl font-semibold text-zinc-100">Mis Cuentas</h2>
+      <div className="flex items-center justify-between mb-6">
+          <h2 id="cuentas-modal-title" className="text-xl font-semibold text-zinc-100">{t("cuentas.title")}</h2>
           <button
             onClick={onClose}
-            aria-label="Cerrar panel de cuentas"
+            aria-label={t("cuentas.ariaClose")}
             className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
@@ -146,7 +159,7 @@ export default function CuentasModal({
                     <p className="text-sm font-medium text-zinc-200">{c.nombre}</p>
                     {/* BUG #20 FIX: c.saldo_inicial ya es number en claro */}
                     <p className="text-xs text-zinc-500">
-                      Saldo inicial: {(c.saldo_inicial ?? 0).toFixed(2)}€
+                      {t("cuentas.saldoInicial", { amount: (c.saldo_inicial ?? 0).toFixed(2) })}
                     </p>
                   </div>
 
@@ -156,24 +169,24 @@ export default function CuentasModal({
                         onClick={() => setConfirmDeleteId(null)}
                         className="text-xs text-zinc-500 hover:text-zinc-300 px-2"
                       >
-                        Cancelar
+                        {t("cuentas.deleteCancel")}
                       </button>
                       <button
                         onClick={() => handleDelete(c.id)}
                         disabled={deletingId === c.id}
-                        aria-label={`Confirmar borrado de ${c.nombre}`}
+                        aria-label={t("cuentas.ariaDeleteConfirm", { name: c.nombre })}
                         className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg font-medium hover:bg-red-600 transition-all flex items-center gap-1"
                       >
                         {deletingId === c.id
                           ? <Loader2 className="w-3 h-3 animate-spin" />
-                          : "Borrar"
+                          : t("cuentas.deleteConfirm")
                         }
                       </button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmDeleteId(c.id)}
-                      aria-label={`Borrar cuenta ${c.nombre}`}
+                      aria-label={t("cuentas.ariaDeleteAccount", { name: c.nombre })}
                       className="w-8 h-8 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -187,14 +200,14 @@ export default function CuentasModal({
 
         {/* Formulario nueva cuenta */}
         <div className="space-y-4 pt-4 border-t border-zinc-800">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">Nueva cuenta</p>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("cuentas.sectionNew")}</p>
 
           <input
             type="text"
             value={nombre}
             onChange={e => setNombre(e.target.value)}
-            placeholder="Ej: BBVA, Efectivo, Revolut..."
-            aria-label="Nombre de la cuenta"
+            placeholder={t("cuentas.placeholderNombre")}
+            aria-label={t("cuentas.ariaLabelNombre")}
             className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
           />
 
@@ -203,37 +216,38 @@ export default function CuentasModal({
             inputMode="decimal"
             value={saldoInicial}
             onChange={e => setSaldoInicial(e.target.value)}
-            placeholder="Saldo inicial (€)"
-            aria-label="Saldo inicial en euros"
+            placeholder={t("cuentas.placeholderSaldo")}
+            aria-label={t("cuentas.ariaLabelSaldo")}
             className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
           />
 
           <div>
-            <p className="text-xs text-zinc-500 mb-2" id="icono-label">Icono</p>
+            <p className="text-xs text-zinc-500 mb-2" id="icono-label">{t("cuentas.sectionIcono")}</p>
             <div className="grid grid-cols-4 gap-2" role="group" aria-labelledby="icono-label">
               {CUENTA_ICON_OPTIONS.map(opt => {
                 const OIcon = getIcon(opt.name)
+                const iconLabel = t(`cuentas.icon${opt.name.replace("Landmark","Banco").replace("Wallet","Efectivo").replace("CreditCard","Tarjeta").replace("TrendingUp","Inversion").replace("Coins","Monedas").replace("Banknote","Billetes").replace("Building2","Entidad").replace("Package","Otro")}` as Parameters<typeof t>[0])
                 return (
                   <button
                     key={opt.name}
                     onClick={() => setIcono(opt.name)}
-                    aria-label={`Icono ${opt.label}`}
+                    aria-label={`Icono ${iconKeyMap[opt.name] ?? opt.label}`}
                     aria-pressed={icono === opt.name}
                     className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all ${icono === opt.name
                       ? "border-emerald-500/50 bg-emerald-950/30"
                       : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"
                       }`}
-                  >
-                    <OIcon className="w-5 h-5 text-zinc-300" />
-                    <span className="text-[10px] text-zinc-500">{opt.label}</span>
-                  </button>
+                      >
+                      <OIcon className="w-5 h-5 text-zinc-300" />
+                      <span className="text-[10px] text-zinc-500">{iconKeyMap[opt.name] ?? opt.label}</span>
+                    </button>
                 )
               })}
             </div>
           </div>
 
           <div>
-            <p className="text-xs text-zinc-500 mb-2" id="color-label">Color</p>
+            <p className="text-xs text-zinc-500 mb-2" id="color-label">{t("cuentas.sectionColor")}</p>
             <div className="flex gap-2 flex-wrap" role="group" aria-labelledby="color-label">
               {CUENTA_COLORS.map(c => (
                 <button
@@ -259,7 +273,7 @@ export default function CuentasModal({
               ? <Loader2 className="w-4 h-4 animate-spin" />
               : <Plus className="w-4 h-4" />
             }
-            Crear cuenta
+            {t("cuentas.createButton")}
           </button>
         </div>
       </div>

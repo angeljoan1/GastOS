@@ -12,9 +12,11 @@
 //          panel del formulario. Así el estado de posición (pos) persiste.
 
 import { useState, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 
 export default function FeedbackWidget({ userId }: { userId: string }) {
+  const t = useTranslations()
   const [isOpen,       setIsOpen]       = useState(false)
   const [tipo,         setTipo]         = useState<"Bug" | "Idea">("Idea")
   const [mensaje,      setMensaje]      = useState("")
@@ -49,10 +51,10 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
           setMensaje("")
         }, 3000)
       } else {
-        setSubmitError("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
+        setSubmitError(t("feedback.errorSend"))
       }
     } catch {
-      setSubmitError("Error de conexión al enviar el ticket.")
+      setSubmitError(t("feedback.errorNetwork"))
     } finally {
       setIsSubmitting(false)
     }
@@ -97,7 +99,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onClick={handleClick}
-        aria-label="Abrir buzón de sugerencias"
+        aria-label={t("feedback.ariaOpen")}
         aria-expanded={isOpen}
         style={{
           transform:      `translate(${pos.x}px, ${pos.y}px)`,
@@ -105,7 +107,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
           pointerEvents:  isOpen ? "none" : undefined,
         }}
         className="fixed bottom-24 right-6 bg-zinc-800 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-opacity duration-300 opacity-50 hover:opacity-100 z-50 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
-        title="Enviar sugerencia o error"
+        title={t("feedback.title")}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -122,7 +124,6 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         </svg>
       </button>
 
-      {/* Panel del formulario — se muestra/oculta independientemente del botón */}
       {isOpen && (
         <div
           className="fixed bottom-24 right-6 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-bottom-5"
@@ -132,11 +133,11 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         >
           <div className="bg-zinc-800 px-4 py-3 flex justify-between items-center border-b border-zinc-700">
             <h3 id="feedback-title" className="font-medium text-zinc-100">
-              Buzón de Sugerencias
+              {t("feedback.panelTitle")}
             </h3>
             <button
               onClick={() => { setIsOpen(false); setSubmitError(null) }}
-              aria-label="Cerrar buzón de sugerencias"
+              aria-label={t("feedback.ariaClose")}
               className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
             >
               <svg
@@ -158,20 +159,19 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
 
           {success ? (
             <div className="p-6 text-center text-emerald-400" role="status">
-              <p>¡Gracias por tu aportación!</p>
-              <p className="text-xs mt-2 text-zinc-500">Tomamos nota para mejorar GastOS.</p>
+              <p>{t("feedback.successMsg")}</p>
+              <p className="text-xs mt-2 text-zinc-500">{t("feedback.successHint")}</p>
             </div>
           ) : (
-            // BUG #13 FIX: aria-label en el formulario
             <form
               onSubmit={handleSubmit}
               className="p-4 flex flex-col gap-4"
-              aria-label="Formulario de sugerencias y errores"
+              aria-label={t("feedback.ariaFormLabel")}
             >
               <div
                 className="flex gap-2 bg-zinc-950 p-1 rounded-lg"
                 role="group"
-                aria-label="Tipo de mensaje"
+                aria-label={t("feedback.ariaTypeGroup")}
               >
                 <button
                   type="button"
@@ -181,7 +181,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
                     tipo === "Idea" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500"
                   }`}
                 >
-                  💡 Idea
+                  {t("feedback.typeIdea")}
                 </button>
                 <button
                   type="button"
@@ -191,16 +191,13 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
                     tipo === "Bug" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500"
                   }`}
                 >
-                  🐛 Error
+                  {t("feedback.typeBug")}
                 </button>
               </div>
 
               <div>
                 <label htmlFor="feedback-mensaje" className="sr-only">
-                  {tipo === "Idea"
-                    ? "¿Qué nueva función te gustaría ver?"
-                    : "¿Qué no funciona correctamente?"
-                  }
+                  {tipo === "Idea" ? t("feedback.labelIdea") : t("feedback.labelBug")}
                 </label>
                 <textarea
                   id="feedback-mensaje"
@@ -208,11 +205,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
                   rows={4}
                   value={mensaje}
                   onChange={e => setMensaje(e.target.value)}
-                  placeholder={
-                    tipo === "Idea"
-                      ? "¿Qué nueva función te gustaría ver?"
-                      : "¿Qué no funciona correctamente?"
-                  }
+                  placeholder={tipo === "Idea" ? t("feedback.placeholderIdea") : t("feedback.placeholderBug")}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors resize-none"
                 />
               </div>
@@ -228,7 +221,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
                 disabled={isSubmitting}
                 className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
               >
-                {isSubmitting ? "Enviando..." : "Enviar ticket"}
+                {isSubmitting ? t("common.sending") : t("feedback.submit")}
               </button>
             </form>
           )}

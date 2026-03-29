@@ -6,10 +6,12 @@
 //         Ahora importa el cliente compartido de lib/supabase.ts.
 
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"          // ← Singleton compartido
 import { Loader2, CheckCircle2, Lock, AlertCircle } from "lucide-react"
 
 export default function ResetPasswordPage() {
+  const t = useTranslations()
   const [password,        setPassword]        = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading,         setLoading]         = useState(false)
@@ -29,7 +31,7 @@ export default function ResetPasswordPage() {
       const errorDesc   = searchParams.get("error_description") || hashParams.get("error_description")
 
       if (errorDesc) {
-        setError("El enlace es inválido o ha caducado.")
+        setError(t("reset_password.errorLinkInvalid"))
         setIsVerifying(false)
         return
       }
@@ -55,7 +57,7 @@ export default function ResetPasswordPage() {
         // Limpiar la URL para que no quede rastro del token
         window.history.replaceState({}, document.title, window.location.pathname)
       } else {
-        setError("No se ha detectado una sesión válida. Es posible que el enlace ya se haya usado.")
+        setError(t("reset_password.errorNoSession"))
       }
 
       setIsVerifying(false)
@@ -66,12 +68,12 @@ export default function ResetPasswordPage() {
 
   async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault()
-    if (password !== confirmPassword) return setError("Las contraseñas no coinciden.")
+    if (password !== confirmPassword) return setError(t("reset_password.errorPasswordMismatch"))
   
     const tieneLetras  = /[a-zA-Z]/.test(password)
     const tieneNumeros = /[0-9]/.test(password)
     if (password.length < 8 || !tieneLetras || !tieneNumeros) {
-      return setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+      return setError(t("reset_password.errorPasswordWeak"))
     }
 
     setLoading(true)
@@ -80,7 +82,7 @@ export default function ResetPasswordPage() {
     const { error: updateError } = await supabase.auth.updateUser({ password })
 
     if (updateError) {
-      setError("Error al actualizar: " + updateError.message)
+      setError(t("reset_password.errorUpdate", { message: updateError.message }))
     } else {
       setSuccess(true)
       setTimeout(() => { window.location.href = "/" }, 2000)
@@ -96,13 +98,13 @@ export default function ResetPasswordPage() {
           <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-4">
             <Lock className="w-6 h-6 text-emerald-400" />
           </div>
-          <h1 className="text-xl font-bold text-zinc-100">Nueva Contraseña</h1>
+          <h1 className="text-xl font-bold text-zinc-100">{t("reset_password.title")}</h1>
         </div>
 
         {isVerifying && (
           <div className="flex flex-col items-center py-4">
             <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-4" />
-            <p className="text-zinc-400 text-sm">Validando seguridad...</p>
+            <p className="text-zinc-400 text-sm">{t("reset_password.validating")}</p>
           </div>
         )}
 
@@ -116,7 +118,7 @@ export default function ResetPasswordPage() {
               onClick={() => window.location.href = "/"}
               className="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
             >
-              Volver al inicio
+              {t("reset_password.backToHome")}
             </button>
           </div>
         )}
@@ -124,7 +126,7 @@ export default function ResetPasswordPage() {
         {!isVerifying && hasSession && success && (
           <div className="flex flex-col items-center py-4 animate-in fade-in">
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mb-3" />
-            <p className="text-emerald-400 font-medium">¡Contraseña cambiada!</p>
+            <p className="text-emerald-400 font-medium">{t("reset_password.successMsg")}</p>
           </div>
         )}
 
@@ -132,7 +134,7 @@ export default function ResetPasswordPage() {
           <form onSubmit={handleUpdatePassword} className="space-y-4 animate-in fade-in">
             <div>
               <label htmlFor="new-password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
-                Nueva contraseña
+                {t("reset_password.labelNewPassword")}
               </label>
               <input
                 id="new-password"
@@ -140,14 +142,14 @@ export default function ResetPasswordPage() {
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Nueva contraseña"
+                placeholder={t("reset_password.placeholderNewPassword")}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
               />
             </div>
 
             <div>
               <label htmlFor="confirm-password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">
-                Confirmar contraseña
+                {t("reset_password.labelConfirmPassword")}
               </label>
               <input
                 id="confirm-password"
@@ -155,7 +157,7 @@ export default function ResetPasswordPage() {
                 required
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="Repite la contraseña"
+                placeholder={t("reset_password.placeholderConfirmPassword")}
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
               />
             </div>
@@ -173,7 +175,7 @@ export default function ResetPasswordPage() {
             >
               {loading
                 ? <Loader2 className="w-5 h-5 animate-spin" />
-                : "Guardar y acceder"
+                : t("reset_password.submit")
               }
             </button>
           </form>

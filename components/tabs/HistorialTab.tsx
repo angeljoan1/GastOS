@@ -10,6 +10,7 @@
 //          en el momento del cleanup, no al montar.
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import {
   Loader2, Package, Edit2, Trash2, Search,
@@ -38,6 +39,7 @@ export default function HistorialTab({
   categorias: Categoria[]
   cuentas: Cuenta[]
 }) {
+  const t = useTranslations()
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -93,8 +95,8 @@ export default function HistorialTab({
           const notaStr     = m.nota ? await decryptData(m.nota) : null
           return {
             ...m,
-            cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
-            nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+            cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
+            nota:     notaStr     === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
           }
         })
       )
@@ -204,8 +206,8 @@ export default function HistorialTab({
       .eq("id", updated.id)
       .select()
 
-    if (error) {
-      setUpdateError("Error al guardar: " + error.message)
+      if (error) {
+        setUpdateError(t("historial.errorSave", { message: error.message }))
     } else if (data?.length) {
       setUpdateError(null)
       setMovimientos(prev =>
@@ -237,7 +239,7 @@ export default function HistorialTab({
   )
 
   const catSheetOptions: SheetOption[] = [
-    { value: "", label: "Todas las categorías" },
+    { value: "", label: t("historial.filterAllCategories") },
     ...categorias.map(c => ({
       value: c.id,
       label: c.label,
@@ -260,8 +262,8 @@ export default function HistorialTab({
               type="search"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nota o categoría..."
-              aria-label="Buscar movimientos"
+              placeholder={t("historial.searchPlaceholder")}
+              aria-label={t("historial.ariaSearch")}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
             />
           </div>
@@ -270,13 +272,13 @@ export default function HistorialTab({
 
         {/* Filtros: categoría + tipo */}
         <div className="flex gap-2 w-full">
-        <div className="w-[48%]">
+          <div className="w-[48%]">
             {(() => {
               const cat = categorias.find(c => c.id === selectedCategory)
               return (
                 <SheetTrigger
                   onClick={() => setShowCatSheet(true)}
-                  placeholder="Categoría"
+                  placeholder={t("historial.filterCategory")}
                   label={cat?.label}
                   icono={cat?.icono}
                   color={cat?.tipo === "ingreso" ? "#10b981" : cat?.tipo === "gasto" ? "#ef4444" : undefined}
@@ -287,16 +289,16 @@ export default function HistorialTab({
           <div className="w-[48%]">
             {(() => {
               const tipoOpts = [
-                { id: "todos", label: "Todos", color: undefined, icono: undefined },
-                { id: "gasto", label: "Gastos", color: "#ef4444", icono: "TrendingDown" },
-                { id: "ingreso", label: "Ingresos", color: "#10b981", icono: "TrendingUp" },
-                { id: "transferencia", label: "Transfer.", color: "#3b82f6", icono: "ArrowLeftRight" },
+                { id: "todos",         label: t("historial.filterAll"),           color: undefined,  icono: undefined          },
+                { id: "gasto",         label: t("historial.filterExpenses"),      color: "#ef4444",  icono: "TrendingDown"     },
+                { id: "ingreso",       label: t("historial.filterIncome"),        color: "#10b981",  icono: "TrendingUp"       },
+                { id: "transferencia", label: t("historial.filterTransfersShort"),color: "#3b82f6",  icono: "ArrowLeftRight"   },
               ]
-              const sel = tipoOpts.find(t => t.id === tipoFilter)
+              const sel = tipoOpts.find(opt => opt.id === tipoFilter)
               return (
                 <SheetTrigger
                   onClick={() => setShowTipoSheet(true)}
-                  placeholder="Tipo"
+                  placeholder={t("historial.filterType")}
                   label={sel?.label}
                   icono={sel?.icono}
                   color={sel?.color}
@@ -317,10 +319,7 @@ export default function HistorialTab({
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Package className="w-10 h-10 text-zinc-700" aria-hidden="true" />
             <p className="text-sm text-zinc-600">
-              {searchTerm
-                ? "No hay resultados para esa búsqueda"
-                : "No hay movimientos"
-              }
+              {searchTerm ? t("historial.noResults") : t("historial.noMovements")}
             </p>
           </div>
         ) : (
@@ -357,13 +356,13 @@ export default function HistorialTab({
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${esTransfer ? "bg-blue-500/10" : esIngreso ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
                     {esTransfer
                       ? <ArrowLeftRight className="w-4 h-4 text-blue-400" aria-hidden="true" />
-                      : <CatIcon className={`w-4 h-4 ${esTransfer ? "text-blue-400" : esIngreso ? "text-emerald-400" : "text-red-400"}`} aria-hidden="true" />
+                      : <CatIcon className={`w-4 h-4 ${esIngreso ? "text-emerald-400" : "text-red-400"}`} aria-hidden="true" />
                     }
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-200 truncate">
-                      {esTransfer ? "Transferencia" : (cat?.label ?? m.categoria)}
+                      {esTransfer ? t("historial.labelTransfer") : (cat?.label ?? m.categoria)}
                     </p>
                     <span className={`w-fit text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${esTransfer
                       ? "bg-blue-500/15 text-blue-400"
@@ -371,7 +370,7 @@ export default function HistorialTab({
                         ? "bg-emerald-500/15 text-emerald-400"
                         : "bg-red-500/15 text-red-400"
                       }`}>
-                      {esTransfer ? "Transfer" : esIngreso ? "Ingreso" : "Gasto"}
+                      {esTransfer ? t("historial.badgeTransfer") : esIngreso ? t("historial.badgeIngreso") : t("historial.badgeGasto")}
                     </span>
                     {esTransfer && cuenta && cuentaDest && (
                       <p className="text-xs text-zinc-500 mt-0.5 truncate">
@@ -381,26 +380,38 @@ export default function HistorialTab({
                     {!esTransfer && cuenta && (
                       <p className="text-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
                     )}
-                    {m.nota && (
+                    {m.nota === DECRYPT_ERROR ? (
+                      <p className="text-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
+                    ) : m.nota ? (
                       <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
-                    )}
+                    ) : null}
                     <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
                   </div>
 
-                  <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${amountColor}`}
-                    aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
-                  >
-                    {amountPrefix}
-                    {(m.cantidad as number).toLocaleString("es-ES", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}€
-                  </p>
+                  {m.cantidad === -1 ? (
+                    <span
+                      className="text-sm font-semibold flex-shrink-0 text-zinc-600"
+                      aria-label={t("common.encryptedValue")}
+                      title={t("common.encryptedValue")}
+                    >
+                      {t("common.encryptedShort")}
+                    </span>
+                  ) : (
+                    <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${amountColor}`}
+                      aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
+                    >
+                      {amountPrefix}
+                      {(m.cantidad as number).toLocaleString("es-ES", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}€
+                    </p>
+                  )}
 
                   <button
                     onClick={() => setEditingMov(m)}
                     disabled={isDeleting}
-                    aria-label={`Editar movimiento de ${m.cantidad.toFixed(2)}€`}
+                    aria-label={t("historial.ariaEdit", { amount: m.cantidad === -1 ? "?" : m.cantidad.toFixed(2) })}
                     className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 transition-all flex-shrink-0"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -409,7 +420,7 @@ export default function HistorialTab({
                   <button
                     onClick={() => setConfirmarBorrado(m.id)}
                     disabled={isDeleting}
-                    aria-label={`Borrar movimiento de ${m.cantidad.toFixed(2)}€`}
+                    aria-label={t("historial.ariaDelete", { amount: m.cantidad === -1 ? "?" : m.cantidad.toFixed(2) })}
                     className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 transition-all flex-shrink-0"
                   >
                     {isDeleting
@@ -421,7 +432,6 @@ export default function HistorialTab({
               )
             })}
 
-            {/* "Cargar más" solo si no hay búsqueda activa */}
             {hasMore && !searchTerm && (
               <button
                 onClick={() => {
@@ -434,7 +444,7 @@ export default function HistorialTab({
               >
                 {loading
                   ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : "Cargar más antiguos"
+                  : t("historial.loadMore")
                 }
               </button>
             )}
@@ -452,37 +462,44 @@ export default function HistorialTab({
         >
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
             <h3 id="confirm-delete-title" className="text-zinc-100 font-semibold mb-2">
-              ¿Borrar{" "}
-              {movABorrar?.tipo === "ingreso"
-                ? "ingreso"
-                : movABorrar?.tipo === "transferencia"
-                  ? "transferencia"
-                  : "gasto"
-              }?
+              {t("historial.deleteConfirmTitle", {
+                tipo: movABorrar?.tipo === "ingreso"
+                  ? t("historial.deleteConfirmIngreso")
+                  : movABorrar?.tipo === "transferencia"
+                    ? t("historial.deleteConfirmTransfer")
+                    : t("historial.deleteConfirmGasto")
+              })}
             </h3>
-            <p className="text-zinc-500 text-sm mb-6">Esta acción no se puede deshacer.</p>
+            <p className="text-zinc-500 text-sm mb-6">{t("historial.deleteConfirmBody")}</p>
             <div className="flex gap-3">
               <button
                 ref={cancelDeleteRef}
                 onClick={() => setConfirmarBorrado(null)}
-                aria-label="Cancelar borrado"
+                aria-label={t("historial.ariaCancelDelete")}
                 className="flex-1 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-all"
               >
-                Cancelar
+                {t("common.cancel")}
               </button>
               <button
                 onClick={() => handleDelete(confirmarBorrado!)}
-                aria-label={`Confirmar borrado de ${movABorrar?.tipo === "ingreso" ? "ingreso" : movABorrar?.tipo === "transferencia" ? "transferencia" : "gasto"} de ${movABorrar?.cantidad.toFixed(2)}€`}
+                aria-label={t("historial.ariaDeleteConfirm", {
+                  tipo: movABorrar?.tipo === "ingreso"
+                    ? t("historial.deleteConfirmIngreso")
+                    : movABorrar?.tipo === "transferencia"
+                      ? t("historial.deleteConfirmTransfer")
+                      : t("historial.deleteConfirmGasto"),
+                      amount: movABorrar && movABorrar.cantidad !== -1 ? movABorrar.cantidad.toFixed(2) : "?",
+                })}
                 className="flex-1 py-2 text-sm bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all"
               >
-                Borrar
+                {t("common.delete")}
               </button>
             </div>
           </div>
         </div>
       )}
 
-<EditMovimientoModal
+      <EditMovimientoModal
         isOpen={!!editingMov}
         onClose={() => { setEditingMov(null); setUpdateError(null) }}
         movimiento={editingMov}
@@ -495,21 +512,21 @@ export default function HistorialTab({
       <BottomSheet
         isOpen={showTipoSheet}
         onClose={() => setShowTipoSheet(false)}
-        title="Filtrar por tipo"
+        title={t("historial.sheetTitleFilterType")}
         value={tipoFilter}
         onChange={v => setTipoFilter(v as TipoFilter)}
         options={[
-          { value: "todos", label: "Todos" },
-          { value: "gasto", label: "Gastos", icono: "TrendingDown", tipo: "gasto" },
-          { value: "ingreso", label: "Ingresos", icono: "TrendingUp", tipo: "ingreso" },
-          { value: "transferencia", label: "Transferencias", icono: "ArrowLeftRight", tipo: "transferencia" },
+          { value: "todos",         label: t("historial.filterAll")       },
+          { value: "gasto",         label: t("historial.filterExpenses"),  icono: "TrendingDown",  tipo: "gasto"          },
+          { value: "ingreso",       label: t("historial.filterIncome"),    icono: "TrendingUp",    tipo: "ingreso"        },
+          { value: "transferencia", label: t("historial.filterTransfers"), icono: "ArrowLeftRight",tipo: "transferencia"  },
         ]}
       />
 
       <BottomSheet
         isOpen={showCatSheet}
         onClose={() => setShowCatSheet(false)}
-        title="Filtrar por categoría"
+        title={t("historial.sheetTitleFilterCategory")}
         value={selectedCategory}
         onChange={v => { setSelectedCategory(v); setSearchTerm("") }}
         options={catSheetOptions}

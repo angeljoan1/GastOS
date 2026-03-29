@@ -13,6 +13,7 @@
 //   - Advertencia de pérdida de datos en recuperación visible ANTES del botón de envío
 
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import { Loader2, Lock, Delete, KeyRound } from "lucide-react"
 import type { Session } from "@supabase/supabase-js"
@@ -43,7 +44,8 @@ export default function PinPadScreen({
   session: Session
   onUnlocked: () => void
 }) {
-  const [pinInput, setPinInput]           = useState("")
+    const t = useTranslations()
+    const [pinInput, setPinInput]           = useState("")
   const [pinToConfirm, setPinToConfirm]   = useState<string | null>(null)
   const [vaultToken, setVaultToken]       = useState<string | null>(null)
   const [vaultSalt, setVaultSalt]         = useState<string | null>(null)   // base64 del salt
@@ -89,7 +91,7 @@ export default function PinPadScreen({
                   .update({ reset_token: null, reset_token_expires_at: null })
                   .eq("user_id", session.user.id)
               } else {
-            setVaultError("El enlace de recuperación ha caducado o ya fue usado.")
+                setVaultError(t("pin.errorLinkExpired"))
           }
         }
 
@@ -157,7 +159,7 @@ export default function PinPadScreen({
               processUnlock(newPin)
             } else {
               triggerHaptic([50, 50, 50])
-              setVaultError("Los PINs no coinciden. Vuelve a intentarlo.")
+              setVaultError(t("pin.errorPinMismatch"))
               setPinInput("")
               setPinToConfirm(null)
             }
@@ -218,16 +220,16 @@ export default function PinPadScreen({
               .eq("user_id", session.user.id)
               .maybeSingle()
             if (existing) {
-              setVaultToken(existing.verification_token)
-              setVaultSalt(existing.kdf_salt ?? null)
-              setIsFirstTime(false)
-              setVaultError("Ya tienes una bóveda. Introduce tu PIN original.")
+                setVaultToken(existing.verification_token)
+                setVaultSalt(existing.kdf_salt ?? null)
+                setIsFirstTime(false)
+                setVaultError(t("pin.errorVaultExists"))
               setPinInput("")
               setIsUnlocking(false)
               return
             }
           }
-          throw new Error("No se pudo guardar la bóveda.")
+          throw new Error(t("pin.errorVaultSave"))
         }
 
         saveKey(derivedKey)
@@ -240,7 +242,7 @@ export default function PinPadScreen({
       } else if (vaultToken) {
         if (!vaultSalt) {
           // Vault antiguo sin salt (pre-migración) — no debería ocurrir tras el vaciado
-          throw new Error("Bóveda sin salt. Contacta con soporte o usa la recuperación.")
+          throw new Error(t("pin.errorVaultNoSalt"))
         }
 
         const saltBytes  = Uint8Array.from(atob(vaultSalt), c => c.charCodeAt(0))
@@ -252,13 +254,13 @@ export default function PinPadScreen({
             onUnlocked()
           } else {
           triggerHaptic([50, 50, 50])
-          setVaultError("PIN incorrecto. Inténtalo de nuevo.")
+          setVaultError(t("pin.errorPinIncorrect"))
           setPinInput("")
         }
       }
     } catch (e: unknown) {
       console.error("processUnlock error:", e)
-      setVaultError(e instanceof Error ? e.message : "Error de seguridad. Reintenta.")
+      setVaultError(e instanceof Error ? e.message : t("pin.errorSecurityGeneric"))
       setPinInput("")
     } finally {
       setIsUnlocking(false)
@@ -268,33 +270,34 @@ export default function PinPadScreen({
   // ─── Recuperación via email ──────────────────────────────────────────────────
   const handleRecovery = async () => {
     setRecoveryLoading(true)
-
+    setVaultError(null)
+  
     const resetToken = crypto.randomUUID()
     const expiresAt  = new Date(Date.now() + 1000 * 60 * 30).toISOString()
-
+  
     const { error: tokenError } = await supabase
       .from("user_vault")
       .update({ reset_token: resetToken, reset_token_expires_at: expiresAt })
       .eq("user_id", session.user.id)
-
+  
     if (tokenError) {
-      setVaultError("Error al generar el enlace. Inténtalo más tarde.")
+      setVaultError(t("pin.errorRecoveryGenerate"))
       setRecoveryLoading(false)
       return
     }
-
+  
     await supabase.auth.signOut()
-
+  
     const { error } = await supabase.auth.signInWithOtp({
       email: session.user.email!,
       options: {
         emailRedirectTo: `${window.location.origin}/?reset_vault=1&reset_token=${resetToken}`,
       },
     })
-
+  
     setRecoveryLoading(false)
     if (!error) setRecoverySuccess(true)
-    else setVaultError("Error al enviar el correo. Inténtalo más tarde.")
+    else setVaultError(t("pin.errorRecoveryEmail"))
   }
 
   // ─── Biometría ───────────────────────────────────────────────────────────────
@@ -304,11 +307,11 @@ export default function PinPadScreen({
     const ok = await saveBiometricKey(session.user.id)
     setBiometricLoading(false)
     if (ok) {
-      setBiometricEnabled(true)
-      onUnlocked()
-    } else {
-      setBiometricError("No se pudo activar. Inténtalo de nuevo.")
-    }
+        setBiometricEnabled(true)
+        onUnlocked()
+      } else {
+        setBiometricError(t("pin.biometricErrorActivate"))
+      }
   }
 
   const handleRetryBiometric = async () => {
@@ -317,7 +320,7 @@ export default function PinPadScreen({
     const ok = await loadBiometricKey(session.user.id)
     setBiometricLoading(false)
     if (ok) onUnlocked()
-    else setBiometricError("Biometría fallida. Usa tu PIN.")
+        else setBiometricError(t("pin.biometricErrorRetry"))
   }
 
   // ─── Renders ────────────────────────────────────────────────────────────────
@@ -335,38 +338,32 @@ export default function PinPadScreen({
         <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6">
           <KeyRound className="w-6 h-6 text-emerald-400" />
         </div>
-        <h2 className="text-xl font-bold text-zinc-100 mb-3">Recuperar acceso</h2>
+        <h2 className="text-xl font-bold text-zinc-100 mb-3">{t("pin.recoveryTitle")}</h2>
 
         {recoverySuccess ? (
           <div className="space-y-4 max-w-xs">
             <p className="text-zinc-400 text-sm leading-relaxed">
-              Te hemos enviado un enlace a{" "}
-              <strong className="text-zinc-200">{session.user.email}</strong>.
+            {t.rich("pin.recoverySuccessIntro", { email: () => <strong className="text-zinc-200">{session.user.email}</strong> })}
             </p>
             <p className="text-zinc-500 text-xs leading-relaxed bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              ⚠️ Al usar ese enlace podrás crear un{" "}
-              <strong>PIN nuevo</strong>, pero los movimientos cifrados con el PIN anterior
-              ya no serán legibles. Los datos de categorías y cuentas se mantienen.
+              {t("pin.recoverySuccessWarning")}
             </p>
             <button
               onClick={() => supabase.auth.signOut()}
               className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
             >
-              Cerrar sesión
+              {t("pin.recoverySuccessSignOut")}
             </button>
           </div>
         ) : (
           <div className="space-y-4 max-w-xs">
             <p className="text-zinc-400 text-sm leading-relaxed">
-              Si has olvidado tu PIN, podemos enviarte un enlace a{" "}
-              <strong className="text-zinc-200">{session.user.email}</strong> para crear uno nuevo.
+            {t.rich("pin.recoveryIntro", { email: () => <strong className="text-zinc-200">{session.user.email}</strong> })}
             </p>
 
-            {/* Advertencia ANTES del botón — visible siempre, no solo tras pulsar */}
             <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90 text-left">
-              <strong className="font-semibold">⚠️ Importante:</strong> los movimientos
-              cifrados con tu PIN actual <strong>no podrán recuperarse</strong> con el PIN
-              nuevo. Las categorías y cuentas sí se mantienen.
+              <strong className="font-semibold">{t("pin.recoveryWarningLabel")}</strong>{" "}
+              {t("pin.recoveryWarning")}
             </div>
 
             {vaultError && (
@@ -381,15 +378,15 @@ export default function PinPadScreen({
               className="w-full py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {recoveryLoading
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-                : "Enviar enlace de recuperación"
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> {t("common.sending")}</>
+                : t("pin.recoverySendButton")
               }
             </button>
             <button
               onClick={() => { setShowRecovery(false); setVaultError(null) }}
               className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
             >
-              Volver al PIN
+              {t("pin.recoveryBackToPin")}
             </button>
           </div>
         )}
@@ -404,9 +401,9 @@ export default function PinPadScreen({
           <Lock className="w-7 h-7 text-emerald-400" />
         </div>
         <div className="space-y-2 max-w-xs">
-          <h2 className="text-xl font-bold text-zinc-100">Desbloqueo rápido</h2>
+          <h2 className="text-xl font-bold text-zinc-100">{t("pin.biometricOfferTitle")}</h2>
           <p className="text-sm text-zinc-400 leading-relaxed">
-            ¿Quieres usar la biometría de tu dispositivo para desbloquear GastOS en lugar del PIN?
+            {t("pin.biometricOfferDesc")}
           </p>
         </div>
         {biometricError && (
@@ -422,18 +419,18 @@ export default function PinPadScreen({
           >
             {biometricLoading
               ? <Loader2 className="w-4 h-4 animate-spin" />
-              : "Activar desbloqueo biométrico"
+              : t("pin.biometricActivate")
             }
           </button>
           <button
             onClick={onUnlocked}
             className="w-full py-3 bg-zinc-800 text-zinc-300 font-bold rounded-xl hover:bg-zinc-700 transition-all"
           >
-            Ahora no
+            {t("pin.biometricSkip")}
           </button>
         </div>
         <p className="text-[10px] text-zinc-700 max-w-xs">
-          Puedes activarlo o desactivarlo más adelante en Ajustes → Seguridad
+          {t("pin.biometricSettingsHint")}
         </p>
       </div>
     )
@@ -443,7 +440,7 @@ export default function PinPadScreen({
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-        <p className="text-sm text-zinc-500">Verificando identidad...</p>
+        <p className="text-sm text-zinc-500">{t("common.verifying")}</p>
       </div>
     )
   }
@@ -458,22 +455,22 @@ export default function PinPadScreen({
         </div>
         <h2 className="text-xl font-bold text-zinc-100 uppercase tracking-widest">
           {isFirstTime
-            ? pinToConfirm !== null ? "Confirma tu PIN" : "Crear PIN de acceso"
-            : "Desbloquear GastOS"
+            ? pinToConfirm !== null ? t("pin.titleConfirm") : t("pin.titleCreate")
+            : t("pin.titleUnlock")
           }
         </h2>
         <p className="text-zinc-500 text-xs max-w-[240px] mx-auto leading-relaxed">
           {isFirstTime
             ? pinToConfirm !== null
-              ? vaultError || "Repite los 6 dígitos para confirmar."
-              : "Elige 6 dígitos para proteger tus finanzas. Podrás recuperar el acceso via email si lo olvidas."
-            : vaultError || "Introduce tu PIN de 6 dígitos."
+              ? vaultError || t("pin.subtitleConfirm")
+              : t("pin.subtitleCreate")
+            : vaultError || t("pin.subtitleUnlock")
           }
         </p>
       </div>
 
       {/* Indicadores de dígitos */}
-      <div className="flex gap-4 my-10" aria-label="PIN introducido" aria-live="polite">
+      <div className="flex gap-4 my-10" aria-label={t("pin.ariaPin")} aria-live="polite">
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
@@ -511,7 +508,7 @@ export default function PinPadScreen({
         <button
           onClick={handleBackspace}
           disabled={isUnlocking || pinInput.length === 0}
-          aria-label="Borrar dígito"
+          aria-label={t("pin.ariaDeleteDigit")}
           className="w-20 h-20 rounded-full flex items-center justify-center text-zinc-600 hover:text-red-400 active:scale-75 transition-all"
         >
           <Delete className="w-7 h-7" />
@@ -526,7 +523,7 @@ export default function PinPadScreen({
             disabled={biometricLoading}
             className="text-[10px] text-zinc-500 uppercase tracking-[0.15em] hover:text-zinc-300 transition-colors"
           >
-            {biometricLoading ? "Verificando..." : "Usar biometría"}
+            {biometricLoading ? t("pin.biometricVerifying") : t("pin.biometricUse")}
           </button>
         )}
         {biometricError && (
@@ -537,14 +534,14 @@ export default function PinPadScreen({
             onClick={() => setShowRecovery(true)}
             className="text-[10px] text-zinc-600 uppercase tracking-[0.15em] hover:text-zinc-400 transition-colors"
           >
-            ¿Olvidaste tu PIN?
+            {t("pin.forgotPin")}
           </button>
         )}
         <button
           onClick={() => supabase.auth.signOut()}
           className="text-[10px] text-zinc-700 uppercase tracking-[0.2em] hover:text-zinc-500 transition-colors"
         >
-          Cerrar Sesión
+          {t("pin.signOut")}
         </button>
       </div>
 

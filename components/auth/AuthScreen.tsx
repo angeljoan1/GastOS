@@ -10,11 +10,13 @@
 //          asociarlos correctamente con su input.
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import { Loader2 } from "lucide-react"
 
 export default function AuthScreen() {
-  const [email,              setEmail]              = useState("")
+    const t = useTranslations()
+    const [email,              setEmail]              = useState("")
   const [password,           setPassword]           = useState("")
   const [confirmPassword,    setConfirmPassword]    = useState("")
   const [isLogin,            setIsLogin]            = useState(true)
@@ -30,15 +32,15 @@ export default function AuthScreen() {
     setLoading(true)
 
     if (!isLogin) {
-      if (password !== confirmPassword) {
-        setError("Las contraseñas no coinciden.")
+        if (password !== confirmPassword) {
+            setError(t("auth.errorPasswordMismatch"))
         setLoading(false)
         return
       }
       const tieneLetras  = /[a-zA-Z]/.test(password)
       const tieneNumeros = /[0-9]/.test(password)
       if (password.length < 8 || !tieneLetras || !tieneNumeros) {
-        setError("La contraseña debe tener al menos 8 caracteres, incluir letras y números.")
+        setError(t("auth.errorPasswordWeak"))
         setLoading(false)
         return
       }
@@ -46,11 +48,11 @@ export default function AuthScreen() {
 
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError("No hemos podido iniciar sesión. Verifica que el correo y la contraseña sean correctos, o crea una cuenta si aún no tienes una.")
+      if (error) setError(t("auth.errorLoginFailed"))
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setError(error.message)
-      else setSuccess("Registro exitoso. Revisa tu correo para confirmar tu cuenta.")
+        else setSuccess(t("auth.successRegister"))
     }
 
     setLoading(false)
@@ -59,7 +61,7 @@ export default function AuthScreen() {
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault()
     if (!email) {
-      setError("Por favor, introduce tu correo electrónico.")
+        setError(t("auth.errorEmailRequired"))
       return
     }
     setLoading(true)
@@ -71,7 +73,7 @@ export default function AuthScreen() {
     })
 
     if (error) setError(error.message)
-    else setSuccess("Te hemos enviado un enlace para recuperar tu contraseña. Revisa tu bandeja de entrada.")
+        else setSuccess(t("auth.successResetLink"))
     setLoading(false)
   }
 
@@ -91,12 +93,12 @@ export default function AuthScreen() {
           <div className="mb-4">
             <img
               src="/icon.png"
-              alt="Logo GastOS"
+              alt={t("auth.logoAlt")}
               className="w-20 h-20 rounded-3xl shadow-lg shadow-emerald-400/30"
             />
           </div>
           <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">GastOS</h1>
-          <p className="text-sm text-zinc-400 mt-1">Registro de gastos personal</p>
+          <p className="text-sm text-zinc-400 mt-1">{t("auth.appTagline")}</p>
         </div>
 
         {/* Tabs login / registro — ocultos en modo recuperación */}
@@ -111,8 +113,8 @@ export default function AuthScreen() {
                   ? "bg-zinc-700 text-zinc-100 shadow-sm"
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
-            >
-              Iniciar Sesión
+              >
+              {t("auth.tabLogin")}
             </button>
             <button
               role="tab"
@@ -124,7 +126,7 @@ export default function AuthScreen() {
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              Registrarse
+              {t("auth.tabRegister")}
             </button>
           </div>
         )}
@@ -135,10 +137,10 @@ export default function AuthScreen() {
           className="space-y-4"
           aria-label={
             isResettingPassword
-              ? "Formulario de recuperación de contraseña"
+              ? t("auth.ariaFormReset")
               : isLogin
-              ? "Formulario de inicio de sesión"
-              : "Formulario de registro"
+              ? t("auth.ariaFormLogin")
+              : t("auth.ariaFormRegister")
           }
         >
           {/* BUG #16 FIX: label con contraste suficiente (text-zinc-300, text-xs)
@@ -147,8 +149,8 @@ export default function AuthScreen() {
             <label
               htmlFor="auth-email"
               className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-            >
-              Correo electrónico
+              >
+              {t("auth.labelEmail")}
             </label>
             <input
               id="auth-email"
@@ -156,7 +158,7 @@ export default function AuthScreen() {
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="tu@email.com"
+              placeholder={t("auth.placeholderEmail")}
               autoComplete="email"
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
             />
@@ -168,8 +170,8 @@ export default function AuthScreen() {
                 <label
                   htmlFor="auth-password"
                   className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-                >
-                  Contraseña
+                  >
+                  {t("auth.labelPassword")}
                 </label>
                 <input
                   id="auth-password"
@@ -178,7 +180,7 @@ export default function AuthScreen() {
                   minLength={6}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t("auth.placeholderPassword")}
                   autoComplete={isLogin ? "current-password" : "new-password"}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                 />
@@ -191,7 +193,7 @@ export default function AuthScreen() {
                     onClick={() => { setIsResettingPassword(true); resetModeState() }}
                     className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors"
                   >
-                    ¿Has olvidado tu contraseña?
+                    {t("auth.forgotPassword")}
                   </button>
                 </div>
               )}
@@ -201,8 +203,8 @@ export default function AuthScreen() {
                   <label
                     htmlFor="auth-confirm-password"
                     className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-                  >
-                    Confirmar contraseña
+>
+                    {t("auth.labelConfirmPassword")}
                   </label>
                   <input
                     id="auth-confirm-password"
@@ -210,7 +212,7 @@ export default function AuthScreen() {
                     required
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder={t("auth.placeholderPassword")}
                     autoComplete="new-password"
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   />
@@ -237,10 +239,10 @@ export default function AuthScreen() {
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
             {isResettingPassword
-              ? "Enviar enlace"
+              ? t("auth.submitResetLink")
               : isLogin
-              ? "Entrar"
-              : "Crear cuenta"
+              ? t("auth.submitLogin")
+              : t("auth.submitRegister")
             }
           </button>
 
@@ -250,7 +252,7 @@ export default function AuthScreen() {
               onClick={() => { setIsResettingPassword(false); resetModeState() }}
               className="w-full text-sm text-zinc-400 hover:text-zinc-200 transition-colors py-2"
             >
-              Volver a Iniciar Sesión
+              {t("auth.backToLogin")}
             </button>
           )}
         </form>

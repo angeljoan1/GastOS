@@ -4,6 +4,7 @@
 // Versión limpia tras extraer PinPadScreen a components/auth/PinPadScreen.tsx
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useTranslations } from "next-intl"
 import FeedbackWidget from "@/components/FeedbackWidget"
 import ImportCSVModal from "@/components/modals/ImportCSVModal"
 import {
@@ -23,10 +24,11 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 20
+const APP_VERSION = 21
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
+  const t = useTranslations()
   const [tab, setTab]                   = useState<"ingreso" | "historial" | "dashboard">("ingreso")
   const [categorias, setCategorias]     = useState<Categoria[]>([])
   const [cuentas, setCuentas]           = useState<Cuenta[]>([])
@@ -122,7 +124,7 @@ function MainApp({ session }: { session: Session }) {
     .order("created_at", { ascending: false })
 
     if (!data || data.length === 0) {
-      setExportMsg("No hay movimientos para exportar")
+      setExportMsg(t("nav.exportNoData"))
       setTimeout(() => setExportMsg(null), 3000)
       setIsMenuOpen(false)
       return
@@ -168,9 +170,9 @@ function MainApp({ session }: { session: Session }) {
         </div>
 
         <div className="flex items-center gap-1">
-          <button
+        <button
             onClick={() => setShowCuentas(true)}
-            aria-label="Mis cuentas"
+            aria-label={t("nav.ariaAccounts")}
             className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <Landmark className="w-5 h-5 text-zinc-400" />
@@ -179,7 +181,7 @@ function MainApp({ session }: { session: Session }) {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(o => !o)}
-              aria-label="Menú principal"
+              aria-label={t("nav.ariaMenu")}
               aria-expanded={isMenuOpen}
               aria-haspopup="menu"
               className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
@@ -197,7 +199,7 @@ function MainApp({ session }: { session: Session }) {
                   onClick={() => { setShowSettings(true); setIsMenuOpen(false) }}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
                 >
-                  <Settings className="w-4 h-4" /> Configuración
+                  <Settings className="w-4 h-4" /> {t("nav.menuSettings")}
                 </button>
                 <button
                   role="menuitem"
@@ -205,14 +207,14 @@ function MainApp({ session }: { session: Session }) {
                   className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
                 >
                   <Download className="w-4 h-4" />
-                  {exportMsg ?? "Exportar CSV"}
+                  {exportMsg ?? t("nav.menuExportCSV")}
                 </button>
                 <button
                   role="menuitem"
                   onClick={() => { setShowImport(true); setIsMenuOpen(false) }}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
                 >
-                  <Upload className="w-4 h-4" /> Importar CSV
+                  <Upload className="w-4 h-4" /> {t("nav.menuImportCSV")}
                 </button>
                 <div className="h-px bg-zinc-800 my-1 mx-2" />
                 <button
@@ -220,7 +222,7 @@ function MainApp({ session }: { session: Session }) {
                   onClick={() => { clearKey(); clearBiometricKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
                   className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-950/30 rounded-lg transition-colors w-full"
                 >
-                  <LogOut className="w-4 h-4" /> Cerrar Sesión
+                  <LogOut className="w-4 h-4" /> {t("nav.menuSignOut")}
                 </button>
               </div>
             )}
@@ -236,11 +238,11 @@ function MainApp({ session }: { session: Session }) {
 
       <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1 pb-safe-bottom">
         <div className="flex items-end justify-around">
-          {[
-            { id: "ingreso",    Icon: WalletCards, label: "Registrar"  },
-            { id: "historial",  Icon: History,     label: "Historial"  },
-            { id: "dashboard",  Icon: BarChart3,   label: "Dashboard"  },
-          ].map(({ id, Icon, label }) => (
+        {([
+            { id: "ingreso",    Icon: WalletCards, label: t("nav.register")   },
+            { id: "historial",  Icon: History,     label: t("nav.historial")  },
+            { id: "dashboard",  Icon: BarChart3,   label: t("nav.dashboard")  },
+          ] as const).map(({ id, Icon, label }) => (
             <button
               key={id}
               onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
@@ -289,6 +291,25 @@ function MainApp({ session }: { session: Session }) {
         }}
       />
       <FeedbackWidget userId={session.user.id} />
+    </div>
+  )
+}
+
+// ─── Pantalla de actualización ────────────────────────────────────────────────
+function NeedsUpdateScreen() {
+  const t = useTranslations()
+  return (
+    <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+      <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6">
+        <RefreshCw className="w-10 h-10 text-emerald-500" />
+      </div>
+      <h2 className="text-2xl font-bold text-zinc-100 mb-3">{t("app.updateRequired")}</h2>
+      <button
+        onClick={() => window.location.reload()}
+        className="bg-emerald-500 text-zinc-950 font-bold py-3 px-8 rounded-xl w-full max-w-sm transition-all"
+      >
+        {t("app.updateButton")}
+      </button>
     </div>
   )
 }
@@ -382,18 +403,7 @@ export default function App() {
   )
 
   if (needsUpdate) return (
-    <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
-      <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-6">
-        <RefreshCw className="w-10 h-10 text-emerald-500" />
-      </div>
-      <h2 className="text-2xl font-bold text-zinc-100 mb-3">Actualización Necesaria</h2>
-      <button
-        onClick={() => window.location.reload()}
-        className="bg-emerald-500 text-zinc-950 font-bold py-3 px-8 rounded-xl w-full max-w-sm transition-all"
-      >
-        Actualizar ahora
-      </button>
-    </div>
+    <NeedsUpdateScreen />
   )
 
   if (!session)  return <AuthScreen />

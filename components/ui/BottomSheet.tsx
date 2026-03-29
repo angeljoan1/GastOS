@@ -171,11 +171,8 @@ export function SheetTrigger({
           <Icon className="w-3 h-3" style={{ color: color ?? "#71717a" }} aria-hidden="true" />
         </div>
       )}
-      <div className="flex-1 overflow-hidden min-w-0">
-        <span
-          className={`text-sm whitespace-nowrap inline-block ${label ? "text-zinc-200" : "text-zinc-500"}`}
-          style={label && label.length > 10 ? { animation: "marquee 3s ease-in-out infinite alternate" } : undefined}
-        >
+      <div className="flex-1 min-w-0">
+        <span className={`text-sm block truncate ${label ? "text-zinc-200" : "text-zinc-500"}`}>
           {label ?? placeholder}
         </span>
       </div>

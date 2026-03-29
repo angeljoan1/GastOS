@@ -8,6 +8,7 @@
 //         y se muestra el valor raw si no hay match con ninguna categoría.
 
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { X, Loader2 } from "lucide-react"
 import type { Movimiento, Categoria, Cuenta } from "@/types"
 
@@ -22,6 +23,7 @@ export default function EditMovimientoModal({
   onSave: (updatedMov: Movimiento) => Promise<void>
   saveError?: string | null
 }) {
+  const t = useTranslations()
   const [cantidad, setCantidad] = useState("")
   const [categoria, setCategoria] = useState("")
   const [nota, setNota] = useState("")
@@ -97,13 +99,18 @@ export default function EditMovimientoModal({
     >
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
       <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
-        <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6">
           <h2 id="edit-modal-title" className="text-xl font-semibold text-zinc-100">
-            Editar {esTransfer ? "Transferencia" : movimiento.tipo === "ingreso" ? "Ingreso" : "Gasto"}
+            {esTransfer
+              ? `${t("common.edit")} ${t("historial.deleteConfirmTransfer")}`
+              : movimiento.tipo === "ingreso"
+                ? `${t("common.edit")} ${t("historial.deleteConfirmIngreso")}`
+                : `${t("common.edit")} ${t("historial.deleteConfirmGasto")}`
+            }
           </h2>
           <button
             onClick={onClose}
-            aria-label="Cerrar modal de edición"
+            aria-label={t("common.close")}
             className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
@@ -143,7 +150,7 @@ export default function EditMovimientoModal({
           {!esTransfer && (
             <div>
               <label htmlFor="edit-categoria" className="block text-sm font-medium text-zinc-300 mb-2">
-                Categoría
+                {t("ingreso.labelCategoria")}
               </label>
               <select
                 id="edit-categoria"
@@ -151,24 +158,16 @@ export default function EditMovimientoModal({
                 onChange={e => setCategoria(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
               >
-                {/* BUG #4 FIX: si el movimiento tiene una categoría que no existe
-                    en el catálogo (texto libre de CSV), la mostramos como opción
-                    seleccionada para no perder el dato */}
                 {!categoriaEnCatalogo && movimiento.categoria && (
                   <option value={movimiento.categoria}>
                     {movimiento.categoria} (importada)
                   </option>
                 )}
-
-                {/* Opción vacía de guardia solo si la categoría actual es vacía */}
                 {!categoria && (
-                  <option value="" disabled>Selecciona una categoría</option>
+                  <option value="" disabled>{t("ingreso.placeholderSelectCuenta")}</option>
                 )}
-
                 {categoriasFiltradas.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.label}
-                  </option>
+                  <option key={cat.id} value={cat.id}>{cat.label}</option>
                 ))}
               </select>
             </div>
@@ -177,7 +176,7 @@ export default function EditMovimientoModal({
           {cuentas.length > 0 && (
             <div>
               <label htmlFor="edit-cuenta" className="block text-sm font-medium text-zinc-300 mb-2">
-                Cuenta
+                {t("ingreso.labelCuenta")}
               </label>
               <select
                 id="edit-cuenta"
@@ -185,7 +184,7 @@ export default function EditMovimientoModal({
                 onChange={e => setCuentaId(e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
               >
-                <option value="">Sin cuenta asignada</option>
+                <option value="">{t("ingreso.placeholderSelectCuenta")}</option>
                 {cuentas.map(c => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
@@ -195,13 +194,13 @@ export default function EditMovimientoModal({
 
           <div>
             <label htmlFor="edit-nota" className="block text-sm font-medium text-zinc-300 mb-2">
-              Nota (opcional)
+              {t("ingreso.labelNota")}
             </label>
             <textarea
               id="edit-nota"
               value={nota}
               onChange={e => setNota(e.target.value)}
-              placeholder="Añade una descripción..."
+              placeholder={t("ingreso.placeholderNotaGasto")}
               maxLength={80}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all resize-none h-20"
             />
@@ -219,7 +218,7 @@ export default function EditMovimientoModal({
             onClick={onClose}
             className="flex-1 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
           >
-            Cancelar
+            {t("common.cancel")}
           </button>
           <button
             onClick={handleSave}
@@ -227,7 +226,7 @@ export default function EditMovimientoModal({
             className="flex-1 py-3 text-sm bg-emerald-500 text-zinc-950 font-semibold rounded-xl hover:bg-emerald-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Guardar
+            {t("common.save")}
           </button>
         </div>
       </div>

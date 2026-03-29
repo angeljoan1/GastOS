@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { createPortal } from "react-dom"
 import { ShieldCheck, X } from "lucide-react"
 
 export default function EncryptionBadge() {
+  const t = useTranslations()
   const [showInfo, setShowInfo]   = useState(false)
   const [mounted,  setMounted]    = useState(false)
 
@@ -16,8 +18,8 @@ export default function EncryptionBadge() {
 
   useEffect(() => {
     if (showInfo) {
-      const t = setTimeout(() => closeButtonRef.current?.focus(), 50)
-      return () => clearTimeout(t)
+      const timer = setTimeout(() => closeButtonRef.current?.focus(), 50)
+      return () => clearTimeout(timer)
     } else {
       triggerRef.current?.focus()
     }
@@ -52,7 +54,7 @@ export default function EncryptionBadge() {
           <button
             ref={closeButtonRef}
             onClick={() => setShowInfo(false)}
-            aria-label="Cerrar información de seguridad"
+            aria-label={t("encryption.ariaClose")}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-4 h-4 text-zinc-500" aria-hidden="true" />
@@ -60,22 +62,15 @@ export default function EncryptionBadge() {
         </div>
 
         <h3 id="e2ee-dialog-title" className="text-base font-semibold text-zinc-100 mb-2">
-          Encriptación de extremo a extremo
+          {t("encryption.dialogTitle")}
         </h3>
 
         <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
-          <p>
-            Tu PIN genera una clave criptográfica que nunca sale de tu dispositivo.
-            Cantidades, notas, nombres de cuentas y presupuestos se cifran con ella
-            antes de enviarse al servidor.
-          </p>
-          <p>
-            Ni el servidor, ni los administradores, ni nadie con acceso a la base de
-            datos puede leer tus datos financieros. Solo tu PIN los descifra.
-          </p>
+          <p>{t("encryption.para1")}</p>
+          <p>{t("encryption.para2")}</p>
           <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90">
-            <strong className="font-semibold">Importante:</strong> Si pierdes tu PIN,
-            tus datos cifrados son irrecuperables. Guárdalo en un lugar seguro.
+            <strong className="font-semibold">{t("encryption.warningLabel")}</strong>{" "}
+            {t("encryption.warningText")}
           </div>
         </div>
 
@@ -83,7 +78,7 @@ export default function EncryptionBadge() {
           onClick={() => setShowInfo(false)}
           className="w-full mt-5 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
         >
-          Entendido
+          {t("common.understood")}
         </button>
       </div>
     </div>
@@ -94,7 +89,7 @@ export default function EncryptionBadge() {
       <button
         ref={triggerRef}
         onClick={() => setShowInfo(true)}
-        aria-label="Ver información de seguridad E2EE"
+        aria-label={t("encryption.ariaInfo")}
         aria-haspopup="dialog"
         className="flex items-center gap-1.5 text-zinc-700 hover:text-zinc-500 transition-colors opacity-60 hover:opacity-100"
       >
@@ -103,8 +98,6 @@ export default function EncryptionBadge() {
         <span className="text-[10px] font-medium tracking-wide hidden sm:inline">E2EE</span>
       </button>
 
-      {/* Portal: el modal se monta directamente en document.body,
-          fuera del stacking context del header */}
       {mounted && showInfo && createPortal(modal, document.body)}
     </>
   )

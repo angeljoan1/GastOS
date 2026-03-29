@@ -12,7 +12,12 @@
 //          específica de gasto.
 
 import { useState, useEffect } from "react"
-import { X, Trash2, Loader2, Plus, Target, PiggyBank, ChevronRight, Shield, Fingerprint } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { X, Trash2, Loader2, Plus, Target, PiggyBank, ChevronRight, Shield, Fingerprint, Globe } from "lucide-react"
+
+const LOCALE_KEY = "gastos_locale"
+const SUPPORTED_LOCALES = ["es", "en", "ca"] as const
+type Locale = typeof SUPPORTED_LOCALES[number]
 import { supabase } from "@/lib/supabase"
 import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
 import { encryptData, isBiometricAvailable, hasBiometricKey, saveBiometricKey, clearBiometricKey } from "@/lib/crypto"
@@ -57,6 +62,8 @@ export default function SettingsModal({
   const [bioEnabled, setBioEnabled] = useState(false)
   const [bioLoading, setBioLoading] = useState(false)
   const [bioError, setBioError] = useState<string | null>(null)
+  const [pendingLocale, setPendingLocale] = useState<Locale | null>(null)
+  const t = useTranslations()
 
   useEffect(() => {
     if (isOpen) {
@@ -220,9 +227,32 @@ export default function SettingsModal({
     } else {
       const ok = await saveBiometricKey(userId)
       if (ok) setBioEnabled(true)
-        else setBioError("No se pudo activar. Inténtalo de nuevo.")
+      else setBioError("No se pudo activar. Inténtalo de nuevo.")
     }
     setBioLoading(false)
+  }
+
+
+
+  const currentLocale = ((): Locale => {
+    if (typeof window === "undefined") return "es"
+    const stored = localStorage.getItem(LOCALE_KEY)
+    if (stored && SUPPORTED_LOCALES.includes(stored as Locale)) return stored as Locale
+    return "es"
+  })()
+
+  // 1. Esta función ahora solo manda al usuario a la "sala de espera"
+  const handleChangeLocale = (locale: Locale) => {
+    if (locale === currentLocale) return
+    // Despedimos a window.confirm y en su lugar abrimos nuestro modal
+    setPendingLocale(locale)
+  }
+
+  // 2. Esta es la función que ejecuta el cambio real si el usuario dice "Sí"
+  const confirmLocaleChange = () => {
+    if (!pendingLocale) return
+    localStorage.setItem(LOCALE_KEY, pendingLocale)
+    window.location.reload()
   }
 
   const gastoCats = categorias.filter(c => c.tipo === "gasto")
@@ -235,15 +265,15 @@ export default function SettingsModal({
       aria-labelledby="settings-modal-title"
     >
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
-      <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+        <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center justify-between mb-5">
           <h2 id="settings-modal-title" className="text-xl font-semibold text-zinc-100">
-            Configuración
+            {t("settings.title")}
           </h2>
           <button
             onClick={onClose}
-            aria-label="Cerrar configuración"
+            aria-label={t("settings.ariaClose")}
             className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
@@ -252,20 +282,44 @@ export default function SettingsModal({
 
         {/* Lista vertical de secciones */}
         <div className="space-y-2 mb-4">
+
+          {/* ── Selector de idioma ── */}
+          <div className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-zinc-800 bg-zinc-800/40">
+            <Globe className="w-4 h-4 text-zinc-600 flex-shrink-0" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-zinc-300">{t("settings.sectionIdioma")}</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{t("settings.sectionIdiomaDesc")}</p>
+            </div>
+            <div className="flex gap-1">
+              {SUPPORTED_LOCALES.map(loc => (
+                <button
+                  key={loc}
+                  onClick={() => handleChangeLocale(loc)}
+                  aria-pressed={currentLocale === loc}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${currentLocale === loc
+                    ? "bg-emerald-500 text-zinc-950"
+                    : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200"
+                    }`}
+                >
+                  {loc.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {([
-            { id: "categorias",   label: "Categorías",   desc: "Gestiona tus categorías",         Icon: ChevronRight },
-            { id: "presupuestos", label: "Presupuestos",  desc: "Límites mensuales por categoría", Icon: ChevronRight },
-            { id: "objetivos",    label: "Objetivos",     desc: "Metas de ahorro mensual",         Icon: ChevronRight },
-            { id: "seguridad",    label: "Seguridad",     desc: "Biometría y acceso",              Icon: Shield       },
+            { id: "categorias", label: t("settings.sectionCategorias"), desc: t("settings.sectionCategoriasDesc"), Icon: ChevronRight },
+            { id: "presupuestos", label: t("settings.sectionPresupuestos"), desc: t("settings.sectionPresupuestosDesc"), Icon: ChevronRight },
+            { id: "objetivos", label: t("settings.sectionObjetivos"), desc: t("settings.sectionObjetivosDesc"), Icon: ChevronRight },
+            { id: "seguridad", label: t("settings.sectionSeguridad"), desc: t("settings.sectionSeguridadDesc"), Icon: Shield },
           ] as const).map(({ id, label, desc, Icon }) => (
             <button
               key={id}
               onClick={() => { setActiveTab(activeTab === id ? null : id); setError(null); setBioError(null) }}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all text-left ${
-                activeTab === id
-                  ? "border-emerald-500/40 bg-emerald-950/20"
-                  : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-700"
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all text-left ${activeTab === id
+                ? "border-emerald-500/40 bg-emerald-950/20"
+                : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-700"
+                }`}
             >
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium ${activeTab === id ? "text-zinc-100" : "text-zinc-300"}`}>
@@ -288,7 +342,7 @@ export default function SettingsModal({
         {activeTab === "categorias" && (
           <div className="space-y-6 mt-2">
             <p className="text-xs text-zinc-600">
-              Las categorías aparecen en la pestaña <strong className="text-zinc-500">Registrar</strong> para clasificar tus movimientos.
+              {t.rich("settings.categoriasHint", { tab: chunks => <strong className="text-zinc-500">{chunks}</strong> })}
             </p>
             {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
               const cats = categorias.filter(c => c.tipo === tipo)
@@ -296,7 +350,7 @@ export default function SettingsModal({
               return (
                 <div key={tipo} className="mb-5">
                   <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
-                    {tipo === "gasto" ? "Solo Gastos" : tipo === "ingreso" ? "Solo Ingresos" : "Compartidas (Ambos)"}
+                    {tipo === "gasto" ? t("settings.catTypeGasto") : tipo === "ingreso" ? t("settings.catTypeIngreso") : t("settings.catTypeAmbos")}
                   </p>
                   <div className="space-y-2">
                     {cats.map(cat => {
@@ -308,7 +362,7 @@ export default function SettingsModal({
                             <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" aria-hidden="true" />
                             <span className="text-sm text-zinc-200">{cat.label}</span>
                             {cat.tipo === "ambos" && (
-                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">ambos</span>
+                              <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">{t("settings.catTagAmbos")}</span>
                             )}
                           </div>
                           <button
@@ -327,16 +381,16 @@ export default function SettingsModal({
               )
             })}
             <div className="space-y-3 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">Nueva categoría</p>
-              <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700" role="group" aria-label="Tipo de categoría">
-                {(["gasto", "ingreso", "ambos"] as const).map(t => (
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("settings.catNewSection")}</p>
+              <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700" role="group" aria-label={t("settings.catAriaTypeGroup")}>
+                {(["gasto", "ingreso", "ambos"] as const).map(tipo => (
                   <button
-                    key={t}
-                    onClick={() => setNewCatTipo(t)}
-                    aria-pressed={newCatTipo === t}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === t ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+                    key={tipo}
+                    onClick={() => setNewCatTipo(tipo)}
+                    aria-pressed={newCatTipo === tipo}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === tipo ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
                   >
-                    {t === "gasto" ? "Gasto" : t === "ingreso" ? "Ingreso" : "Ambos"}
+                    {tipo === "gasto" ? t("settings.catTypeButtonGasto") : tipo === "ingreso" ? t("settings.catTypeButtonIngreso") : t("settings.catTypeButtonAmbos")}
                   </button>
                 ))}
               </div>
@@ -345,22 +399,22 @@ export default function SettingsModal({
                   type="text"
                   value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
-                  placeholder="Nombre de la categoría"
-                  aria-label="Nombre de la nueva categoría"
+                  placeholder={t("settings.catPlaceholderName")}
+                  aria-label={t("settings.catAriaName")}
                   onKeyDown={e => e.key === "Enter" && handleAddCat()}
                   className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                 />
                 <button
                   onClick={handleAddCat}
                   disabled={savingCat || !newCatName.trim()}
-                  aria-label="Crear categoría"
+                  aria-label={t("settings.catAriaCreate")}
                   className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-medium hover:bg-emerald-400 disabled:opacity-50 transition-all"
                 >
                   {savingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
               </div>
               <div>
-                <p className="text-xs text-zinc-600 mb-2" id="icono-cat-label">Icono</p>
+                <p className="text-xs text-zinc-600 mb-2" id="icono-cat-label">{t("settings.catSectionIcono")}</p>
                 <div className="grid grid-cols-7 gap-1.5" role="group" aria-labelledby="icono-cat-label">
                   {CATEGORIA_ICON_OPTIONS.map(name => {
                     const Ico = getIcon(name)
@@ -386,12 +440,13 @@ export default function SettingsModal({
         {activeTab === "presupuestos" && (
           <div className="space-y-3 mt-2">
             <p className="text-xs text-zinc-600 mb-4">
-              Asigna un límite mensual a tus categorías de{" "}
-              <strong className="text-zinc-500">gasto puro</strong>. El widget de presupuestos
-              en el <strong className="text-zinc-500">Dashboard</strong> muestra el progreso de cada límite.
+              {t.rich("settings.presupuestosHint", {
+                gasto: chunks => <strong className="text-zinc-500">{chunks}</strong>,
+                dashboard: chunks => <strong className="text-zinc-500">{chunks}</strong>,
+              })}
             </p>
             {gastoCats.length === 0 ? (
-              <p className="text-sm text-zinc-600 text-center py-8">No tienes categorías de gasto aún.</p>
+              <p className="text-sm text-zinc-600 text-center py-8">{t("settings.presupuestosNoCats")}</p>
             ) : (
               gastoCats.map(cat => {
                 const CIcon = getIcon(cat.icono)
@@ -408,7 +463,7 @@ export default function SettingsModal({
                       {pres && !isEditing && (
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-emerald-400 tabular-nums">{Number(pres.cantidad).toFixed(2)}€</span>
-                          <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto(pres.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">Editar</button>
+                          <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto(pres.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
                           <button onClick={() => handleDeletePresupuesto(pres.id)} disabled={isDeleting} className="text-zinc-600 hover:text-red-400 transition-colors">
                             {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
@@ -416,7 +471,7 @@ export default function SettingsModal({
                       )}
                       {!pres && !isEditing && (
                         <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto("") }} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
-                          <Target className="w-3.5 h-3.5" aria-hidden="true" /> Añadir límite
+                          <Target className="w-3.5 h-3.5" aria-hidden="true" /> {t("settings.presupuestosAddLimit")}
                         </button>
                       )}
                     </div>
@@ -425,7 +480,7 @@ export default function SettingsModal({
                         <input
                           type="number" inputMode="decimal" value={inputPresupuesto}
                           onChange={e => setInputPresupuesto(e.target.value)}
-                          placeholder="Límite mensual (€)" autoFocus
+                          placeholder={t("settings.presupuestosPlaceholder")} autoFocus
                           onKeyDown={e => { if (e.key === "Enter") handleSavePresupuesto(cat.id); if (e.key === "Escape") setEditingPresupuesto(null) }}
                           className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                         />
@@ -446,28 +501,28 @@ export default function SettingsModal({
         {activeTab === "objetivos" && (
           <div className="space-y-4 mt-2">
             <p className="text-xs text-zinc-600">
-              Define metas de ahorro mensuales. El widget de{" "}
-              <strong className="text-zinc-500">Objetivo de ahorro</strong> en el Dashboard
-              mostrará tu progreso. Los datos se cifran con tu PIN.
+              {t.rich("settings.objetivosHint", {
+                widget: chunks => <strong className="text-zinc-500">{chunks}</strong>,
+              })}
             </p>
             <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                   <PiggyBank className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                 </div>
-                <p className="text-sm font-medium text-zinc-200 flex-1">Ahorro mensual</p>
+                <p className="text-sm font-medium text-zinc-200 flex-1">{t("settings.objetivoAhorroMensual")}</p>
                 {objetivoAhorro && !editingObj && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-emerald-400 tabular-nums">{objetivoAhorro.cantidad.toFixed(2)}€</span>
-                    <button onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">Editar</button>
-                    <button onClick={handleDeleteObjetivo} aria-label="Borrar objetivo de ahorro" className="text-zinc-600 hover:text-red-400 transition-colors">
+                    <button onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
+                    <button onClick={handleDeleteObjetivo} aria-label={t("settings.ariaDeleteObjetivo")} className="text-zinc-600 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
                 {!objetivoAhorro && !editingObj && (
                   <button onClick={() => setEditingObj(true)} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
-                    <Target className="w-3.5 h-3.5" aria-hidden="true" /> Añadir objetivo
+                    <Target className="w-3.5 h-3.5" aria-hidden="true" /> {t("settings.objetivosAdd")}
                   </button>
                 )}
               </div>
@@ -476,7 +531,7 @@ export default function SettingsModal({
                   <input
                     type="number" inputMode="decimal" value={inputObjetivo}
                     onChange={e => setInputObjetivo(e.target.value)}
-                    placeholder="Objetivo mensual (€)" autoFocus
+                    placeholder={t("settings.objetivosPlaceholder")} autoFocus
                     onKeyDown={e => { if (e.key === "Enter") handleSaveObjetivo(); if (e.key === "Escape") setEditingObj(false) }}
                     className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
@@ -494,12 +549,12 @@ export default function SettingsModal({
         {activeTab === "seguridad" && (
           <div className="space-y-4 mt-2">
             <p className="text-xs text-zinc-600">
-              Configura el acceso biométrico para desbloquear GastOS sin introducir el PIN.
+              {t("settings.seguridadHint")}
             </p>
             {!bioAvailable ? (
               <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
                 <Fingerprint className="w-5 h-5 text-zinc-600 flex-shrink-0" aria-hidden="true" />
-                <p className="text-sm text-zinc-500">Tu dispositivo no soporta desbloqueo biométrico.</p>
+                <p className="text-sm text-zinc-500">{t("settings.bioNotSupported")}</p>
               </div>
             ) : (
               <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
@@ -508,21 +563,20 @@ export default function SettingsModal({
                     <Fingerprint className={`w-4 h-4 ${bioEnabled ? "text-emerald-400" : "text-zinc-500"}`} aria-hidden="true" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-200">Desbloqueo biométrico</p>
+                    <p className="text-sm font-medium text-zinc-200">{t("settings.bioTitle")}</p>
                     <p className="text-xs text-zinc-600 mt-0.5">
-                    {bioEnabled ? "Activo — biometría del dispositivo" : "Inactivo — solo PIN"}
+                      {bioEnabled ? t("settings.bioActiveDesc") : t("settings.bioInactiveDesc")}
                     </p>
                   </div>
                   <button
                     onClick={handleToggleBiometric}
                     disabled={bioLoading}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                      bioEnabled
-                        ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
-                        : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
-                    } disabled:opacity-50`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${bioEnabled
+                      ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
+                      : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                      } disabled:opacity-50`}
                   >
-                    {bioLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : bioEnabled ? "Desactivar" : "Activar"}
+                    {bioLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : bioEnabled ? t("settings.bioDeactivate") : t("settings.bioActivate")}
                   </button>
                 </div>
                 {bioError && (
@@ -530,7 +584,7 @@ export default function SettingsModal({
                 )}
                 {bioEnabled && (
                   <p className="text-xs text-zinc-700">
-                    Si cambias tu PIN via recuperación de correo, deberás reactivar la biometría.
+                    {t("settings.bioReactivateHint")}
                   </p>
                 )}
               </div>
@@ -542,8 +596,40 @@ export default function SettingsModal({
           onClick={onClose}
           className="w-full mt-6 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
         >
-          Cerrar
+          {t("common.close")}
         </button>
+        {/* Modal confirmación cambio de idioma */}
+        {pendingLocale && (
+          <div
+            className="absolute inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center rounded-t-3xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-lang-title"
+          >
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
+              <h3 id="confirm-lang-title" className="text-zinc-100 font-semibold mb-2">
+                {t("settings.langChangeConfirm")}
+              </h3>
+              <p className="text-zinc-500 text-sm mb-6">
+                {t("settings.langChangeWarning")}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPendingLocale(null)}
+                  className="flex-1 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-all"
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  onClick={confirmLocaleChange}
+                  className="flex-1 py-2 text-sm bg-emerald-500 text-zinc-950 rounded-xl font-medium hover:bg-emerald-400 transition-all"
+                >
+                  {t("common.confirm")}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

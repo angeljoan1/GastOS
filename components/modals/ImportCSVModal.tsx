@@ -9,6 +9,7 @@
 //         sin añadir estado global.
 
 import { useState, useRef, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import {
   X, Upload, AlertTriangle, CheckCircle2, Loader2, FileText, Trash2,
 } from "lucide-react"
@@ -38,6 +39,7 @@ export default function ImportCSVModal({
   cuentas: Cuenta[]
   onSuccess?: () => void   // BUG #5 FIX: callback opcional para notificar al padre
 }) {
+  const t = useTranslations()
   const [filas, setFilas] = useState<FilaParseada[]>([])
   const [importing, setImporting] = useState(false)
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload")
@@ -80,7 +82,7 @@ export default function ImportCSVModal({
 
       const lineas = text.replace(/\r/g, "").split("\n").filter(l => l.trim())
       if (lineas.length < 2) {
-        setErrorGlobal("El archivo está vacío o no tiene datos.")
+        setErrorGlobal(t("import_csv.errorEmpty"))
         return
       }
 
@@ -101,7 +103,7 @@ export default function ImportCSVModal({
       void iID
 
       if (iCantidad === -1 || iCat === -1) {
-        setErrorGlobal("No se encontraron las columnas 'Categoria' y 'Cantidad'. ¿Es un CSV exportado desde GastOS?")
+        setErrorGlobal(t("import_csv.errorColumns"))
         return
       }
 
@@ -139,14 +141,14 @@ export default function ImportCSVModal({
             return {
               index: idx + 2, fecha: fechaRaw, tipo, categoria: categoriaResuelta,
               cantidad: 0, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
-              error: "Cantidad inválida",
+              error: t("import_csv.errorInvalidAmount"),
             }
           }
           if (!["gasto", "ingreso", "transferencia"].includes(tipo)) {
             return {
               index: idx + 2, fecha: fechaRaw, tipo, categoria: categoriaResuelta,
               cantidad, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
-              error: `Tipo desconocido: "${tipo}"`,
+              error: t("import_csv.errorUnknownType", { tipo }),
             }
           }
 
@@ -169,7 +171,7 @@ export default function ImportCSVModal({
             cuenta_id: cuenta?.id ?? null,
             cuenta_destino_id: cuentaDest?.id ?? null,
             valida: !sinCuentaDest,
-            error: sinCuentaDest ? "Transferencia sin cuenta destino válida" : undefined,
+            error: sinCuentaDest ? t("import_csv.errorNoDestAccount") : undefined,
           }
         })
         // ignorar líneas completamente vacías
@@ -213,8 +215,8 @@ export default function ImportCSVModal({
         .from("movimientos")
         .insert(rows.slice(i, i + BATCH))
 
-      if (error) {
-        setErrorGlobal(`Error en lote ${Math.floor(i / BATCH) + 1}: ${error.message}`)
+        if (error) {
+          setErrorGlobal(t("import_csv.errorBatch", { batch: Math.floor(i / BATCH) + 1, message: error.message }))
         errorOcurrido = true
         break
       }
@@ -239,13 +241,13 @@ export default function ImportCSVModal({
       <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
       <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
-        <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6">
           <h2 id="import-modal-title" className="text-xl font-semibold text-zinc-100">
-            Importar CSV
+            {t("import_csv.title")}
           </h2>
           <button
             onClick={handleClose}
-            aria-label="Cerrar importador de CSV"
+            aria-label={t("import_csv.ariaClose")}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-400" />
@@ -257,18 +259,13 @@ export default function ImportCSVModal({
           <div className="space-y-5">
             <div className="bg-zinc-800/50 border border-zinc-700/60 rounded-2xl p-4 space-y-2">
               <p className="text-xs text-zinc-400 font-medium uppercase tracking-widest">
-                Formato aceptado
+                {t("import_csv.formatTitle")}
               </p>
               <p className="text-xs text-zinc-500">
-                CSV con columnas:{" "}
-                <span className="text-zinc-300 font-mono">
-                  Fecha, Tipo, Categoria, Cantidad, Nota, Cuenta, Cuenta destino
-                </span>
+                {t("import_csv.formatColumns")}
               </p>
               <p className="text-xs text-zinc-500">
-                Compatible con el CSV exportado por GastOS y con separador{" "}
-                <span className="font-mono text-zinc-300">,</span> o{" "}
-                <span className="font-mono text-zinc-300">;</span>
+                {t("import_csv.formatCompat")}
               </p>
             </div>
 
@@ -285,13 +282,13 @@ export default function ImportCSVModal({
             <label className="flex flex-col items-center justify-center gap-3 w-full py-10 rounded-2xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 hover:bg-emerald-950/10 transition-all cursor-pointer">
               <Upload className="w-8 h-8 text-zinc-600" />
               <span className="text-sm text-zinc-500">
-                Pulsa para seleccionar un archivo .csv
+                {t("import_csv.uploadLabel")}
               </span>
               <input
                 ref={fileRef}
                 type="file"
                 accept=".csv"
-                aria-label="Seleccionar archivo CSV"
+                aria-label={t("import_csv.ariaFileInput")}
                 className="hidden"
                 onChange={handleFile}
               />
@@ -305,17 +302,16 @@ export default function ImportCSVModal({
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-emerald-950/30 border border-emerald-900/40 rounded-xl p-3 text-center">
                 <p className="text-2xl font-light text-emerald-400">{validas.length}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">filas válidas</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{t("import_csv.validRows")}</p>
               </div>
               <div className={`rounded-xl p-3 text-center border ${invalidas.length > 0
                 ? "bg-red-950/30 border-red-900/40"
                 : "bg-zinc-800/50 border-zinc-700/40"
                 }`}>
-                <p className={`text-2xl font-light ${invalidas.length > 0 ? "text-red-400" : "text-zinc-600"
-                  }`}>
+                <p className={`text-2xl font-light ${invalidas.length > 0 ? "text-red-400" : "text-zinc-600"}`}>
                   {invalidas.length}
                 </p>
-                <p className="text-xs text-zinc-500 mt-0.5">filas con error</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{t("import_csv.errorRows")}</p>
               </div>
             </div>
 
@@ -325,7 +321,7 @@ export default function ImportCSVModal({
               </div>
             )}
 
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1" role="list" aria-label="Filas del CSV">
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1" role="list" aria-label={t("import_csv.ariaFileList")}>
               {filas.map(f => (
                 <div
                   key={f.index}
@@ -345,23 +341,17 @@ export default function ImportCSVModal({
                         }`}>
                         {f.tipo}
                       </span>
-                      <span className="text-zinc-300 font-medium">
-                        {f.cantidad.toFixed(2)}€
-                      </span>
+                      <span className="text-zinc-300 font-medium">{f.cantidad.toFixed(2)}€</span>
                       <span className="text-zinc-500 truncate">
                         {categorias.find(c => c.id === f.categoria)?.label ?? f.categoria}
                       </span>
                     </div>
-                    {f.nota && (
-                      <p className="text-zinc-600 truncate">{f.nota}</p>
-                    )}
-                    {!f.valida && (
-                      <p className="text-red-400">{f.error}</p>
-                    )}
+                    {f.nota && <p className="text-zinc-600 truncate">{f.nota}</p>}
+                    {!f.valida && <p className="text-red-400">{f.error}</p>}
                   </div>
                   <button
                     onClick={() => eliminarFila(f.index)}
-                    aria-label={`Eliminar fila ${f.index}`}
+                    aria-label={t("import_csv.ariaDeleteRow", { index: f.index })}
                     className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-zinc-800 transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -375,7 +365,7 @@ export default function ImportCSVModal({
                 onClick={handleReset}
                 className="flex-1 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
               >
-                Cambiar archivo
+                {t("import_csv.changeFile")}
               </button>
               <button
                 onClick={handleImport}
@@ -383,8 +373,8 @@ export default function ImportCSVModal({
                 className="flex-1 py-3 text-sm bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
                 {importing
-                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Importando...</>
-                  : <><FileText className="w-4 h-4" /> Importar {validas.length} filas</>
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> {t("common.importing")}</>
+                  : <><FileText className="w-4 h-4" /> {t("import_csv.importButton", { count: validas.length })}</>
                 }
               </button>
             </div>
@@ -397,22 +387,17 @@ export default function ImportCSVModal({
             <CheckCircle2 className="w-16 h-16 text-emerald-400" strokeWidth={1.5} />
             <div>
               <p className="text-lg font-semibold text-zinc-100">
-                {validas.length} movimientos importados
+                {t("import_csv.successTitle", { count: validas.length })}
               </p>
               <p className="text-sm text-zinc-500 mt-1">
-                Ve al Historial para verlos.
+                {t("import_csv.successHint")}
               </p>
             </div>
             <button
-              onClick={() => {
-                // BUG #5 FIX: notificamos al padre antes de cerrar
-                // para que pueda refrescar el HistorialTab
-                onSuccess?.()
-                handleClose()
-              }}
+              onClick={() => { onSuccess?.(); handleClose() }}
               className="mt-2 w-full py-3 bg-emerald-500 text-zinc-950 font-bold rounded-xl hover:bg-emerald-400 transition-all"
             >
-              Cerrar
+              {t("common.close")}
             </button>
           </div>
         )}

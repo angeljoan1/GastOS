@@ -7,6 +7,7 @@
 //   - encryptData/decryptData ahora son async → se usa await
 
 import { useState, useEffect } from "react"
+import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import {
   CalendarDays, X, Loader2, CheckCircle2, Delete,
@@ -32,6 +33,7 @@ export default function IngresoTab({
   categorias: Categoria[]
   cuentas: Cuenta[]
 }) {
+  const t = useTranslations()
   const [display,             setDisplay]             = useState("0")
   const [nota,                setNota]                = useState("")
   const [success,             setSuccess]             = useState(false)
@@ -77,8 +79,8 @@ export default function IngresoTab({
           const notaStr     = m.nota ? await decryptData(m.nota) : null
           return {
             ...m,
-            cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
-            nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+            cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
+            nota:     notaStr     === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
           }
         })
       )
@@ -90,6 +92,7 @@ export default function IngresoTab({
 
       const pending: Movimiento[] = []
       map.forEach(sub => {
+        if (sub.cantidad === -1) return // irrecuperable — no mostrar
         const ultimo    = new Date(sub.created_at)
         const meses     = mesesDePeriod(sub.recur_period)
         const vencimiento = new Date(
@@ -153,26 +156,26 @@ export default function IngresoTab({
     setShowRecurModal(false)
     setShowPeriodStep(false)
     const cantidadRaw = parseFloat(display)
-    if (!cantidadRaw || cantidadRaw <= 0) return setError("Introduce una cantidad mayor que 0.")
-    setLoading(true)
-    setError(null)
-
-    const cantidadEncriptada = await encryptData(cantidadRaw)
-    const notaEncriptada     = nota ? await encryptData(nota.trim()) : null
-
-    const { error } = await supabase.from("movimientos").insert({
-      cantidad:     cantidadEncriptada,
-      categoria:    cat,
-      nota:         notaEncriptada,
-      is_recurring: isRecurring,
-      ...(isRecurring && period ? { recur_period: period } : {}),
-      tipo:         tipoMovimiento,
-      cuenta_id:    cuentaId || null,
-    })
-
-    setLoading(false)
-    if (error) {
-      setError("Error al guardar.")
+    if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
+      setLoading(true)
+      setError(null)
+  
+      const cantidadEncriptada = await encryptData(cantidadRaw)
+      const notaEncriptada     = nota ? await encryptData(nota.trim()) : null
+  
+      const { error } = await supabase.from("movimientos").insert({
+        cantidad:     cantidadEncriptada,
+        categoria:    cat,
+        nota:         notaEncriptada,
+        is_recurring: isRecurring,
+        ...(isRecurring && period ? { recur_period: period } : {}),
+        tipo:         tipoMovimiento,
+        cuenta_id:    cuentaId || null,
+      })
+  
+      setLoading(false)
+      if (error) {
+        setError(t("ingreso.errorSave"))
     } else {
       setSuccess(true)
       setDisplay("0")
@@ -184,9 +187,9 @@ export default function IngresoTab({
   async function handleGuardarTransferencia() {
     triggerHaptic()
     const cantidadRaw = parseFloat(display)
-    if (!cantidadRaw || cantidadRaw <= 0) return setError("Introduce una cantidad mayor que 0.")
-    if (!cuentaId || !cuentaDestinoId)     return setError("Selecciona ambas cuentas.")
-    if (cuentaId === cuentaDestinoId)      return setError("Las cuentas deben ser diferentes.")
+    if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
+      if (!cuentaId || !cuentaDestinoId)     return setError(t("ingreso.errorSelectBothAccounts"))
+      if (cuentaId === cuentaDestinoId)      return setError(t("ingreso.errorSameAccount"))
 
     setLoading(true)
     setError(null)
@@ -281,10 +284,10 @@ export default function IngresoTab({
   return (
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-      {success && (
+{success && (
         <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-3 rounded-t-xl animate-in fade-in duration-300">
           <CheckCircle2 className={`w-16 h-16 ${accent.text}`} strokeWidth={1.5} />
-          <p className={`font-semibold text-lg ${accent.text}`}>¡Guardado!</p>
+          <p className={`font-semibold text-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
         </div>
       )}
 
@@ -301,46 +304,43 @@ export default function IngresoTab({
             {!showPeriodStep ? (
               <>
                 <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">
-                  {tipoMovimiento === "ingreso" ? "¿Se cobra periódicamente?" : "¿Es un pago periódico?"}
+                  {tipoMovimiento === "ingreso" ? t("ingreso.recurModalTitleIngreso") : t("ingreso.recurModalTitleGasto")}
                 </h3>
                 <p className="text-zinc-500 text-sm mb-6">
-                  {tipoMovimiento === "ingreso"
-                    ? "Podemos recordártelo para que confirmes si ya has cobrado."
-                    : "Podemos marcarlo como recurrente para mejor control."
-                  }
+                  {tipoMovimiento === "ingreso" ? t("ingreso.recurModalDescIngreso") : t("ingreso.recurModalDescGasto")}
                 </p>
                 <div className="flex flex-col gap-3">
-                <button
+                  <button
                     onClick={() => setShowPeriodStep(true)}
                     className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
                   >
-                    {tipoMovimiento === "ingreso" ? "Sí, se cobra periódicamente" : "Sí, se repite"}
+                    {tipoMovimiento === "ingreso" ? t("ingreso.recurYesIngreso") : t("ingreso.recurYesGasto")}
                   </button>
                   <button
                     onClick={() => handleGuardar(pendingCat!, false)}
                     className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
                   >
-                    {tipoMovimiento === "ingreso" ? "No, es un ingreso puntual" : "No, es solo un pago puntual"}
+                    {tipoMovimiento === "ingreso" ? t("ingreso.recurNoIngreso") : t("ingreso.recurNoGasto")}
                   </button>
                   <button
                     onClick={() => { setShowRecurModal(false); setShowPeriodStep(false) }}
                     className="mt-1 text-xs text-zinc-600 hover:text-zinc-400"
                   >
-                    Cancelar
+                    {t("common.cancel")}
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">¿Cada cuánto?</h3>
-                <p className="text-zinc-500 text-sm mb-4">Selecciona la frecuencia de repetición.</p>
+                <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">{t("ingreso.recurPeriodTitle")}</h3>
+                <p className="text-zinc-500 text-sm mb-4">{t("ingreso.recurPeriodDesc")}</p>
                 <div className="flex flex-col gap-2 mb-4">
                   {([
-                    { value: 'monthly',    label: 'Mensual',    sub: 'Cada mes'     },
-                    { value: 'bimonthly',  label: 'Bimestral',  sub: 'Cada 2 meses' },
-                    { value: 'quarterly',  label: 'Trimestral', sub: 'Cada 3 meses' },
-                    { value: 'semiannual', label: 'Semestral',  sub: 'Cada 6 meses' },
-                    { value: 'annual',     label: 'Anual',      sub: 'Cada año'     },
+                    { value: 'monthly',    label: t("ingreso.recurMonthly"),    sub: t("ingreso.recurMonthlyDesc")    },
+                    { value: 'bimonthly',  label: t("ingreso.recurBimonthly"),  sub: t("ingreso.recurBimonthlyDesc")  },
+                    { value: 'quarterly',  label: t("ingreso.recurQuarterly"),  sub: t("ingreso.recurQuarterlyDesc")  },
+                    { value: 'semiannual', label: t("ingreso.recurSemiannual"), sub: t("ingreso.recurSemiannualDesc") },
+                    { value: 'annual',     label: t("ingreso.recurAnnual"),     sub: t("ingreso.recurAnnualDesc")     },
                   ] as const).map(({ value, label, sub }) => (
                     <button
                       key={value}
@@ -361,13 +361,13 @@ export default function IngresoTab({
                     onClick={() => setShowPeriodStep(false)}
                     className="flex-1 py-2.5 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all"
                   >
-                    Atrás
+                    {t("common.back")}
                   </button>
                   <button
                     onClick={() => handleGuardar(pendingCat!, true, recurPeriod)}
                     className={`flex-1 py-2.5 text-sm ${accent.bg} text-zinc-950 rounded-xl font-bold ${accent.hover} transition-all`}
                   >
-                    Guardar
+                    {t("common.save")}
                   </button>
                 </div>
               </>
@@ -376,12 +376,12 @@ export default function IngresoTab({
         </div>
       )}
 
-      {pendingSubs.length > 0 && (
+{pendingSubs.length > 0 && (
         <div className="border-b border-zinc-800/60 p-4 bg-zinc-950">
           <div className="flex items-center gap-2 mb-2">
             <CalendarDays className="w-4 h-4 text-zinc-400" aria-hidden="true" />
             <p className="font-semibold text-xs uppercase tracking-wider text-zinc-400">
-              Recurrentes pendientes — {new Date().toLocaleDateString("es-ES", { month: "long" })}
+              {t("ingreso.pendingTitle")} — {new Date().toLocaleDateString("es-ES", { month: "long" })}
             </p>
           </div>
           <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
@@ -401,13 +401,16 @@ export default function IngresoTab({
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                       esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
                     }`}>
-                      {esIngreso ? "↑ Ingreso" : "↓ Gasto"}
+                      {esIngreso ? t("ingreso.pendingLabelIngreso") : t("ingreso.pendingLabelGasto")}
                     </span>
                     <p className="text-sm text-zinc-200 truncate font-medium mt-1">
-                      {catLabel}{sub.nota ? ` · ${sub.nota}` : ""}
+                      {catLabel}{sub.nota && sub.nota !== DECRYPT_ERROR ? ` · ${sub.nota}` : ""}
                     </p>
                     <p className="text-xs text-zinc-500 mt-0.5">
-                      {sub.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                      {sub.cantidad === -1
+                        ? t("common.encryptedShort")
+                        : `${sub.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`
+                      }
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
@@ -431,7 +434,7 @@ export default function IngresoTab({
                     >
                       {processingSub === sub.id
                         ? <Loader2 className="w-3 h-3 animate-spin" />
-                        : esIngreso ? "¿Cobrado?" : "Cobrar"
+                        : esIngreso ? t("ingreso.pendingCollect") : t("ingreso.pendingPay")
                       }
                     </button>
                   </div>
@@ -443,11 +446,11 @@ export default function IngresoTab({
       )}
 
       <div className="px-4 pt-4 pb-2">
-        <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800" role="group" aria-label="Tipo de movimiento">
+        <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800" role="group" aria-label={t("ingreso.ariaTypeGroup")}>
           {([
-            { id: "gasto",         label: "Gasto",         Icon: TrendingDown,   activeClass: "bg-red-500/15 text-red-400 border border-red-500/30"       },
-            { id: "ingreso",       label: "Ingreso",       Icon: TrendingUp,     activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
-            { id: "transferencia", label: "Transferencia", Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30"     },
+            { id: "gasto",         label: t("ingreso.typeGasto"),         Icon: TrendingDown,   activeClass: "bg-red-500/15 text-red-400 border border-red-500/30"           },
+            { id: "ingreso",       label: t("ingreso.typeIngreso"),       Icon: TrendingUp,     activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
+            { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30"         },
           ] as const).map(({ id, label, Icon, activeClass }) => (
             <button
               key={id}
@@ -459,7 +462,7 @@ export default function IngresoTab({
             >
               <Icon className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{id === "transferencia" ? "Transfer" : label}</span>
+              <span className="sm:hidden">{id === "transferencia" ? t("ingreso.typeTransferShort") : label}</span>
             </button>
           ))}
         </div>
@@ -476,7 +479,7 @@ export default function IngresoTab({
         <div className="flex items-center justify-between w-full mt-1">
           <EncryptionBadge />
           <p className={`text-xs font-medium uppercase tracking-widest ${accent.text} opacity-60`}>
-            {tipoMovimiento === "gasto" ? "Gasto" : tipoMovimiento === "ingreso" ? "Ingreso" : "Transferencia"}
+            {tipoMovimiento === "gasto" ? t("ingreso.typeGasto") : tipoMovimiento === "ingreso" ? t("ingreso.typeIngreso") : t("ingreso.typeTransferencia")}
           </p>
         </div>
       </div>
@@ -486,7 +489,7 @@ export default function IngresoTab({
 
           <div>
             <label htmlFor="nota-input" className="block text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">
-              Nota opcional
+              {t("ingreso.labelNota")}
             </label>
             <input
               id="nota-input"
@@ -496,10 +499,10 @@ export default function IngresoTab({
               maxLength={80}
               placeholder={
                 tipoMovimiento === "ingreso"
-                  ? "Ej: Nómina de marzo"
+                  ? t("ingreso.placeholderNotaIngreso")
                   : tipoMovimiento === "transferencia"
-                    ? "Ej: Ahorro mensual"
-                    : "Ej: Cena con Juan"
+                    ? t("ingreso.placeholderNotaTransfer")
+                    : t("ingreso.placeholderNotaGasto")
               }
               className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
             />
@@ -509,19 +512,19 @@ export default function IngresoTab({
             <div className="space-y-3">
               {cuentas.length < 2 ? (
                 <div className="bg-blue-950/30 border border-blue-900/40 rounded-xl p-4 text-center">
-                  <p className="text-sm text-blue-300 font-medium mb-1">Necesitas al menos 2 cuentas</p>
-                  <p className="text-xs text-zinc-500">Crea tus cuentas desde el menú → Mis Cuentas</p>
+                  <p className="text-sm text-blue-300 font-medium mb-1">{t("ingreso.needTwoAccounts")}</p>
+                  <p className="text-xs text-zinc-500">{t("ingreso.needTwoAccountsHint")}</p>
                 </div>
               ) : (
                 <>
                   <div>
-                    <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">Cuenta origen</p>
+                    <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaOrigen")}</p>
                     {(() => {
                       const c = cuentas.find(c => c.id === cuentaId)
                       return (
                         <SheetTrigger
                           onClick={() => setShowCuentaSheet(true)}
-                          placeholder="Selecciona cuenta..."
+                          placeholder={t("ingreso.placeholderSelectCuenta")}
                           label={c?.nombre}
                           icono={c?.icono}
                           color={c?.color}
@@ -530,13 +533,13 @@ export default function IngresoTab({
                     })()}
                   </div>
                   <div>
-                    <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">Cuenta destino</p>
+                    <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaDestino")}</p>
                     {(() => {
                       const c = cuentas.find(c => c.id === cuentaDestinoId)
                       return (
                         <SheetTrigger
                           onClick={() => setShowCuentaDestSheet(true)}
-                          placeholder="Selecciona cuenta..."
+                          placeholder={t("ingreso.placeholderSelectCuenta")}
                           label={c?.nombre}
                           icono={c?.icono}
                           color={c?.color}
@@ -553,7 +556,7 @@ export default function IngresoTab({
                       ? <Loader2 className="w-4 h-4 animate-spin" />
                       : <ArrowLeftRight className="w-4 h-4" />
                     }
-                    Registrar transferencia
+                    {t("ingreso.registerTransfer")}
                   </button>
                 </>
               )}
@@ -564,8 +567,8 @@ export default function IngresoTab({
             <>
               {cuentas.length > 0 && (
                 <div>
-                  <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">Cuenta</p>
-                  <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Seleccionar cuenta">
+                  <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuenta")}</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t("ingreso.ariaSelectCuenta")}>
                     {cuentas.map(c => {
                       const CIcon    = getIcon(c.icono)
                       const selected = cuentaId === c.id
@@ -591,9 +594,9 @@ export default function IngresoTab({
               )}
 
               <div>
-              <div className="flex items-baseline justify-between mb-3 px-1">
-                  <p className="text-xs text-zinc-600 uppercase tracking-widest">Categoría</p>
-                  <p className="text-[10px] text-zinc-700">Gestiona en Ajustes</p>
+                <div className="flex items-baseline justify-between mb-3 px-1">
+                  <p className="text-xs text-zinc-600 uppercase tracking-widest">{t("ingreso.labelCategoria")}</p>
+                  <p className="text-[10px] text-zinc-700">{t("ingreso.manageInSettings")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {Array.from(
@@ -611,7 +614,7 @@ export default function IngresoTab({
                       key={cat.id}
                       cat={cat}
                       onPress={onCategoryClick}
-                      disabled={isDisabled || loading}  // ← incluye loading para evitar doble envío
+                      disabled={isDisabled || loading}
                     />
                   ))}
                 </div>
@@ -626,7 +629,7 @@ export default function IngresoTab({
           <button
             key={k}
             onClick={() => handleDigit(k)}
-            aria-label={k === "." ? "punto decimal" : k}
+            aria-label={k === "." ? t("ingreso.ariaDecimalPoint") : k}
             className="h-14 flex items-center justify-center text-2xl font-light text-zinc-200 active:bg-zinc-800 rounded-xl transition-all tabular-nums"
           >
             {k}
@@ -634,7 +637,7 @@ export default function IngresoTab({
         ))}
         <button
           onClick={handleBackspace}
-          aria-label="Borrar último dígito"
+          aria-label={t("pin.ariaDeleteDigit")}
           className="h-14 flex items-center justify-center text-zinc-500 hover:text-red-400 active:bg-zinc-800 active:scale-95 rounded-xl transition-all"
         >
           <Delete className="w-6 h-6" />
@@ -644,7 +647,7 @@ export default function IngresoTab({
       <BottomSheet
         isOpen={showCuentaSheet}
         onClose={() => setShowCuentaSheet(false)}
-        title="Cuenta origen"
+        title={t("ingreso.sheetTitleCuentaOrigen")}
         value={cuentaId}
         onChange={setCuentaId}
         options={cuentas.map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}
@@ -652,7 +655,7 @@ export default function IngresoTab({
       <BottomSheet
         isOpen={showCuentaDestSheet}
         onClose={() => setShowCuentaDestSheet(false)}
-        title="Cuenta destino"
+        title={t("ingreso.sheetTitleCuentaDestino")}
         value={cuentaDestinoId}
         onChange={setCuentaDestinoId}
         options={cuentas.filter(c => c.id !== cuentaId).map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}

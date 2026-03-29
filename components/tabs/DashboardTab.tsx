@@ -24,7 +24,7 @@ import {
 } from "recharts"
 import { getIcon } from "@/lib/icons"
 import type { Categoria, Movimiento, Cuenta, SaldoCuenta, Presupuesto, Objetivo } from "@/types"
-import { decryptData } from "@/lib/crypto"
+import { decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 type WidgetId =
@@ -186,11 +186,15 @@ export default function DashboardTab({
       if (data) {
         // 2. Usamos el coordinador para desencriptar todo el arreglo
         const decryptedData = await Promise.all(
-          data.map(async (m) => ({
-            ...m,
-            cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-            nota: m.nota ? await decryptData(m.nota) : null,
-          }))
+          data.map(async (m) => {
+            const cantidadStr = await decryptData(m.cantidad)
+            const notaStr     = m.nota ? await decryptData(m.nota) : null
+            return {
+              ...m,
+              cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
+              nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+            }
+          })
         );
         setMovimientos(decryptedData);
       }

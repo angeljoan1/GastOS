@@ -413,116 +413,6 @@ export async function POST(request: Request) {
 }
 </file>
 
-<file path="app/globals.css">
-/* app/globals.css */
-/* ─── Fixes en este archivo ──────────────────────────────────────────────────
-   BUG #24: globals.css declaraba font-family: Arial en body, compitiendo con
-            la variable CSS de Geist Sans que layout.tsx aplica en <html>.
-            Aunque Geist ganaba en la práctica por especificidad, la declaración
-            de Arial era confusa y podía causar flash of unstyled text en SSR.
-            FIX: eliminamos la declaración de font-family en body y dejamos que
-            la herencia desde <html> (donde layout.tsx aplica --font-geist-sans)
-            actúe de forma limpia.
-   ──────────────────────────────────────────────────────────────────────────── */
-
-   @import "tailwindcss";
-
-   :root {
-     --background: #ffffff;
-     --foreground: #171717;
-   }
-   
-   @theme inline {
-     --color-background: var(--background);
-     --color-foreground: var(--foreground);
-     --font-sans: var(--font-geist-sans);
-     --font-mono: var(--font-geist-mono);
-   }
-   
-   @media (prefers-color-scheme: dark) {
-     :root {
-       --background: #0a0a0a;
-       --foreground: #ededed;
-     }
-   }
-   
-   body {
-     background: var(--background);
-     color:      var(--foreground);
-     /* BUG #24 FIX: eliminada la línea font-family: Arial, Helvetica, sans-serif
-        La fuente la hereda correctamente desde la variable --font-geist-sans
-        aplicada en el elemento <html> por layout.tsx */
-   }
-
-   @keyframes marquee {
-    0%    { transform: translateX(0); }
-    30%   { transform: translateX(0); }
-    70%   { transform: translateX(calc(-100% + 70px)); }
-    100%  { transform: translateX(calc(-100% + 70px)); }
-  }
-</file>
-
-<file path="app/manifest.ts">
-// app/manifest.ts
-// ─── Fixes en este archivo ────────────────────────────────────────────────────
-// BUG #25: El mismo archivo icon.png se declaraba tres veces con tamaños
-//          inconsistentes (192×2 y 512), y dos entradas tenían el mismo
-//          purpose="any". Android e iOS usaban el icono escalado con pérdida.
-//
-//          FIX: declaramos tres entradas semánticamente distintas:
-//            1. 192×192 any        → icono estándar para pantallas normales
-//            2. 512×512 any        → icono HD para splash screen y instalación
-//               (si tienes un icon-512.png aparte, úsalo aquí; si no, icon.png)
-//            3. 192×192 maskable   → icono adaptable para fondos de Android
-//
-//          Si solo tienes un archivo de icono, no pasa nada — el navegador
-//          escala el de 512 para el uso de 192 mejor que al revés.
-//          Lo ideal es tener icon-192.png e icon-512.png separados.
-
-import { MetadataRoute } from "next"
-
-export default function manifest(): MetadataRoute.Manifest {
-  return {
-    name:             "GastOS - Tu dinero, bajo control",
-    short_name:       "GastOS",
-    description:      "Registro personal y seguro para el control diario de tus finanzas.",
-    start_url:        "/",
-    display:          "standalone",
-    orientation:      "portrait",
-    background_color: "#000000",
-    theme_color:      "#09090b",
-    lang:             "es",
-    id:               "/",
-    scope:            "/",
-    icons: [
-      {
-        // Icono estándar para uso general (launcher, notificaciones)
-        src:     "/icon.png",
-        sizes:   "192x192",
-        type:    "image/png",
-        purpose: "any",
-      },
-      {
-        // Icono de alta resolución para splash screen e instalación PWA
-        // Si tienes un icon-512.png de mayor resolución, cámbialo aquí
-        src:     "/icon.png",
-        sizes:   "512x512",
-        type:    "image/png",
-        purpose: "any",
-      },
-      {
-        // Icono maskable: Android lo recorta con máscara circular/redondeada.
-        // El contenido importante debe estar en el 80% central del icono.
-        src:     "/icon.png",
-        sizes:   "192x192",
-        type:    "image/png",
-        purpose: "maskable",
-      },
-    ],
-  }
-}
-</file>
-
 <file path="components/auth/AuthScreen.tsx">
 "use client"
 
@@ -1431,46 +1321,6 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 </file>
 
-<file path="app/layout.tsx">
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: 'GastOS',
-  description: 'Aplicación personal y segura para el registro diario de gastos.',
-}
-
-export const viewport: Viewport = {
-  themeColor: "#09090b",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html
-      lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
-  );
-}
-</file>
-
 <file path="components/auth/PinPadScreen.tsx">
 "use client"
 
@@ -2160,16 +2010,26 @@ export default function ImportCSVModal({
             ? cuentas.find(c => c.id === cuentaDestRaw || c.nombre.toLowerCase() === cuentaDestRaw.toLowerCase())
             : undefined
 
+          // Bug 10 FIX: resolver categoría a su id del catálogo cuando sea posible.
+          // Buscamos primero por id exacto (CSV exportado por GastOS),
+          // luego por label case-insensitive (CSV externo).
+          // Si no hay match guardamos catRaw como fallback (texto libre importado),
+          // que EditMovimientoModal ya sabe manejar como "categoría importada".
+          const catMatch =
+            categorias.find(c => c.id === catRaw) ??
+            categorias.find(c => c.label.toLowerCase() === catRaw.toLowerCase())
+          const categoriaResuelta = catMatch?.id ?? catRaw
+
           if (isNaN(cantidad) || cantidad <= 0) {
             return {
-              index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
+              index: idx + 2, fecha: fechaRaw, tipo, categoria: categoriaResuelta,
               cantidad: 0, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: "Cantidad inválida",
             }
           }
           if (!["gasto", "ingreso", "transferencia"].includes(tipo)) {
             return {
-              index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
+              index: idx + 2, fecha: fechaRaw, tipo, categoria: categoriaResuelta,
               cantidad, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: `Tipo desconocido: "${tipo}"`,
             }
@@ -2188,7 +2048,7 @@ export default function ImportCSVModal({
             index: idx + 2,
             fecha: fechaISO,
             tipo,
-            categoria: catRaw,
+            categoria: categoriaResuelta,
             cantidad,
             nota,
             cuenta_id: cuenta?.id ?? null,
@@ -2373,7 +2233,9 @@ export default function ImportCSVModal({
                       <span className="text-zinc-300 font-medium">
                         {f.cantidad.toFixed(2)}€
                       </span>
-                      <span className="text-zinc-500 truncate">{f.categoria}</span>
+                      <span className="text-zinc-500 truncate">
+                        {categorias.find(c => c.id === f.categoria)?.label ?? f.categoria}
+                      </span>
                     </div>
                     {f.nota && (
                       <p className="text-zinc-600 truncate">{f.nota}</p>
@@ -2732,7 +2594,7 @@ import { X, Loader2 } from "lucide-react"
 import type { Movimiento, Categoria, Cuenta } from "@/types"
 
 export default function EditMovimientoModal({
-  isOpen, onClose, movimiento, categorias, cuentas, onSave,
+  isOpen, onClose, movimiento, categorias, cuentas, onSave, saveError,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -2740,6 +2602,7 @@ export default function EditMovimientoModal({
   categorias: Categoria[]
   cuentas: Cuenta[]
   onSave: (updatedMov: Movimiento) => Promise<void>
+  saveError?: string | null
 }) {
   const [cantidad, setCantidad] = useState("")
   const [categoria, setCategoria] = useState("")
@@ -2927,7 +2790,13 @@ export default function EditMovimientoModal({
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
+        {saveError && (
+          <div role="alert" className="mt-4 bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+            {saveError}
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-4">
           <button
             onClick={onClose}
             className="flex-1 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
@@ -2946,6 +2815,111 @@ export default function EditMovimientoModal({
       </div>
     </div>
   )
+}
+</file>
+
+<file path="app/layout.tsx">
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: 'GastOS',
+  description: 'Aplicación personal y segura para el registro diario de gastos.',
+}
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html
+      lang="es"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col">{children}</body>
+    </html>
+  );
+}
+</file>
+
+<file path="app/manifest.ts">
+// app/manifest.ts
+// ─── Fixes en este archivo ────────────────────────────────────────────────────
+// BUG #25: El mismo archivo icon.png se declaraba tres veces con tamaños
+//          inconsistentes (192×2 y 512), y dos entradas tenían el mismo
+//          purpose="any". Android e iOS usaban el icono escalado con pérdida.
+//
+//          FIX: declaramos tres entradas semánticamente distintas:
+//            1. 192×192 any        → icono estándar para pantallas normales
+//            2. 512×512 any        → icono HD para splash screen y instalación
+//               (si tienes un icon-512.png aparte, úsalo aquí; si no, icon.png)
+//            3. 192×192 maskable   → icono adaptable para fondos de Android
+//
+//          Si solo tienes un archivo de icono, no pasa nada — el navegador
+//          escala el de 512 para el uso de 192 mejor que al revés.
+//          Lo ideal es tener icon-192.png e icon-512.png separados.
+
+import { MetadataRoute } from "next"
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name:             "GastOS - Tu dinero, bajo control",
+    short_name:       "GastOS",
+    description:      "Registro personal y seguro para el control diario de tus finanzas.",
+    start_url:        "/",
+    display:          "standalone",
+    orientation:      "portrait",
+    background_color: "#09090b",
+    theme_color:      "#09090b",
+    lang:             "es",
+    id:               "/",
+    scope:            "/",
+    icons: [
+      {
+        // Icono estándar para uso general (launcher, notificaciones)
+        src:     "/icon.png",
+        sizes:   "192x192",
+        type:    "image/png",
+        purpose: "any",
+      },
+      {
+        // Icono de alta resolución para splash screen e instalación PWA
+        // Si tienes un icon-512.png de mayor resolución, cámbialo aquí
+        src:     "/icon.png",
+        sizes:   "512x512",
+        type:    "image/png",
+        purpose: "any",
+      },
+      {
+        // Icono maskable: Android lo recorta con máscara circular/redondeada.
+        // El contenido importante debe estar en el 80% central del icono.
+        src:     "/icon.png",
+        sizes:   "192x192",
+        type:    "image/png",
+        purpose: "maskable",
+      },
+    ],
+  }
 }
 </file>
 
@@ -2972,6 +2946,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
   const [mensaje,      setMensaje]      = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success,      setSuccess]      = useState(false)
+  const [submitError,  setSubmitError]  = useState<string | null>(null)
 
   // Estado de arrastre del botón flotante
   const [pos,       setPos]       = useState({ x: 0, y: 0 })
@@ -2992,6 +2967,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         body:    JSON.stringify({ userId, tipo, mensaje }),
       })
       if (response.ok) {
+        setSubmitError(null)
         setSuccess(true)
         setTimeout(() => {
           setIsOpen(false)
@@ -2999,10 +2975,10 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
           setMensaje("")
         }, 3000)
       } else {
-        alert("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
+        setSubmitError("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
       }
     } catch {
-      alert("Error de conexión al enviar el ticket.")
+      setSubmitError("Error de conexión al enviar el ticket.")
     } finally {
       setIsSubmitting(false)
     }
@@ -3085,7 +3061,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
               Buzón de Sugerencias
             </h3>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => { setIsOpen(false); setSubmitError(null) }}
               aria-label="Cerrar buzón de sugerencias"
               className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
             >
@@ -3167,6 +3143,12 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
                 />
               </div>
 
+              {submitError && (
+                <div role="alert" className="bg-red-950/50 border border-red-900/50 rounded-lg px-3 py-2 text-xs text-red-400">
+                  {submitError}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -3205,7 +3187,7 @@ import { getIcon } from "@/lib/icons"
 import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
 import type { Categoria, Movimiento, Cuenta } from "@/types"
 import BottomSheet, { SheetTrigger, type SheetOption } from "@/components/ui/BottomSheet"
-import { encryptData, decryptData } from "@/lib/crypto"
+import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 type TipoFilter = "todos" | "gasto" | "ingreso" | "transferencia"
@@ -3237,13 +3219,17 @@ export default function HistorialTab({
   const [isSearching, setIsSearching] = useState(false)
   const [showCatSheet, setShowCatSheet] = useState(false)
   const [showTipoSheet, setShowTipoSheet] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
 
-  // Carga desde BD y desencripta. No filtra por nota porque está cifrada en BD.
+  // Carga desde BD y desencripta.
+  // Cuando forSearch=true carga SIN paginación para buscar en todos los movimientos.
+  // La nota está cifrada en BD, por eso no se puede filtrar server-side por texto.
   const fetchMovimientos = useCallback(async (
     pageIndex: number,
     categoryFilter: string,
     tipo: TipoFilter,
     isNew = false,
+    forSearch = false,
   ) => {
     if (isNew) setIsSearching(true)
 
@@ -3257,25 +3243,35 @@ export default function HistorialTab({
     else if (tipo === "ingreso") q = q.eq("tipo", "ingreso")
     else if (tipo === "transferencia") q = q.eq("tipo", "transferencia")
 
-    const from = pageIndex * 20
-    const { data, error } = await q.range(from, from + 19)
+    // Sin paginación cuando se busca por texto: necesitamos todos los movimientos
+    // para filtrar en memoria (las notas están cifradas en BD).
+    if (!forSearch) {
+      const from = pageIndex * 20
+      q = q.range(from, from + 19)
+    }
+
+    const { data, error } = await q
 
     if (error) {
       console.error("Error en la búsqueda:", error.message)
     } else if (data) {
-      // Aplicamos el coordinador
       const decryptedData = await Promise.all(
-        data.map(async (m) => ({
-          ...m,
-          cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-          nota: m.nota ? await decryptData(m.nota) : null,
-        }))
-      );
+        data.map(async (m) => {
+          const cantidadStr = await decryptData(m.cantidad)
+          const notaStr     = m.nota ? await decryptData(m.nota) : null
+          return {
+            ...m,
+            cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
+            nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+          }
+        })
+      )
 
       if (isNew) setMovimientos(decryptedData)
       else setMovimientos(prev => [...prev, ...decryptedData])
 
-      setHasMore(data.length === 20)
+      // hasMore no aplica en modo búsqueda completa
+      if (!forSearch) setHasMore(data.length === 20)
     }
 
     setLoading(false)
@@ -3297,11 +3293,18 @@ export default function HistorialTab({
     }
   }, [confirmarBorrado])
 
-  // BUG #9 FIX: resetear page cuando cambia searchTerm para que al borrar
-  // el filtro de texto no quede "en medio" de la paginación
+  // Bug 15 FIX: cuando hay texto de búsqueda, cargamos TODOS los movimientos
+  // (sin paginar) para poder filtrar en memoria, ya que las notas están cifradas
+  // en BD y no se pueden buscar server-side.
+  // Al borrar el término volvemos al fetch paginado normal.
   useEffect(() => {
     setPage(0)
-  }, [searchTerm])
+    if (searchTerm.trim()) {
+      fetchMovimientos(0, selectedCategory, tipoFilter, true, true)
+    } else {
+      fetchMovimientos(0, selectedCategory, tipoFilter, true, false)
+    }
+  }, [searchTerm, fetchMovimientos, selectedCategory, tipoFilter])
 
   // Filtrado en memoria por texto (los datos ya están desencriptados)
   const movimientosFiltrados = searchTerm.trim()
@@ -3349,6 +3352,7 @@ export default function HistorialTab({
   }
 
   async function handleUpdateMovimiento(updated: Movimiento) {
+    setUpdateError(null)
     const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
 
     const cantidadEncriptada = await encryptData(updated.cantidad)
@@ -3363,13 +3367,15 @@ export default function HistorialTab({
         tipo: updated.tipo ?? "gasto",
         created_at: updated.created_at,
         cuenta_id: updated.cuenta_id,
+        cuenta_destino_id: updated.cuenta_destino_id ?? null,
       })
       .eq("id", updated.id)
       .select()
 
     if (error) {
-      alert("Error: " + error.message)
+      setUpdateError("Error al guardar: " + error.message)
     } else if (data?.length) {
+      setUpdateError(null)
       setMovimientos(prev =>
         prev.map(m =>
           m.id === updated.id
@@ -3644,13 +3650,14 @@ export default function HistorialTab({
         </div>
       )}
 
-      <EditMovimientoModal
+<EditMovimientoModal
         isOpen={!!editingMov}
-        onClose={() => setEditingMov(null)}
+        onClose={() => { setEditingMov(null); setUpdateError(null) }}
         movimiento={editingMov}
         categorias={categorias}
         cuentas={cuentas}
         onSave={handleUpdateMovimiento}
+        saveError={updateError}
       />
 
       <BottomSheet
@@ -3698,7 +3705,7 @@ import {
 import { getIcon } from "@/lib/icons"
 import type { Categoria, Movimiento, Cuenta } from "@/types"
 import BottomSheet, { SheetTrigger } from "@/components/ui/BottomSheet"
-import { encryptData, decryptData } from "@/lib/crypto"
+import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 function triggerHaptic() {
@@ -3737,44 +3744,55 @@ export default function IngresoTab({
   }, [cuentas, cuentaId])
 
   useEffect(() => {
-    supabase
-      .from("movimientos")
-      .select("*")
-      .eq("is_recurring", true)
-      .order("created_at", { ascending: false })
-      .then(async ({ data }) => {
-        if (!data) return
-        const now = new Date()
-        const map = new Map<string, Movimiento>()
+    // Bug 8 FIX: user_id explícito para no depender solo de RLS.
+    // Bug 2 FIX: distinguimos DECRYPT_ERROR de dato vacío legítimo.
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-        const decrypted = await Promise.all(
-          data.map(async m => ({
+      const { data } = await supabase
+        .from("movimientos")
+        .select("*")
+        .eq("is_recurring", true)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+
+      if (!data) return
+      const now = new Date()
+      const map = new Map<string, Movimiento>()
+
+      const decrypted = await Promise.all(
+        data.map(async m => {
+          const cantidadStr = await decryptData(m.cantidad)
+          const notaStr     = m.nota ? await decryptData(m.nota) : null
+          return {
             ...m,
-            cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-            nota:     m.nota ? await decryptData(m.nota) : null,
-          }))
-        )
-
-        decrypted.forEach(m => {
-          const key = `${m.categoria}-${m.nota || ""}`
-          if (!map.has(key)) map.set(key, m)
+            cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
+            nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+          }
         })
+      )
 
-        const pending: Movimiento[] = []
-        map.forEach(sub => {
-          const ultimo    = new Date(sub.created_at)
-          const meses     = mesesDePeriod(sub.recur_period)
-          const vencimiento = new Date(
-            ultimo.getFullYear(),
-            ultimo.getMonth() + meses,
-            ultimo.getDate(),
-            12, 0, 0, 0
-          )
-          if (vencimiento <= now) pending.push(sub)
-        })
-
-        setPendingSubs(pending)
+      decrypted.forEach(m => {
+        const key = `${m.categoria}-${m.nota || ""}`
+        if (!map.has(key)) map.set(key, m)
       })
+
+      const pending: Movimiento[] = []
+      map.forEach(sub => {
+        const ultimo    = new Date(sub.created_at)
+        const meses     = mesesDePeriod(sub.recur_period)
+        const vencimiento = new Date(
+          ultimo.getFullYear(),
+          ultimo.getMonth() + meses,
+          ultimo.getDate(),
+          12, 0, 0, 0
+        )
+        if (vencimiento <= now) pending.push(sub)
+      })
+
+      setPendingSubs(pending)
+    })()
   }, [])
 
   const accent =
@@ -4389,6 +4407,67 @@ function CategoryButton({
 }
 </file>
 
+<file path="app/globals.css">
+/* app/globals.css */
+/* ─── Fixes en este archivo ──────────────────────────────────────────────────
+   BUG #24: globals.css declaraba font-family: Arial en body, compitiendo con
+            la variable CSS de Geist Sans que layout.tsx aplica en <html>.
+            Aunque Geist ganaba en la práctica por especificidad, la declaración
+            de Arial era confusa y podía causar flash of unstyled text en SSR.
+            FIX: eliminamos la declaración de font-family en body y dejamos que
+            la herencia desde <html> (donde layout.tsx aplica --font-geist-sans)
+            actúe de forma limpia.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+   @import "tailwindcss";
+
+   :root {
+     --background: #ffffff;
+     --foreground: #171717;
+   }
+   
+   @theme inline {
+     --color-background: var(--background);
+     --color-foreground: var(--foreground);
+     --font-sans: var(--font-geist-sans);
+     --font-mono: var(--font-geist-mono);
+   }
+   
+   @media (prefers-color-scheme: dark) {
+     :root {
+       --background: #0a0a0a;
+       --foreground: #ededed;
+     }
+   }
+   
+   html, body {
+    background: #09090b;
+    color:      var(--foreground);
+  }
+
+  @media (display-mode: standalone) {
+    html, body {
+      overscroll-behavior: none;
+    }
+  }
+
+  @layer utilities {
+   .pt-safe-top {
+     padding-top: env(safe-area-inset-top);
+   }
+   .pb-safe-bottom {
+     padding-bottom: env(safe-area-inset-bottom);
+   }
+ }
+  
+  @keyframes marquee {
+    0%    { transform: translateX(0); }
+    30%   { transform: translateX(0); }
+    70%   { transform: translateX(calc(-100% + 70px)); }
+    100%  { transform: translateX(calc(-100% + 70px)); }
+  }
+</file>
+
 <file path="components/tabs/DashboardTab.tsx">
 "use client"
 
@@ -4416,7 +4495,7 @@ import {
 } from "recharts"
 import { getIcon } from "@/lib/icons"
 import type { Categoria, Movimiento, Cuenta, SaldoCuenta, Presupuesto, Objetivo } from "@/types"
-import { decryptData } from "@/lib/crypto"
+import { decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 type WidgetId =
@@ -4578,11 +4657,15 @@ export default function DashboardTab({
       if (data) {
         // 2. Usamos el coordinador para desencriptar todo el arreglo
         const decryptedData = await Promise.all(
-          data.map(async (m) => ({
-            ...m,
-            cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-            nota: m.nota ? await decryptData(m.nota) : null,
-          }))
+          data.map(async (m) => {
+            const cantidadStr = await decryptData(m.cantidad)
+            const notaStr     = m.nota ? await decryptData(m.nota) : null
+            return {
+              ...m,
+              cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
+              nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+            }
+          })
         );
         setMovimientos(decryptedData);
       }
@@ -6335,9 +6418,6 @@ export function generateSalt(): string {
   return btoa(String.fromCharCode(...bytes))
 }
 
-function saltFromBase64(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-}
 
 // ─── Derivación de clave ──────────────────────────────────────────────────────
 // salt: Uint8Array generado con generateSalt() y recuperado de BD.
@@ -6467,6 +6547,9 @@ export async function isKeyValid(key: CryptoKey, tokenFromDB: string): Promise<b
 //
 // Los componentes afectados son: IngresoTab, HistorialTab, CuentasModal,
 // ImportCSVModal, DashboardTab, page.tsx — todos ya tienen funciones async.
+// Símbolo centinela que los callers usan para detectar fallos de descifrado.
+// Nunca debe llegar a la UI ni a Supabase.
+export const DECRYPT_ERROR = '__GASTOS_DECRYPT_ERROR__'
 
 export async function encryptData(text: string | number): Promise<string> {
   const key = _masterKey
@@ -6512,9 +6595,11 @@ export async function decryptData(cipherText: string | number): Promise<string> 
     )
 
     return new TextDecoder().decode(plainBuffer)
-  } catch {
-    // AES-GCM falla si el ciphertext fue manipulado → devolvemos vacío, no el cifrado
-    return ''
+} catch {
+    // AES-GCM falla si el ciphertext fue manipulado o la clave no coincide.
+    // Devolvemos el símbolo especial DECRYPT_ERROR para que el caller pueda
+    // distinguir un fallo real de un dato legítimamente vacío.
+    return DECRYPT_ERROR
   }
 }
 
@@ -6716,7 +6801,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 17
+const APP_VERSION = 19
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
@@ -6853,7 +6938,7 @@ function MainApp({ session }: { session: Session }) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
+    <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
       <header className="flex items-center justify-between px-4 pt-safe-top pb-0.5 min-h-10 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm relative z-20">
         <div className="flex items-center gap-2">
         <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-lg" />
@@ -6927,7 +7012,7 @@ function MainApp({ session }: { session: Session }) {
         {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} />}
       </main>
 
-      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1">
+      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1 pb-safe-bottom">
         <div className="flex items-end justify-around">
           {[
             { id: "ingreso",    Icon: WalletCards, label: "Registrar"  },

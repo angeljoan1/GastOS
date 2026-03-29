@@ -20,6 +20,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
   const [mensaje,      setMensaje]      = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success,      setSuccess]      = useState(false)
+  const [submitError,  setSubmitError]  = useState<string | null>(null)
 
   // Estado de arrastre del botón flotante
   const [pos,       setPos]       = useState({ x: 0, y: 0 })
@@ -40,6 +41,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         body:    JSON.stringify({ userId, tipo, mensaje }),
       })
       if (response.ok) {
+        setSubmitError(null)
         setSuccess(true)
         setTimeout(() => {
           setIsOpen(false)
@@ -47,10 +49,10 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
           setMensaje("")
         }, 3000)
       } else {
-        alert("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
+        setSubmitError("Hubo un problema al enviar el mensaje. Inténtalo de nuevo más tarde.")
       }
     } catch {
-      alert("Error de conexión al enviar el ticket.")
+      setSubmitError("Error de conexión al enviar el ticket.")
     } finally {
       setIsSubmitting(false)
     }
@@ -133,7 +135,7 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
               Buzón de Sugerencias
             </h3>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => { setIsOpen(false); setSubmitError(null) }}
               aria-label="Cerrar buzón de sugerencias"
               className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
             >
@@ -214,6 +216,12 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors resize-none"
                 />
               </div>
+
+              {submitError && (
+                <div role="alert" className="bg-red-950/50 border border-red-900/50 rounded-lg px-3 py-2 text-xs text-red-400">
+                  {submitError}
+                </div>
+              )}
 
               <button
                 type="submit"

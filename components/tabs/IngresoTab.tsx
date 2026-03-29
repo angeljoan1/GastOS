@@ -15,7 +15,7 @@ import {
 import { getIcon } from "@/lib/icons"
 import type { Categoria, Movimiento, Cuenta } from "@/types"
 import BottomSheet, { SheetTrigger } from "@/components/ui/BottomSheet"
-import { encryptData, decryptData } from "@/lib/crypto"
+import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 function triggerHaptic() {
@@ -54,44 +54,55 @@ export default function IngresoTab({
   }, [cuentas, cuentaId])
 
   useEffect(() => {
-    supabase
-      .from("movimientos")
-      .select("*")
-      .eq("is_recurring", true)
-      .order("created_at", { ascending: false })
-      .then(async ({ data }) => {
-        if (!data) return
-        const now = new Date()
-        const map = new Map<string, Movimiento>()
+    // Bug 8 FIX: user_id explícito para no depender solo de RLS.
+    // Bug 2 FIX: distinguimos DECRYPT_ERROR de dato vacío legítimo.
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-        const decrypted = await Promise.all(
-          data.map(async m => ({
+      const { data } = await supabase
+        .from("movimientos")
+        .select("*")
+        .eq("is_recurring", true)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+
+      if (!data) return
+      const now = new Date()
+      const map = new Map<string, Movimiento>()
+
+      const decrypted = await Promise.all(
+        data.map(async m => {
+          const cantidadStr = await decryptData(m.cantidad)
+          const notaStr     = m.nota ? await decryptData(m.nota) : null
+          return {
             ...m,
-            cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-            nota:     m.nota ? await decryptData(m.nota) : null,
-          }))
-        )
-
-        decrypted.forEach(m => {
-          const key = `${m.categoria}-${m.nota || ""}`
-          if (!map.has(key)) map.set(key, m)
+            cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
+            nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+          }
         })
+      )
 
-        const pending: Movimiento[] = []
-        map.forEach(sub => {
-          const ultimo    = new Date(sub.created_at)
-          const meses     = mesesDePeriod(sub.recur_period)
-          const vencimiento = new Date(
-            ultimo.getFullYear(),
-            ultimo.getMonth() + meses,
-            ultimo.getDate(),
-            12, 0, 0, 0
-          )
-          if (vencimiento <= now) pending.push(sub)
-        })
-
-        setPendingSubs(pending)
+      decrypted.forEach(m => {
+        const key = `${m.categoria}-${m.nota || ""}`
+        if (!map.has(key)) map.set(key, m)
       })
+
+      const pending: Movimiento[] = []
+      map.forEach(sub => {
+        const ultimo    = new Date(sub.created_at)
+        const meses     = mesesDePeriod(sub.recur_period)
+        const vencimiento = new Date(
+          ultimo.getFullYear(),
+          ultimo.getMonth() + meses,
+          ultimo.getDate(),
+          12, 0, 0, 0
+        )
+        if (vencimiento <= now) pending.push(sub)
+      })
+
+      setPendingSubs(pending)
+    })()
   }, [])
 
   const accent =

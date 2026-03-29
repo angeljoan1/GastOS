@@ -32,9 +32,6 @@ export function generateSalt(): string {
   return btoa(String.fromCharCode(...bytes))
 }
 
-function saltFromBase64(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-}
 
 // ─── Derivación de clave ──────────────────────────────────────────────────────
 // salt: Uint8Array generado con generateSalt() y recuperado de BD.
@@ -164,6 +161,9 @@ export async function isKeyValid(key: CryptoKey, tokenFromDB: string): Promise<b
 //
 // Los componentes afectados son: IngresoTab, HistorialTab, CuentasModal,
 // ImportCSVModal, DashboardTab, page.tsx — todos ya tienen funciones async.
+// Símbolo centinela que los callers usan para detectar fallos de descifrado.
+// Nunca debe llegar a la UI ni a Supabase.
+export const DECRYPT_ERROR = '__GASTOS_DECRYPT_ERROR__'
 
 export async function encryptData(text: string | number): Promise<string> {
   const key = _masterKey
@@ -209,9 +209,11 @@ export async function decryptData(cipherText: string | number): Promise<string> 
     )
 
     return new TextDecoder().decode(plainBuffer)
-  } catch {
-    // AES-GCM falla si el ciphertext fue manipulado → devolvemos vacío, no el cifrado
-    return ''
+} catch {
+    // AES-GCM falla si el ciphertext fue manipulado o la clave no coincide.
+    // Devolvemos el símbolo especial DECRYPT_ERROR para que el caller pueda
+    // distinguir un fallo real de un dato legítimamente vacío.
+    return DECRYPT_ERROR
   }
 }
 

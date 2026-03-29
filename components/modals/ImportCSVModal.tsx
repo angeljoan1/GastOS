@@ -125,16 +125,26 @@ export default function ImportCSVModal({
             ? cuentas.find(c => c.id === cuentaDestRaw || c.nombre.toLowerCase() === cuentaDestRaw.toLowerCase())
             : undefined
 
+          // Bug 10 FIX: resolver categoría a su id del catálogo cuando sea posible.
+          // Buscamos primero por id exacto (CSV exportado por GastOS),
+          // luego por label case-insensitive (CSV externo).
+          // Si no hay match guardamos catRaw como fallback (texto libre importado),
+          // que EditMovimientoModal ya sabe manejar como "categoría importada".
+          const catMatch =
+            categorias.find(c => c.id === catRaw) ??
+            categorias.find(c => c.label.toLowerCase() === catRaw.toLowerCase())
+          const categoriaResuelta = catMatch?.id ?? catRaw
+
           if (isNaN(cantidad) || cantidad <= 0) {
             return {
-              index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
+              index: idx + 2, fecha: fechaRaw, tipo, categoria: categoriaResuelta,
               cantidad: 0, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: "Cantidad inválida",
             }
           }
           if (!["gasto", "ingreso", "transferencia"].includes(tipo)) {
             return {
-              index: idx + 2, fecha: fechaRaw, tipo, categoria: catRaw,
+              index: idx + 2, fecha: fechaRaw, tipo, categoria: categoriaResuelta,
               cantidad, nota, cuenta_id: null, cuenta_destino_id: null, valida: false,
               error: `Tipo desconocido: "${tipo}"`,
             }
@@ -153,7 +163,7 @@ export default function ImportCSVModal({
             index: idx + 2,
             fecha: fechaISO,
             tipo,
-            categoria: catRaw,
+            categoria: categoriaResuelta,
             cantidad,
             nota,
             cuenta_id: cuenta?.id ?? null,
@@ -338,7 +348,9 @@ export default function ImportCSVModal({
                       <span className="text-zinc-300 font-medium">
                         {f.cantidad.toFixed(2)}€
                       </span>
-                      <span className="text-zinc-500 truncate">{f.categoria}</span>
+                      <span className="text-zinc-500 truncate">
+                        {categorias.find(c => c.id === f.categoria)?.label ?? f.categoria}
+                      </span>
                     </div>
                     {f.nota && (
                       <p className="text-zinc-600 truncate">{f.nota}</p>

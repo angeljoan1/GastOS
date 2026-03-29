@@ -12,7 +12,7 @@ import { X, Loader2 } from "lucide-react"
 import type { Movimiento, Categoria, Cuenta } from "@/types"
 
 export default function EditMovimientoModal({
-  isOpen, onClose, movimiento, categorias, cuentas, onSave,
+  isOpen, onClose, movimiento, categorias, cuentas, onSave, saveError,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -20,6 +20,7 @@ export default function EditMovimientoModal({
   categorias: Categoria[]
   cuentas: Cuenta[]
   onSave: (updatedMov: Movimiento) => Promise<void>
+  saveError?: string | null
 }) {
   const [cantidad, setCantidad] = useState("")
   const [categoria, setCategoria] = useState("")
@@ -207,7 +208,13 @@ export default function EditMovimientoModal({
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
+        {saveError && (
+          <div role="alert" className="mt-4 bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+            {saveError}
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-4">
           <button
             onClick={onClose}
             className="flex-1 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"

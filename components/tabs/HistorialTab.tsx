@@ -19,7 +19,7 @@ import { getIcon } from "@/lib/icons"
 import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
 import type { Categoria, Movimiento, Cuenta } from "@/types"
 import BottomSheet, { SheetTrigger, type SheetOption } from "@/components/ui/BottomSheet"
-import { encryptData, decryptData } from "@/lib/crypto"
+import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 type TipoFilter = "todos" | "gasto" | "ingreso" | "transferencia"
@@ -51,13 +51,17 @@ export default function HistorialTab({
   const [isSearching, setIsSearching] = useState(false)
   const [showCatSheet, setShowCatSheet] = useState(false)
   const [showTipoSheet, setShowTipoSheet] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
 
-  // Carga desde BD y desencripta. No filtra por nota porque está cifrada en BD.
+  // Carga desde BD y desencripta.
+  // Cuando forSearch=true carga SIN paginación para buscar en todos los movimientos.
+  // La nota está cifrada en BD, por eso no se puede filtrar server-side por texto.
   const fetchMovimientos = useCallback(async (
     pageIndex: number,
     categoryFilter: string,
     tipo: TipoFilter,
     isNew = false,
+    forSearch = false,
   ) => {
     if (isNew) setIsSearching(true)
 
@@ -71,25 +75,35 @@ export default function HistorialTab({
     else if (tipo === "ingreso") q = q.eq("tipo", "ingreso")
     else if (tipo === "transferencia") q = q.eq("tipo", "transferencia")
 
-    const from = pageIndex * 20
-    const { data, error } = await q.range(from, from + 19)
+    // Sin paginación cuando se busca por texto: necesitamos todos los movimientos
+    // para filtrar en memoria (las notas están cifradas en BD).
+    if (!forSearch) {
+      const from = pageIndex * 20
+      q = q.range(from, from + 19)
+    }
+
+    const { data, error } = await q
 
     if (error) {
       console.error("Error en la búsqueda:", error.message)
     } else if (data) {
-      // Aplicamos el coordinador
       const decryptedData = await Promise.all(
-        data.map(async (m) => ({
-          ...m,
-          cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-          nota: m.nota ? await decryptData(m.nota) : null,
-        }))
-      );
+        data.map(async (m) => {
+          const cantidadStr = await decryptData(m.cantidad)
+          const notaStr     = m.nota ? await decryptData(m.nota) : null
+          return {
+            ...m,
+            cantidad: cantidadStr === DECRYPT_ERROR ? 0 : (parseFloat(cantidadStr) || 0),
+            nota:     notaStr     === DECRYPT_ERROR ? null : notaStr,
+          }
+        })
+      )
 
       if (isNew) setMovimientos(decryptedData)
       else setMovimientos(prev => [...prev, ...decryptedData])
 
-      setHasMore(data.length === 20)
+      // hasMore no aplica en modo búsqueda completa
+      if (!forSearch) setHasMore(data.length === 20)
     }
 
     setLoading(false)
@@ -111,11 +125,18 @@ export default function HistorialTab({
     }
   }, [confirmarBorrado])
 
-  // BUG #9 FIX: resetear page cuando cambia searchTerm para que al borrar
-  // el filtro de texto no quede "en medio" de la paginación
+  // Bug 15 FIX: cuando hay texto de búsqueda, cargamos TODOS los movimientos
+  // (sin paginar) para poder filtrar en memoria, ya que las notas están cifradas
+  // en BD y no se pueden buscar server-side.
+  // Al borrar el término volvemos al fetch paginado normal.
   useEffect(() => {
     setPage(0)
-  }, [searchTerm])
+    if (searchTerm.trim()) {
+      fetchMovimientos(0, selectedCategory, tipoFilter, true, true)
+    } else {
+      fetchMovimientos(0, selectedCategory, tipoFilter, true, false)
+    }
+  }, [searchTerm, fetchMovimientos, selectedCategory, tipoFilter])
 
   // Filtrado en memoria por texto (los datos ya están desencriptados)
   const movimientosFiltrados = searchTerm.trim()
@@ -163,6 +184,7 @@ export default function HistorialTab({
   }
 
   async function handleUpdateMovimiento(updated: Movimiento) {
+    setUpdateError(null)
     const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
 
     const cantidadEncriptada = await encryptData(updated.cantidad)
@@ -177,13 +199,15 @@ export default function HistorialTab({
         tipo: updated.tipo ?? "gasto",
         created_at: updated.created_at,
         cuenta_id: updated.cuenta_id,
+        cuenta_destino_id: updated.cuenta_destino_id ?? null,
       })
       .eq("id", updated.id)
       .select()
 
     if (error) {
-      alert("Error: " + error.message)
+      setUpdateError("Error al guardar: " + error.message)
     } else if (data?.length) {
+      setUpdateError(null)
       setMovimientos(prev =>
         prev.map(m =>
           m.id === updated.id
@@ -458,13 +482,14 @@ export default function HistorialTab({
         </div>
       )}
 
-      <EditMovimientoModal
+<EditMovimientoModal
         isOpen={!!editingMov}
-        onClose={() => setEditingMov(null)}
+        onClose={() => { setEditingMov(null); setUpdateError(null) }}
         movimiento={editingMov}
         categorias={categorias}
         cuentas={cuentas}
         onSave={handleUpdateMovimiento}
+        saveError={updateError}
       />
 
       <BottomSheet

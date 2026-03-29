@@ -38,7 +38,15 @@
         aplicada en el elemento <html> por layout.tsx */
    }
 
-   @keyframes marquee {
+   .pt-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  @keyframes marquee {
     0%    { transform: translateX(0); }
     30%   { transform: translateX(0); }
     70%   { transform: translateX(calc(-100% + 70px)); }

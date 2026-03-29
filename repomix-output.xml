@@ -90,6 +90,62 @@ types/index.ts
 <files>
 This section contains the contents of the repository's files.
 
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="AGENTS.md">
+<!-- BEGIN:nextjs-agent-rules -->
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+<!-- END:nextjs-agent-rules -->
+</file>
+
+<file path="CLAUDE.md">
+@AGENTS.md
+</file>
+
 <file path="components/IntlProvider.tsx">
 "use client"
 
@@ -140,6 +196,74 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
     </NextIntlClientProvider>
   )
 }
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="lib/icons.ts">
+import {
+  UtensilsCrossed, Bus, CalendarDays, Package, Briefcase,
+  Laptop, PiggyBank, Repeat2, CircleDollarSign, Wallet,
+  Landmark, CreditCard, TrendingUp, TrendingDown, ShoppingCart,
+  Home, Dumbbell, Heart, Plane, GraduationCap, Fuel, Coffee,
+  Music, Gamepad2, Gift, Banknote, Building2, Coins,
+  ArrowLeftRight, type LucideIcon,
+} from "lucide-react"
+
+export const ICON_MAP: Record<string, LucideIcon> = {
+  UtensilsCrossed, Bus, CalendarDays, Package, Briefcase,
+  Laptop, PiggyBank, Repeat2, CircleDollarSign, Wallet,
+  Landmark, CreditCard, TrendingUp, TrendingDown, ShoppingCart,
+  Home, Dumbbell, Heart, Plane, GraduationCap, Fuel, Coffee,
+  Music, Gamepad2, Gift, Banknote, Building2, Coins, ArrowLeftRight,
+}
+
+export function getIcon(name: string): LucideIcon {
+  return ICON_MAP[name] ?? Package
+}
+
+export const CUENTA_COLORS = [
+  "#10b981", "#3b82f6", "#f59e0b", "#8b5cf6",
+  "#ef4444", "#06b6d4", "#ec4899", "#64748b",
+]
+
+export const CUENTA_ICON_OPTIONS: { name: string; label: string }[] = [
+  { name: "Landmark",   label: "Banco"     },
+  { name: "Wallet",     label: "Efectivo"  },
+  { name: "CreditCard", label: "Tarjeta"   },
+  { name: "TrendingUp", label: "Inversión" },
+  { name: "Coins",      label: "Monedas"   },
+  { name: "Banknote",   label: "Billetes"  },
+  { name: "Building2",  label: "Entidad"   },
+  { name: "Package",    label: "Otro"      },
+]
+
+export const CATEGORIA_ICON_OPTIONS: string[] = [
+  "UtensilsCrossed", "ShoppingCart", "Bus", "Home", "Dumbbell",
+  "Heart", "Plane", "GraduationCap", "Fuel", "Coffee",
+  "Music", "Gamepad2", "Gift", "CalendarDays", "Briefcase",
+  "Laptop", "PiggyBank", "Repeat2", "CircleDollarSign",
+  "Wallet", "Package",
+]
 </file>
 
 <file path="messages/ca.json">
@@ -208,12 +332,12 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
     "errorLinkExpired": "L'enllaç de recuperació ha caducat o ja s'ha usat.",
     "errorSecurityGeneric": "Error de seguretat. Torna-ho a intentar.",
     "recoveryTitle": "Recuperar accés",
-    "recoveryIntro": "Si has oblidat el PIN, podem enviar-te un enllaç a <b>{email}</b> per crear-ne un de nou.",
+    "recoveryIntro": "Si has oblidat el PIN, podem enviar-te un enllaç a <email>{email}</email> per crear-ne un de nou.",
     "recoveryWarning": "els moviments xifrats amb el teu PIN actual no es podran recuperar amb el PIN nou. Les categories i comptes es mantenen.",
     "recoveryWarningLabel": "⚠️ Important:",
     "recoverySendButton": "Enviar enllaç de recuperació",
     "recoveryBackToPin": "Tornar al PIN",
-    "recoverySuccessIntro": "T'hem enviat un enllaç a <b>{email}</b>.",
+    "recoverySuccessIntro": "T'hem enviat un enllaç a <email>{email}</email>.",
     "recoverySuccessWarning": "⚠️ En usar aquell enllaç podràs crear un PIN nou, però els moviments xifrats amb el PIN anterior ja no seran llegibles. Les dades de categories i comptes es mantenen.",
     "recoverySuccessSignOut": "Tancar sessió",
     "errorRecoveryGenerate": "Error en generar l'enllaç. Torna-ho a intentar més tard.",
@@ -662,12 +786,12 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
     "errorLinkExpired": "The recovery link has expired or was already used.",
     "errorSecurityGeneric": "Security error. Please retry.",
     "recoveryTitle": "Recover access",
-    "recoveryIntro": "If you forgot your PIN, we can send a link to <email/> to create a new one.",
+    "recoveryIntro": "If you forgot your PIN, we can send a link to <email>{email}</email> to create a new one.",
     "recoveryWarning": "movements encrypted with your current PIN cannot be recovered with the new PIN. Categories and accounts are kept.",
     "recoveryWarningLabel": "⚠️ Important:",
     "recoverySendButton": "Send recovery link",
     "recoveryBackToPin": "Back to PIN",
-    "recoverySuccessIntro": "We've sent a link to <email/>.",
+    "recoverySuccessIntro": "We've sent a link to <email>{email}</email>.",
     "recoverySuccessWarning": "⚠️ Using that link you'll be able to create a new PIN, but movements encrypted with the old PIN will no longer be readable. Category and account data is kept.",
     "recoverySuccessSignOut": "Sign out",
     "errorRecoveryGenerate": "Error generating the link. Please try again later.",
@@ -1116,12 +1240,12 @@ export default function IntlProvider({ children }: { children: ReactNode }) {
     "errorLinkExpired": "El enlace de recuperación ha caducado o ya fue usado.",
     "errorSecurityGeneric": "Error de seguridad. Reintenta.",
     "recoveryTitle": "Recuperar acceso",
-    "recoveryIntro": "Si has olvidado tu PIN, podemos enviarte un enlace a <email/> para crear uno nuevo.",
+    "recoveryIntro": "Si has olvidado tu PIN, podemos enviarte un enlace a <email>{email}</email> para crear uno nuevo.",
     "recoveryWarning": "los movimientos cifrados con tu PIN actual no podrán recuperarse con el PIN nuevo. Las categorías y cuentas sí se mantienen.",
     "recoveryWarningLabel": "⚠️ Importante:",
     "recoverySendButton": "Enviar enlace de recuperación",
     "recoveryBackToPin": "Volver al PIN",
-    "recoverySuccessIntro": "Te hemos enviado un enlace a <email/>.",
+    "recoverySuccessIntro": "Te hemos enviado un enlace a <email>{email}</email>.",
     "recoverySuccessWarning": "⚠️ Al usar ese enlace podrás crear un PIN nuevo, pero los movimientos cifrados con el PIN anterior ya no serán legibles. Los datos de categorías y cuentas se mantienen.",
     "recoverySuccessSignOut": "Cerrar sesión",
     "errorRecoveryGenerate": "Error al generar el enlace. Inténtalo más tarde.",
@@ -1519,130 +1643,6 @@ declare module "*/messages/es.json" {
   }
 </file>
 
-<file path=".gitignore">
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-</file>
-
-<file path="AGENTS.md">
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
-</file>
-
-<file path="CLAUDE.md">
-@AGENTS.md
-</file>
-
-<file path="eslint.config.mjs">
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
-
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
-
-export default eslintConfig;
-</file>
-
-<file path="lib/icons.ts">
-import {
-  UtensilsCrossed, Bus, CalendarDays, Package, Briefcase,
-  Laptop, PiggyBank, Repeat2, CircleDollarSign, Wallet,
-  Landmark, CreditCard, TrendingUp, TrendingDown, ShoppingCart,
-  Home, Dumbbell, Heart, Plane, GraduationCap, Fuel, Coffee,
-  Music, Gamepad2, Gift, Banknote, Building2, Coins,
-  ArrowLeftRight, type LucideIcon,
-} from "lucide-react"
-
-export const ICON_MAP: Record<string, LucideIcon> = {
-  UtensilsCrossed, Bus, CalendarDays, Package, Briefcase,
-  Laptop, PiggyBank, Repeat2, CircleDollarSign, Wallet,
-  Landmark, CreditCard, TrendingUp, TrendingDown, ShoppingCart,
-  Home, Dumbbell, Heart, Plane, GraduationCap, Fuel, Coffee,
-  Music, Gamepad2, Gift, Banknote, Building2, Coins, ArrowLeftRight,
-}
-
-export function getIcon(name: string): LucideIcon {
-  return ICON_MAP[name] ?? Package
-}
-
-export const CUENTA_COLORS = [
-  "#10b981", "#3b82f6", "#f59e0b", "#8b5cf6",
-  "#ef4444", "#06b6d4", "#ec4899", "#64748b",
-]
-
-export const CUENTA_ICON_OPTIONS: { name: string; label: string }[] = [
-  { name: "Landmark",   label: "Banco"     },
-  { name: "Wallet",     label: "Efectivo"  },
-  { name: "CreditCard", label: "Tarjeta"   },
-  { name: "TrendingUp", label: "Inversión" },
-  { name: "Coins",      label: "Monedas"   },
-  { name: "Banknote",   label: "Billetes"  },
-  { name: "Building2",  label: "Entidad"   },
-  { name: "Package",    label: "Otro"      },
-]
-
-export const CATEGORIA_ICON_OPTIONS: string[] = [
-  "UtensilsCrossed", "ShoppingCart", "Bus", "Home", "Dumbbell",
-  "Heart", "Plane", "GraduationCap", "Fuel", "Coffee",
-  "Music", "Gamepad2", "Gift", "CalendarDays", "Briefcase",
-  "Laptop", "PiggyBank", "Repeat2", "CircleDollarSign",
-  "Wallet", "Package",
-]
-</file>
-
 <file path="postcss.config.mjs">
 const config = {
   plugins: {
@@ -1845,6 +1845,70 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Hubo un error en el servidor" }, { status: 500 });
   }
 }
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/.well-known/assetlinks.json",
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+        ],
+      },
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            // Evita que la app se cargue en iframes (clickjacking)
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            // Evita que el navegador "adivine" el tipo de contenido
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            // No enviar la URL completa como Referer a terceros
+            // Importante para que el reset_token no aparezca en logs externos
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            // Restringe el acceso a APIs de hardware sensibles
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            // Content Security Policy:
+            // - default-src 'self': solo recursos del propio dominio
+            // - script-src: permite scripts propios + inline (Next.js los necesita) + cdnjs para recharts
+            // - connect-src: permite llamadas a Supabase y Resend
+            // - style-src: permite estilos propios e inline (Tailwind los necesita)
+            // - img-src: permite imágenes propias y data URIs
+            // Ajusta los dominios de connect-src si cambias de proveedor
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval necesario para Next.js dev; en prod puedes quitarlo
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "font-src 'self'",
+              "connect-src 'self' https://*.supabase.co https://api.resend.com",
+              "frame-ancestors 'none'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
 </file>
 
 <file path="components/auth/AuthScreen.tsx">
@@ -2697,68 +2761,89 @@ export default function EncryptionBadge() {
 }
 </file>
 
-<file path="next.config.ts">
-import type { NextConfig } from "next";
+<file path="types/index.ts">
+// types/index.ts
+// ─── Fuente Única de Verdad para todos los tipos de GastOS ───
+//
+// CONVENCIÓN DE ENCRIPTACIÓN:
+//   Los campos marcados con [E2EE] se almacenan cifrados en Supabase.
+//   En memoria (estado React) siempre viajan en claro.
+//   La capa de cifrado/descifrado vive exclusivamente en:
+//     - lib/crypto.ts  (funciones)
+//     - page.tsx       (descifrado al cargar desde BD)
+//     - modales/tabs   (cifrado al escribir en BD)
 
-const nextConfig: NextConfig = {
-  async headers() {
-    return [
-      {
-        source: "/.well-known/assetlinks.json",
-        headers: [
-          { key: "Content-Type", value: "application/json" },
-        ],
-      },
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            // Evita que la app se cargue en iframes (clickjacking)
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            // Evita que el navegador "adivine" el tipo de contenido
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            // No enviar la URL completa como Referer a terceros
-            // Importante para que el reset_token no aparezca en logs externos
-            key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
-          },
-          {
-            // Restringe el acceso a APIs de hardware sensibles
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
-          {
-            // Content Security Policy:
-            // - default-src 'self': solo recursos del propio dominio
-            // - script-src: permite scripts propios + inline (Next.js los necesita) + cdnjs para recharts
-            // - connect-src: permite llamadas a Supabase y Resend
-            // - style-src: permite estilos propios e inline (Tailwind los necesita)
-            // - img-src: permite imágenes propias y data URIs
-            // Ajusta los dominios de connect-src si cambias de proveedor
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval necesario para Next.js dev; en prod puedes quitarlo
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self'",
-              "connect-src 'self' https://*.supabase.co https://api.resend.com",
-              "frame-ancestors 'none'",
-            ].join("; "),
-          },
-        ],
-      },
-    ];
-  },
-};
+export type TipoMovimiento = 'gasto' | 'ingreso' | 'transferencia'
+export type TipoCategoria  = 'gasto' | 'ingreso' | 'ambos'
+export type TipoCuenta     = 'banco' | 'efectivo' | 'tarjeta' | 'inversion' | 'otro'
 
-export default nextConfig;
+// ─── Categoría ───────────────────────────────────────────────
+export interface Categoria {
+  id:         string
+  user_id:    string
+  label:      string        // en claro (no se cifra)
+  icono:      string
+  tipo:       TipoCategoria
+  orden:      number
+  created_at: string
+}
+
+// ─── Presupuesto mensual por categoría ───────────────────────
+export interface Presupuesto {
+  id:           string
+  user_id:      string
+  categoria_id: string
+  cantidad:     number      // [E2EE] cifrado en BD, en claro en memoria
+  created_at:   string
+}
+
+// ─── Cuenta / Cartera ────────────────────────────────────────
+// nombre y saldo_inicial se cifran en BD [E2EE]
+// En memoria siempre están en claro (page.tsx los descifra al cargar)
+export interface Cuenta {
+  id:            string
+  user_id:       string
+  nombre:        string     // [E2EE] cifrado en BD, en claro en memoria
+  tipo:          TipoCuenta
+  icono:         string
+  color:         string
+  saldo_inicial: number     // [E2EE] cifrado en BD, en claro en memoria
+  created_at:    string
+}
+
+// ─── Movimiento ──────────────────────────────────────────────
+// cantidad y nota se cifran en BD [E2EE]
+// En memoria siempre están en claro
+export interface Movimiento {
+  id:                 string
+  created_at:         string
+  cantidad:           number        // [E2EE] cifrado en BD, en claro en memoria
+  categoria:          string
+  nota?:              string | null // [E2EE] cifrado en BD, en claro en memoria
+  is_recurring?:      boolean
+  recur_period?:      'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual' | null
+  tipo?:              TipoMovimiento
+  cuenta_id?:         string | null
+  cuenta_destino_id?: string | null
+}
+
+// ─── Saldo calculado (UI only, no persiste en DB) ────────────
+export interface SaldoCuenta {
+  cuenta:       Cuenta
+  saldo_actual: number
+}
+
+// ─── Objetivo de ahorro ──────────────────────────────────────
+// cantidad se cifra en BD [E2EE]
+// En memoria siempre está en claro
+export interface Objetivo {
+  id:         string
+  user_id:    string
+  tipo:       string        // 'ahorro_mensual' por ahora
+  cantidad:   number        // [E2EE] cifrado en BD, en claro en memoria
+  created_at: string
+  updated_at: string
+}
 </file>
 
 <file path="components/auth/PinPadScreen.tsx">
@@ -3034,33 +3119,34 @@ export default function PinPadScreen({
   // ─── Recuperación via email ──────────────────────────────────────────────────
   const handleRecovery = async () => {
     setRecoveryLoading(true)
-
+    setVaultError(null)
+  
     const resetToken = crypto.randomUUID()
     const expiresAt  = new Date(Date.now() + 1000 * 60 * 30).toISOString()
-
+  
     const { error: tokenError } = await supabase
       .from("user_vault")
       .update({ reset_token: resetToken, reset_token_expires_at: expiresAt })
       .eq("user_id", session.user.id)
-
-      if (tokenError) {
-        setVaultError(t("pin.errorRecoveryGenerate"))
+  
+    if (tokenError) {
+      setVaultError(t("pin.errorRecoveryGenerate"))
       setRecoveryLoading(false)
       return
     }
-
+  
     await supabase.auth.signOut()
-
+  
     const { error } = await supabase.auth.signInWithOtp({
       email: session.user.email!,
       options: {
         emailRedirectTo: `${window.location.origin}/?reset_vault=1&reset_token=${resetToken}`,
       },
     })
-
+  
     setRecoveryLoading(false)
     if (!error) setRecoverySuccess(true)
-        else setVaultError(t("pin.errorRecoveryEmail"))
+    else setVaultError(t("pin.errorRecoveryEmail"))
   }
 
   // ─── Biometría ───────────────────────────────────────────────────────────────
@@ -3318,88 +3404,64 @@ export default function PinPadScreen({
 }
 </file>
 
-<file path="types/index.ts">
-// types/index.ts
-// ─── Fuente Única de Verdad para todos los tipos de GastOS ───
+<file path="app/manifest.ts">
+// app/manifest.ts
+// ─── Fixes en este archivo ────────────────────────────────────────────────────
+// BUG #25: El mismo archivo icon.png se declaraba tres veces con tamaños
+//          inconsistentes (192×2 y 512), y dos entradas tenían el mismo
+//          purpose="any". Android e iOS usaban el icono escalado con pérdida.
 //
-// CONVENCIÓN DE ENCRIPTACIÓN:
-//   Los campos marcados con [E2EE] se almacenan cifrados en Supabase.
-//   En memoria (estado React) siempre viajan en claro.
-//   La capa de cifrado/descifrado vive exclusivamente en:
-//     - lib/crypto.ts  (funciones)
-//     - page.tsx       (descifrado al cargar desde BD)
-//     - modales/tabs   (cifrado al escribir en BD)
+//          FIX: declaramos tres entradas semánticamente distintas:
+//            1. 192×192 any        → icono estándar para pantallas normales
+//            2. 512×512 any        → icono HD para splash screen y instalación
+//               (si tienes un icon-512.png aparte, úsalo aquí; si no, icon.png)
+//            3. 192×192 maskable   → icono adaptable para fondos de Android
+//
+//          Si solo tienes un archivo de icono, no pasa nada — el navegador
+//          escala el de 512 para el uso de 192 mejor que al revés.
+//          Lo ideal es tener icon-192.png e icon-512.png separados.
 
-export type TipoMovimiento = 'gasto' | 'ingreso' | 'transferencia'
-export type TipoCategoria  = 'gasto' | 'ingreso' | 'ambos'
-export type TipoCuenta     = 'banco' | 'efectivo' | 'tarjeta' | 'inversion' | 'otro'
+import { MetadataRoute } from "next"
 
-// ─── Categoría ───────────────────────────────────────────────
-export interface Categoria {
-  id:         string
-  user_id:    string
-  label:      string        // en claro (no se cifra)
-  icono:      string
-  tipo:       TipoCategoria
-  orden:      number
-  created_at: string
-}
-
-// ─── Presupuesto mensual por categoría ───────────────────────
-export interface Presupuesto {
-  id:           string
-  user_id:      string
-  categoria_id: string
-  cantidad:     number      // [E2EE] cifrado en BD, en claro en memoria
-  created_at:   string
-}
-
-// ─── Cuenta / Cartera ────────────────────────────────────────
-// nombre y saldo_inicial se cifran en BD [E2EE]
-// En memoria siempre están en claro (page.tsx los descifra al cargar)
-export interface Cuenta {
-  id:            string
-  user_id:       string
-  nombre:        string     // [E2EE] cifrado en BD, en claro en memoria
-  tipo:          TipoCuenta
-  icono:         string
-  color:         string
-  saldo_inicial: number     // [E2EE] cifrado en BD, en claro en memoria
-  created_at:    string
-}
-
-// ─── Movimiento ──────────────────────────────────────────────
-// cantidad y nota se cifran en BD [E2EE]
-// En memoria siempre están en claro
-export interface Movimiento {
-  id:                 string
-  created_at:         string
-  cantidad:           number        // [E2EE] cifrado en BD, en claro en memoria
-  categoria:          string
-  nota?:              string | null // [E2EE] cifrado en BD, en claro en memoria
-  is_recurring?:      boolean
-  recur_period?:      'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual' | null
-  tipo?:              TipoMovimiento
-  cuenta_id?:         string | null
-  cuenta_destino_id?: string | null
-}
-
-// ─── Saldo calculado (UI only, no persiste en DB) ────────────
-export interface SaldoCuenta {
-  cuenta:       Cuenta
-  saldo_actual: number
-}
-
-// ─── Objetivo de ahorro ──────────────────────────────────────
-// cantidad se cifra en BD [E2EE]
-// En memoria siempre está en claro
-export interface Objetivo {
-  id:         string
-  user_id:    string
-  tipo:       string        // 'ahorro_mensual' por ahora
-  cantidad:   number        // [E2EE] cifrado en BD, en claro en memoria
-  created_at: string
-  updated_at: string
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name:             "GastOS - Tu dinero, bajo control",
+    short_name:       "GastOS",
+    description:      "Registro personal y seguro para el control diario de tus finanzas.",
+    start_url:        "/",
+    display:          "standalone",
+    orientation:      "portrait",
+    background_color: "#09090b",
+    theme_color:      "#09090b",
+    lang:             "es",
+    id:               "/",
+    scope:            "/",
+    icons: [
+      {
+        // Icono estándar para uso general (launcher, notificaciones)
+        src:     "/icon.png",
+        sizes:   "192x192",
+        type:    "image/png",
+        purpose: "any",
+      },
+      {
+        // Icono de alta resolución para splash screen e instalación PWA
+        // Si tienes un icon-512.png de mayor resolución, cámbialo aquí
+        src:     "/icon.png",
+        sizes:   "512x512",
+        type:    "image/png",
+        purpose: "any",
+      },
+      {
+        // Icono maskable: Android lo recorta con máscara circular/redondeada.
+        // El contenido importante debe estar en el 80% central del icono.
+        src:     "/icon.png",
+        sizes:   "192x192",
+        type:    "image/png",
+        purpose: "maskable",
+      },
+    ],
+  }
 }
 </file>
 
@@ -4002,6 +4064,67 @@ export default function ImportCSVModal({
 }
 </file>
 
+<file path="app/globals.css">
+/* app/globals.css */
+/* ─── Fixes en este archivo ──────────────────────────────────────────────────
+   BUG #24: globals.css declaraba font-family: Arial en body, compitiendo con
+            la variable CSS de Geist Sans que layout.tsx aplica en <html>.
+            Aunque Geist ganaba en la práctica por especificidad, la declaración
+            de Arial era confusa y podía causar flash of unstyled text en SSR.
+            FIX: eliminamos la declaración de font-family en body y dejamos que
+            la herencia desde <html> (donde layout.tsx aplica --font-geist-sans)
+            actúe de forma limpia.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+   @import "tailwindcss";
+
+   :root {
+     --background: #ffffff;
+     --foreground: #171717;
+   }
+   
+   @theme inline {
+     --color-background: var(--background);
+     --color-foreground: var(--foreground);
+     --font-sans: var(--font-geist-sans);
+     --font-mono: var(--font-geist-mono);
+   }
+   
+   @media (prefers-color-scheme: dark) {
+     :root {
+       --background: #0a0a0a;
+       --foreground: #ededed;
+     }
+   }
+   
+   html, body {
+    background: #09090b;
+    color:      var(--foreground);
+  }
+
+  @media (display-mode: standalone) {
+    html, body {
+      overscroll-behavior: none;
+    }
+  }
+
+  @layer utilities {
+   .pt-safe-top {
+     padding-top: env(safe-area-inset-top);
+   }
+   .pb-safe-bottom {
+     padding-bottom: env(safe-area-inset-bottom);
+   }
+ }
+  
+  @keyframes marquee {
+    0%    { transform: translateX(0); }
+    30%   { transform: translateX(0); }
+    70%   { transform: translateX(calc(-100% + 70px)); }
+    100%  { transform: translateX(calc(-100% + 70px)); }
+  }
+</file>
+
 <file path="app/layout.tsx">
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -4046,67 +4169,6 @@ export default function RootLayout({
       </body>
     </html>
   );
-}
-</file>
-
-<file path="app/manifest.ts">
-// app/manifest.ts
-// ─── Fixes en este archivo ────────────────────────────────────────────────────
-// BUG #25: El mismo archivo icon.png se declaraba tres veces con tamaños
-//          inconsistentes (192×2 y 512), y dos entradas tenían el mismo
-//          purpose="any". Android e iOS usaban el icono escalado con pérdida.
-//
-//          FIX: declaramos tres entradas semánticamente distintas:
-//            1. 192×192 any        → icono estándar para pantallas normales
-//            2. 512×512 any        → icono HD para splash screen y instalación
-//               (si tienes un icon-512.png aparte, úsalo aquí; si no, icon.png)
-//            3. 192×192 maskable   → icono adaptable para fondos de Android
-//
-//          Si solo tienes un archivo de icono, no pasa nada — el navegador
-//          escala el de 512 para el uso de 192 mejor que al revés.
-//          Lo ideal es tener icon-192.png e icon-512.png separados.
-
-import { MetadataRoute } from "next"
-
-export default function manifest(): MetadataRoute.Manifest {
-  return {
-    name:             "GastOS - Tu dinero, bajo control",
-    short_name:       "GastOS",
-    description:      "Registro personal y seguro para el control diario de tus finanzas.",
-    start_url:        "/",
-    display:          "standalone",
-    orientation:      "portrait",
-    background_color: "#09090b",
-    theme_color:      "#09090b",
-    lang:             "es",
-    id:               "/",
-    scope:            "/",
-    icons: [
-      {
-        // Icono estándar para uso general (launcher, notificaciones)
-        src:     "/icon.png",
-        sizes:   "192x192",
-        type:    "image/png",
-        purpose: "any",
-      },
-      {
-        // Icono de alta resolución para splash screen e instalación PWA
-        // Si tienes un icon-512.png de mayor resolución, cámbialo aquí
-        src:     "/icon.png",
-        sizes:   "512x512",
-        type:    "image/png",
-        purpose: "any",
-      },
-      {
-        // Icono maskable: Android lo recorta con máscara circular/redondeada.
-        // El contenido importante debe estar en el 80% central del icono.
-        src:     "/icon.png",
-        sizes:   "192x192",
-        type:    "image/png",
-        purpose: "maskable",
-      },
-    ],
-  }
 }
 </file>
 
@@ -4381,67 +4443,6 @@ export default function EditMovimientoModal({
     "typescript": "^5"
   }
 }
-</file>
-
-<file path="app/globals.css">
-/* app/globals.css */
-/* ─── Fixes en este archivo ──────────────────────────────────────────────────
-   BUG #24: globals.css declaraba font-family: Arial en body, compitiendo con
-            la variable CSS de Geist Sans que layout.tsx aplica en <html>.
-            Aunque Geist ganaba en la práctica por especificidad, la declaración
-            de Arial era confusa y podía causar flash of unstyled text en SSR.
-            FIX: eliminamos la declaración de font-family en body y dejamos que
-            la herencia desde <html> (donde layout.tsx aplica --font-geist-sans)
-            actúe de forma limpia.
-   ──────────────────────────────────────────────────────────────────────────── */
-
-   @import "tailwindcss";
-
-   :root {
-     --background: #ffffff;
-     --foreground: #171717;
-   }
-   
-   @theme inline {
-     --color-background: var(--background);
-     --color-foreground: var(--foreground);
-     --font-sans: var(--font-geist-sans);
-     --font-mono: var(--font-geist-mono);
-   }
-   
-   @media (prefers-color-scheme: dark) {
-     :root {
-       --background: #0a0a0a;
-       --foreground: #ededed;
-     }
-   }
-   
-   html, body {
-    background: #09090b;
-    color:      var(--foreground);
-  }
-
-  @media (display-mode: standalone) {
-    html, body {
-      overscroll-behavior: none;
-    }
-  }
-
-  @layer utilities {
-   .pt-safe-top {
-     padding-top: env(safe-area-inset-top);
-   }
-   .pb-safe-bottom {
-     padding-bottom: env(safe-area-inset-bottom);
-   }
- }
-  
-  @keyframes marquee {
-    0%    { transform: translateX(0); }
-    30%   { transform: translateX(0); }
-    70%   { transform: translateX(calc(-100% + 70px)); }
-    100%  { transform: translateX(calc(-100% + 70px)); }
-  }
 </file>
 
 <file path="components/FeedbackWidget.tsx">
@@ -5945,30 +5946,30 @@ type WidgetId =
   | "objetivo_ahorro" | "comparativa_mes" | "dia_mas_caro"
   | "gasto_dia_semana" | "distribucion_ingreso" | "racha_ahorro"
 
-  interface WidgetMeta { id: WidgetId; label: string; descripcion: string; Icon: React.ElementType }
+interface WidgetMeta { id: WidgetId; label: string; descripcion: string; Icon: React.ElementType }
 
-  function getWidgetCatalog(t: ReturnType<typeof useTranslations>): WidgetMeta[] {
-    return [
-      { id: "resumen_mes",           label: t("dashboard.widgetResumenLabel"),      descripcion: t("dashboard.widgetResumenDesc"),      Icon: Wallet       },
-      { id: "saldo_cuentas",         label: t("dashboard.widgetSaldoLabel"),        descripcion: t("dashboard.widgetSaldoDesc"),        Icon: TrendingUp   },
-      { id: "proyeccion_mes",        label: t("dashboard.widgetProyeccionLabel"),   descripcion: t("dashboard.widgetProyeccionDesc"),   Icon: TrendingDown },
-      { id: "media_diaria",          label: t("dashboard.widgetMediaLabel"),        descripcion: t("dashboard.widgetMediaDesc"),        Icon: TrendingDown },
-      { id: "ratio_ahorro",          label: t("dashboard.widgetRatioLabel"),        descripcion: t("dashboard.widgetRatioDesc"),        Icon: TrendingUp   },
-      { id: "presupuestos_categoria",label: t("dashboard.widgetPresupuestosLabel"), descripcion: t("dashboard.widgetPresupuestosDesc"), Icon: Target       },
-      { id: "mapa_calor",            label: t("dashboard.widgetMapaLabel"),         descripcion: t("dashboard.widgetMapaDesc"),         Icon: Flame        },
-      { id: "donut_categorias",      label: t("dashboard.widgetDonutLabel"),        descripcion: t("dashboard.widgetDonutDesc"),        Icon: Package      },
-      { id: "barras_6meses",         label: t("dashboard.widgetBarrasLabel"),       descripcion: t("dashboard.widgetBarrasDesc"),       Icon: TrendingDown },
-      { id: "linea_gastos",          label: t("dashboard.widgetLineaLabel"),        descripcion: t("dashboard.widgetLineaDesc"),        Icon: TrendingDown },
-      { id: "area_balance",          label: t("dashboard.widgetAreaLabel"),         descripcion: t("dashboard.widgetAreaDesc"),         Icon: ArrowLeftRight},
-      { id: "top_categorias",        label: t("dashboard.widgetTopLabel"),          descripcion: t("dashboard.widgetTopDesc"),          Icon: Package      },
-      { id: "objetivo_ahorro",       label: t("dashboard.widgetObjetivoLabel"),     descripcion: t("dashboard.widgetObjetivoDesc"),     Icon: PiggyBank    },
-      { id: "comparativa_mes",       label: t("dashboard.widgetComparativaLabel"),  descripcion: t("dashboard.widgetComparativaDesc"),  Icon: BarChart2    },
-      { id: "dia_mas_caro",          label: t("dashboard.widgetDiaMasCaroLabel"),   descripcion: t("dashboard.widgetDiaMasCaroDesc"),   Icon: CalendarDays },
-      { id: "gasto_dia_semana",      label: t("dashboard.widgetGastoDiaLabel"),     descripcion: t("dashboard.widgetGastoDiaDesc"),     Icon: BarChart2    },
-      { id: "distribucion_ingreso",  label: t("dashboard.widgetDistribucionLabel"), descripcion: t("dashboard.widgetDistribucionDesc"), Icon: Wallet       },
-      { id: "racha_ahorro",          label: t("dashboard.widgetRachaLabel"),        descripcion: t("dashboard.widgetRachaDesc"),        Icon: Flame        },
-    ]
-  }
+function getWidgetCatalog(t: ReturnType<typeof useTranslations>): WidgetMeta[] {
+  return [
+    { id: "resumen_mes", label: t("dashboard.widgetResumenLabel"), descripcion: t("dashboard.widgetResumenDesc"), Icon: Wallet },
+    { id: "saldo_cuentas", label: t("dashboard.widgetSaldoLabel"), descripcion: t("dashboard.widgetSaldoDesc"), Icon: TrendingUp },
+    { id: "proyeccion_mes", label: t("dashboard.widgetProyeccionLabel"), descripcion: t("dashboard.widgetProyeccionDesc"), Icon: TrendingDown },
+    { id: "media_diaria", label: t("dashboard.widgetMediaLabel"), descripcion: t("dashboard.widgetMediaDesc"), Icon: TrendingDown },
+    { id: "ratio_ahorro", label: t("dashboard.widgetRatioLabel"), descripcion: t("dashboard.widgetRatioDesc"), Icon: TrendingUp },
+    { id: "presupuestos_categoria", label: t("dashboard.widgetPresupuestosLabel"), descripcion: t("dashboard.widgetPresupuestosDesc"), Icon: Target },
+    { id: "mapa_calor", label: t("dashboard.widgetMapaLabel"), descripcion: t("dashboard.widgetMapaDesc"), Icon: Flame },
+    { id: "donut_categorias", label: t("dashboard.widgetDonutLabel"), descripcion: t("dashboard.widgetDonutDesc"), Icon: Package },
+    { id: "barras_6meses", label: t("dashboard.widgetBarrasLabel"), descripcion: t("dashboard.widgetBarrasDesc"), Icon: TrendingDown },
+    { id: "linea_gastos", label: t("dashboard.widgetLineaLabel"), descripcion: t("dashboard.widgetLineaDesc"), Icon: TrendingDown },
+    { id: "area_balance", label: t("dashboard.widgetAreaLabel"), descripcion: t("dashboard.widgetAreaDesc"), Icon: ArrowLeftRight },
+    { id: "top_categorias", label: t("dashboard.widgetTopLabel"), descripcion: t("dashboard.widgetTopDesc"), Icon: Package },
+    { id: "objetivo_ahorro", label: t("dashboard.widgetObjetivoLabel"), descripcion: t("dashboard.widgetObjetivoDesc"), Icon: PiggyBank },
+    { id: "comparativa_mes", label: t("dashboard.widgetComparativaLabel"), descripcion: t("dashboard.widgetComparativaDesc"), Icon: BarChart2 },
+    { id: "dia_mas_caro", label: t("dashboard.widgetDiaMasCaroLabel"), descripcion: t("dashboard.widgetDiaMasCaroDesc"), Icon: CalendarDays },
+    { id: "gasto_dia_semana", label: t("dashboard.widgetGastoDiaLabel"), descripcion: t("dashboard.widgetGastoDiaDesc"), Icon: BarChart2 },
+    { id: "distribucion_ingreso", label: t("dashboard.widgetDistribucionLabel"), descripcion: t("dashboard.widgetDistribucionDesc"), Icon: Wallet },
+    { id: "racha_ahorro", label: t("dashboard.widgetRachaLabel"), descripcion: t("dashboard.widgetRachaDesc"), Icon: Flame },
+  ]
+}
 
 const DEFAULT_WIDGETS: WidgetId[] = [
   "resumen_mes", "saldo_cuentas", "proyeccion_mes",
@@ -6105,11 +6106,11 @@ export default function DashboardTab({
         const decryptedData = await Promise.all(
           data.map(async (m) => {
             const cantidadStr = await decryptData(m.cantidad)
-            const notaStr     = m.nota ? await decryptData(m.nota) : null
+            const notaStr = m.nota ? await decryptData(m.nota) : null
             return {
               ...m,
               cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
-              nota:     notaStr     === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
+              nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
             }
           })
         );
@@ -6150,198 +6151,198 @@ export default function DashboardTab({
       const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
       return localD.getUTCMonth() === sm && localD.getUTCFullYear() === sy
     })
-  const monthGastos = monthMovs.filter(m => (m.tipo ?? "gasto") === "gasto")
-  const monthIngresos = monthMovs.filter(m => m.tipo === "ingreso")
-  const totalGastos = monthGastos.reduce((a, m) => a + m.cantidad, 0)
-  const totalIngresos = monthIngresos.reduce((a, m) => a + m.cantidad, 0)
-  const balanceNeto = totalIngresos - totalGastos
+    const monthGastos = monthMovs.filter(m => (m.tipo ?? "gasto") === "gasto")
+    const monthIngresos = monthMovs.filter(m => m.tipo === "ingreso")
+    const totalGastos = monthGastos.reduce((a, m) => a + m.cantidad, 0)
+    const totalIngresos = monthIngresos.reduce((a, m) => a + m.cantidad, 0)
+    const balanceNeto = totalIngresos - totalGastos
 
-  const saldos: SaldoCuenta[] = cuentas.map(c => ({
-    cuenta: c,
-    saldo_actual: calcularSaldoCuenta(c, movimientos),
-  }))
-  const patrimonioTotal = saldos.reduce((a, s) => a + s.saldo_actual, 0)
+    const saldos: SaldoCuenta[] = cuentas.map(c => ({
+      cuenta: c,
+      saldo_actual: calcularSaldoCuenta(c, movimientos),
+    }))
+    const patrimonioTotal = saldos.reduce((a, s) => a + s.saldo_actual, 0)
 
-  const categoryTotals = monthGastos.reduce((acc, m) => {
-    // Normalizar: si categoria es un ID conocido úsalo, si no buscar por label
-    const catById = categorias.find(c => c.id === m.categoria)
-    const catByLabel = categorias.find(c => c.label.toLowerCase() === m.categoria?.toLowerCase())
-    const key = catById?.id ?? catByLabel?.id ?? m.categoria
-    acc[key] = (acc[key] || 0) + m.cantidad
-    return acc
-  }, {} as Record<string, number>)
+    const categoryTotals = monthGastos.reduce((acc, m) => {
+      // Normalizar: si categoria es un ID conocido úsalo, si no buscar por label
+      const catById = categorias.find(c => c.id === m.categoria)
+      const catByLabel = categorias.find(c => c.label.toLowerCase() === m.categoria?.toLowerCase())
+      const key = catById?.id ?? catByLabel?.id ?? m.categoria
+      acc[key] = (acc[key] || 0) + m.cantidad
+      return acc
+    }, {} as Record<string, number>)
 
-  const pieData = Object.entries(categoryTotals)
-    .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
-    .sort((a, b) => b.value - a.value)
+    const pieData = Object.entries(categoryTotals)
+      .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+      .sort((a, b) => b.value - a.value)
 
-  const last12Months = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(sy, sm - (11 - i), 1)
-    const movs = movimientos.filter(m => {
-      const md = new Date(m.created_at)
-      const localMd = new Date(md.getTime() - md.getTimezoneOffset() * 60000)
-      return localMd.getUTCMonth() === d.getMonth() && localMd.getUTCFullYear() === d.getFullYear()
+    const last12Months = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(sy, sm - (11 - i), 1)
+      const movs = movimientos.filter(m => {
+        const md = new Date(m.created_at)
+        const localMd = new Date(md.getTime() - md.getTimezoneOffset() * 60000)
+        return localMd.getUTCMonth() === d.getMonth() && localMd.getUTCFullYear() === d.getFullYear()
+      })
+      const label = d.toLocaleDateString(locale, { month: "short" })
+      const g = Math.round(movs.filter(m => (m.tipo ?? "gasto") === "gasto").reduce((a, m) => a + m.cantidad, 0) * 100) / 100
+      const ing = Math.round(movs.filter(m => m.tipo === "ingreso").reduce((a, m) => a + m.cantidad, 0) * 100) / 100
+      return {
+        month: label.charAt(0).toUpperCase() + label.slice(1),
+        gastos: g,
+        ingresos: ing,
+        balance: Math.round((ing - g) * 100) / 100,
+      }
     })
-    const label = d.toLocaleDateString(locale, { month: "short" })
-    const g = Math.round(movs.filter(m => (m.tipo ?? "gasto") === "gasto").reduce((a, m) => a + m.cantidad, 0) * 100) / 100
-    const ing = Math.round(movs.filter(m => m.tipo === "ingreso").reduce((a, m) => a + m.cantidad, 0) * 100) / 100
-    return {
-      month: label.charAt(0).toUpperCase() + label.slice(1),
-      gastos: g,
-      ingresos: ing,
-      balance: Math.round((ing - g) * 100) / 100,
-    }
-  })
 
-  const last6Months = last12Months.slice(6)
-  const topCategorias = pieData.slice(0, 5)
-  const maxTopVal = topCategorias[0]?.value ?? 1
-  const diasEnMes = new Date(sy, sm + 1, 0).getDate()
-  const esMesActual = sm === hoy.getMonth() && sy === hoy.getFullYear()
-  const diaActual = esMesActual ? hoy.getDate() : diasEnMes
-  const diasRestantes = diasEnMes - diaActual
-  const gastoDiario = diaActual > 0 ? totalGastos / diaActual : 0
-  const gastoProyectado = Math.round(gastoDiario * diasEnMes * 100) / 100
-  const ahorroProyectado = Math.round((totalIngresos - gastoProyectado) * 100) / 100
-  const pctMes = Math.round((diaActual / diasEnMes) * 100)
+    const last6Months = last12Months.slice(6)
+    const topCategorias = pieData.slice(0, 5)
+    const maxTopVal = topCategorias[0]?.value ?? 1
+    const diasEnMes = new Date(sy, sm + 1, 0).getDate()
+    const esMesActual = sm === hoy.getMonth() && sy === hoy.getFullYear()
+    const diaActual = esMesActual ? hoy.getDate() : diasEnMes
+    const diasRestantes = diasEnMes - diaActual
+    const gastoDiario = diaActual > 0 ? totalGastos / diaActual : 0
+    const gastoProyectado = Math.round(gastoDiario * diasEnMes * 100) / 100
+    const ahorroProyectado = Math.round((totalIngresos - gastoProyectado) * 100) / 100
+    const pctMes = Math.round((diaActual / diasEnMes) * 100)
 
-  const mesAntDate = new Date(sy, sm - 1, 1)
-  const mesAntMovs = movimientos.filter(m => {
-    const d = new Date(m.created_at)
-    const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    return localD.getUTCMonth() === mesAntDate.getMonth() && localD.getUTCFullYear() === mesAntDate.getFullYear()
-  })
-  const totalGastosMesAnt = mesAntMovs.filter(m => (m.tipo ?? "gasto") === "gasto").reduce((a, m) => a + m.cantidad, 0)
-  const diasMesAnt = new Date(sy, sm, 0).getDate()
-  const mediaDiariaAnt = diasMesAnt > 0 ? totalGastosMesAnt / diasMesAnt : 0
-  const diffMedia = gastoDiario - mediaDiariaAnt
-  const diffPct = mediaDiariaAnt > 0 ? Math.round((diffMedia / mediaDiariaAnt) * 100) : 0
+    const mesAntDate = new Date(sy, sm - 1, 1)
+    const mesAntMovs = movimientos.filter(m => {
+      const d = new Date(m.created_at)
+      const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      return localD.getUTCMonth() === mesAntDate.getMonth() && localD.getUTCFullYear() === mesAntDate.getFullYear()
+    })
+    const totalGastosMesAnt = mesAntMovs.filter(m => (m.tipo ?? "gasto") === "gasto").reduce((a, m) => a + m.cantidad, 0)
+    const diasMesAnt = new Date(sy, sm, 0).getDate()
+    const mediaDiariaAnt = diasMesAnt > 0 ? totalGastosMesAnt / diasMesAnt : 0
+    const diffMedia = gastoDiario - mediaDiariaAnt
+    const diffPct = mediaDiariaAnt > 0 ? Math.round((diffMedia / mediaDiariaAnt) * 100) : 0
 
-  const ratioAhorro = totalIngresos > 0
-    ? Math.round(((totalIngresos - totalGastos) / totalIngresos) * 100)
-    : null
-  const ratioColor = ratioAhorro === null
-    ? "text-zinc-500"
-    : ratioAhorro >= 20 ? "text-emerald-400"
-      : ratioAhorro >= 5 ? "text-yellow-400"
-        : "text-red-400"
-  const ratioLabel = "COMPUTED_BELOW"
+    const ratioAhorro = totalIngresos > 0
+      ? Math.round(((totalIngresos - totalGastos) / totalIngresos) * 100)
+      : null
+    const ratioColor = ratioAhorro === null
+      ? "text-zinc-500"
+      : ratioAhorro >= 20 ? "text-emerald-400"
+        : ratioAhorro >= 5 ? "text-yellow-400"
+          : "text-red-400"
+    const ratioLabel = "COMPUTED_BELOW"
 
-  const gastoPorDia: Record<number, number> = {}
-  monthGastos.forEach(m => {
-    const d = new Date(m.created_at)
-    const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    const dia = localD.getUTCDate()
-    gastoPorDia[dia] = (gastoPorDia[dia] ?? 0) + m.cantidad
-  })
-  const maxGastoDia = Math.max(...Object.values(gastoPorDia), 0.01)
+    const gastoPorDia: Record<number, number> = {}
+    monthGastos.forEach(m => {
+      const d = new Date(m.created_at)
+      const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      const dia = localD.getUTCDate()
+      gastoPorDia[dia] = (gastoPorDia[dia] ?? 0) + m.cantidad
+    })
+    const maxGastoDia = Math.max(...Object.values(gastoPorDia), 0.01)
 
-  const primerDiaSemana = new Date(sy, sm, 1).getDay()
-  const offsetLunes = primerDiaSemana === 0 ? 6 : primerDiaSemana - 1
-  const diasGrid: (number | null)[] = [
-    ...Array.from({ length: offsetLunes }, () => null),
-    ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
-  ]
+    const primerDiaSemana = new Date(sy, sm, 1).getDay()
+    const offsetLunes = primerDiaSemana === 0 ? 6 : primerDiaSemana - 1
+    const diasGrid: (number | null)[] = [
+      ...Array.from({ length: offsetLunes }, () => null),
+      ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
+    ]
 
-  // ── Cálculos widgets nuevos ───────────────────────────────────────────────
-  const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
-  const pctObjetivo = objetivoAhorro
-    ? Math.min(Math.round((balanceNeto / objetivoAhorro.cantidad) * 100), 100)
-    : null
+    // ── Cálculos widgets nuevos ───────────────────────────────────────────────
+    const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
+    const pctObjetivo = objetivoAhorro
+      ? Math.min(Math.round((balanceNeto / objetivoAhorro.cantidad) * 100), 100)
+      : null
 
-  const gastoPrevMes = totalGastosMesAnt
-  const ingPrevMes = mesAntMovs.filter(m => m.tipo === "ingreso").reduce((a, m) => a + m.cantidad, 0)
-  const diffGastoMes = totalGastos - gastoPrevMes
-  const diffIngMes = totalIngresos - ingPrevMes
+    const gastoPrevMes = totalGastosMesAnt
+    const ingPrevMes = mesAntMovs.filter(m => m.tipo === "ingreso").reduce((a, m) => a + m.cantidad, 0)
+    const diffGastoMes = totalGastos - gastoPrevMes
+    const diffIngMes = totalIngresos - ingPrevMes
 
-  const diaMasCaro = Object.entries(gastoPorDia)
-    .sort(([, a], [, b]) => b - a)[0]
+    const diaMasCaro = Object.entries(gastoPorDia)
+      .sort(([, a], [, b]) => b - a)[0]
 
     const NOMBRES_DIA = t("dashboard.nombresDia").split(",")
-  const gastoPorDiaSemana: Record<number, number> = {}
-  monthGastos.forEach(m => {
-    const d = new Date(m.created_at)
-    const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    const dow = localD.getUTCDay()
-    gastoPorDiaSemana[dow] = (gastoPorDiaSemana[dow] ?? 0) + m.cantidad
-  })
-  const maxGastoDow = Math.max(...Object.values(gastoPorDiaSemana), 0.01)
-  const dowData = [1, 2, 3, 4, 5, 6, 0].map(dow => ({
-    dia: NOMBRES_DIA[dow],
-    gasto: Math.round((gastoPorDiaSemana[dow] ?? 0) * 100) / 100,
-  }))
+    const gastoPorDiaSemana: Record<number, number> = {}
+    monthGastos.forEach(m => {
+      const d = new Date(m.created_at)
+      const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      const dow = localD.getUTCDay()
+      gastoPorDiaSemana[dow] = (gastoPorDiaSemana[dow] ?? 0) + m.cantidad
+    })
+    const maxGastoDow = Math.max(...Object.values(gastoPorDiaSemana), 0.01)
+    const dowData = [1, 2, 3, 4, 5, 6, 0].map(dow => ({
+      dia: NOMBRES_DIA[dow],
+      gasto: Math.round((gastoPorDiaSemana[dow] ?? 0) * 100) / 100,
+    }))
 
-  const distribucionPct = totalIngresos > 0
-    ? Math.round((totalGastos / totalIngresos) * 100)
-    : null
+    const distribucionPct = totalIngresos > 0
+      ? Math.round((totalGastos / totalIngresos) * 100)
+      : null
 
-  const rachaMaxDias = esMesActual ? hoy.getDate() : diasEnMes
-  let rachaDias = 0
-  let rachaTopCat = ""
-  if (topCategorias.length > 0) {
-    rachaTopCat = topCategorias[0].name
-    for (let d = rachaMaxDias; d >= 1; d--) {
-      if (gastoPorDia[d] === undefined) {
-        rachaDias++
-      } else {
-        break
+    const rachaMaxDias = esMesActual ? hoy.getDate() : diasEnMes
+    let rachaDias = 0
+    let rachaTopCat = ""
+    if (topCategorias.length > 0) {
+      rachaTopCat = topCategorias[0].name
+      for (let d = rachaMaxDias; d >= 1; d--) {
+        if (gastoPorDia[d] === undefined) {
+          rachaDias++
+        } else {
+          break
+        }
       }
     }
-  }
 
-  const presupuestosConGasto = presupuestos
-    .map(p => {
-      const gastado = categoryTotals[p.categoria_id] ?? 0
-      const pct = Math.min((gastado / p.cantidad) * 100, 100)
-      const cat = categorias.find(c => c.id === p.categoria_id)
-      return { ...p, gastado, pct, cat }
-    })
-    .filter(p => p.cat)
+    const presupuestosConGasto = presupuestos
+      .map(p => {
+        const gastado = categoryTotals[p.categoria_id] ?? 0
+        const pct = Math.min((gastado / p.cantidad) * 100, 100)
+        const cat = categorias.find(c => c.id === p.categoria_id)
+        return { ...p, gastado, pct, cat }
+      })
+      .filter(p => p.cat)
 
     const monthLabel = selectedDate.toLocaleDateString(locale, { month: "long", year: "numeric" })
     const DIAS_SEMANA = t("dashboard.diasSemana").split(",")
 
-  return {
-    monthMovs, monthGastos, monthIngresos,
-    totalGastos, totalIngresos, balanceNeto,
-    saldos, patrimonioTotal,
-    categoryTotals, pieData, topCategorias, maxTopVal,
-    last12Months, last6Months,
-    diasEnMes, esMesActual, diaActual, diasRestantes,
-    gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
-    mesAntMovs, totalGastosMesAnt, mediaDiariaAnt, diffMedia, diffPct,
-    ratioAhorro, ratioColor,
-    gastoPorDia, maxGastoDia, primerDiaSemana, offsetLunes, diasGrid,
-    objetivoAhorro, pctObjetivo,
-    gastoPrevMes, ingPrevMes, diffGastoMes, diffIngMes,
-    diaMasCaro, gastoPorDiaSemana, maxGastoDow, dowData,
-    distribucionPct, rachaDias, rachaTopCat,
-    presupuestosConGasto,
-    monthLabel, DIAS_SEMANA, NOMBRES_DIA,
-  }
-}, [movimientos, selectedDate, cuentas, categorias, presupuestos, objetivos])
+    return {
+      monthMovs, monthGastos, monthIngresos,
+      totalGastos, totalIngresos, balanceNeto,
+      saldos, patrimonioTotal,
+      categoryTotals, pieData, topCategorias, maxTopVal,
+      last12Months, last6Months,
+      diasEnMes, esMesActual, diaActual, diasRestantes,
+      gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
+      mesAntMovs, totalGastosMesAnt, mediaDiariaAnt, diffMedia, diffPct,
+      ratioAhorro, ratioColor,
+      gastoPorDia, maxGastoDia, primerDiaSemana, offsetLunes, diasGrid,
+      objetivoAhorro, pctObjetivo,
+      gastoPrevMes, ingPrevMes, diffGastoMes, diffIngMes,
+      diaMasCaro, gastoPorDiaSemana, maxGastoDow, dowData,
+      distribucionPct, rachaDias, rachaTopCat,
+      presupuestosConGasto,
+      monthLabel, DIAS_SEMANA, NOMBRES_DIA,
+    }
+  }, [movimientos, selectedDate, cuentas, categorias, presupuestos, objetivos])
 
-const ratioLabel = ratioAhorro === null
+  const ratioLabel = ratioAhorro === null
     ? t("dashboard.ratioNoIncome") // añade esta clave a los JSON → "Sin ingresos registrados"
     : ratioAhorro >= 20 ? t("dashboard.ratioExcellent")
       : ratioAhorro >= 5 ? t("dashboard.ratioModerate")
         : ratioAhorro >= 0 ? t("dashboard.ratioLow")
           : t("dashboard.ratioNegative")
 
-          if (loading) return (
-            <div className="flex-1 flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
-            </div>
-          )
-          
-          const encryptedBanner = hasEncryptedMovs ? (
-            <div className="mx-4 mb-2 flex items-center gap-2 bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-2.5">
-              <span className="text-sm">🔒</span>
-              <p className="text-xs text-yellow-400/90">{t("common.encryptedBanner")}</p>
-            </div>
-          ) : null
+  if (loading) return (
+    <div className="flex-1 flex items-center justify-center py-20">
+      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+    </div>
+  )
 
-// ── Definición de widgets ─────────────────────────────────────────────────
+  const encryptedBanner = hasEncryptedMovs ? (
+    <div className="mx-4 mb-2 flex items-center gap-2 bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-2.5">
+      <span className="text-sm">🔒</span>
+      <p className="text-xs text-yellow-400/90">{t("common.encryptedBanner")}</p>
+    </div>
+  ) : null
+
+  // ── Definición de widgets ─────────────────────────────────────────────────
   const widgets: Partial<Record<WidgetId, React.ReactNode>> = {
 
     resumen_mes: (
@@ -6387,7 +6388,7 @@ const ratioLabel = ratioAhorro === null
       <WidgetCard key="saldo_cuentas">
         <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionSaldoCuenta")}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionSaldoCuenta")}</p>
             <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
           </div>
           <div className="space-y-3">
@@ -6411,7 +6412,7 @@ const ratioLabel = ratioAhorro === null
               )
             })}
             <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionPatrimonio")}</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionPatrimonio")}</p>
               <HidableAmount
                 value={Math.abs(patrimonioTotal)}
                 prefix={patrimonioTotal < 0 ? "-" : ""}
@@ -6427,7 +6428,7 @@ const ratioLabel = ratioAhorro === null
       <WidgetCard key="proyeccion_mes">
         <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionProyeccion")}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionProyeccion")}</p>
             <div className="flex items-center gap-2">
               <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
               <span className="text-xs text-zinc-600 bg-zinc-800 px-2 py-1 rounded-lg tabular-nums">
@@ -6453,11 +6454,11 @@ const ratioLabel = ratioAhorro === null
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-zinc-800/60 rounded-xl p-3 space-y-1.5">
-            <p className="text-xs text-zinc-500">{t("dashboard.gastoDiarioMedio")}</p>
+              <p className="text-xs text-zinc-500">{t("dashboard.gastoDiarioMedio")}</p>
               <HidableAmount value={gastoDiario} className="text-lg font-light text-zinc-200" />
             </div>
             <div className="bg-zinc-800/60 rounded-xl p-3 space-y-1.5">
-            <p className="text-xs text-zinc-500">{t("dashboard.gastoProyectado")}</p>
+              <p className="text-xs text-zinc-500">{t("dashboard.gastoProyectado")}</p>
               <HidableAmount value={gastoProyectado} className="text-lg font-light text-red-400" />
             </div>
           </div>
@@ -6466,8 +6467,8 @@ const ratioLabel = ratioAhorro === null
             : "bg-red-950/30 border-red-900/40"
             }`}>
             <div>
-            <p className="text-xs text-zinc-400 mb-0.5 font-medium">{t("dashboard.ahorroEstimado")}</p>
-            <p className="text-xs text-zinc-600">{t("dashboard.ahorroRitmoActual")}</p>
+              <p className="text-xs text-zinc-400 mb-0.5 font-medium">{t("dashboard.ahorroEstimado")}</p>
+              <p className="text-xs text-zinc-600">{t("dashboard.ahorroRitmoActual")}</p>
             </div>
             <HidableAmount
               value={Math.abs(ahorroProyectado)}
@@ -6488,7 +6489,7 @@ const ratioLabel = ratioAhorro === null
       <WidgetCard key="media_diaria">
         <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionMediaDiaria")}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionMediaDiaria")}</p>
             <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
           </div>
           <div className="flex items-end justify-between gap-3">
@@ -6513,7 +6514,7 @@ const ratioLabel = ratioAhorro === null
       <WidgetCard key="ratio_ahorro">
         <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionRatioAhorro")}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionRatioAhorro")}</p>
             <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
           </div>
           <div className="flex items-center gap-5">
@@ -6545,15 +6546,15 @@ const ratioLabel = ratioAhorro === null
               <p className={`text-sm font-medium leading-tight ${ratioColor}`}>{ratioLabel}</p>
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between items-center text-xs gap-2">
-                <span className="text-zinc-600 flex-shrink-0">{t("dashboard.sectionIngresosTotales")}</span>
+                  <span className="text-zinc-600 flex-shrink-0">{t("dashboard.sectionIngresosTotales")}</span>
                   <HidableAmount value={totalIngresos} className="text-zinc-400" />
                 </div>
                 <div className="flex justify-between items-center text-xs gap-2">
-                <span className="text-zinc-600 flex-shrink-0">{t("dashboard.sectionGastosTotales")}</span>
+                  <span className="text-zinc-600 flex-shrink-0">{t("dashboard.sectionGastosTotales")}</span>
                   <HidableAmount value={totalGastos} className="text-zinc-400" />
                 </div>
                 <div className="flex justify-between items-center text-xs gap-2 pt-1.5 border-t border-zinc-800">
-                <span className="text-zinc-500 flex-shrink-0">{t("dashboard.sectionAhorroNeto")}</span>
+                  <span className="text-zinc-500 flex-shrink-0">{t("dashboard.sectionAhorroNeto")}</span>
                   <HidableAmount
                     value={Math.abs(balanceNeto)}
                     prefix={balanceNeto >= 0 ? "+" : "-"}
@@ -6601,7 +6602,7 @@ const ratioLabel = ratioAhorro === null
                         <span className="text-sm text-zinc-300 truncate">{p.cat!.label}</span>
                         {superado && (
                           <span className="text-[10px] font-bold text-red-400 bg-red-500/15 px-1.5 py-0.5 rounded flex-shrink-0">
-{t("dashboard.badgeSuperado")}
+                            {t("dashboard.badgeSuperado")}
                           </span>
                         )}
                         {cercano && (
@@ -6645,7 +6646,7 @@ const ratioLabel = ratioAhorro === null
     mapa_calor: (
       <div key="mapa_calor" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionMapaCalor")}</p>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionMapaCalor")}</p>
           <div className="flex items-center gap-1.5" aria-hidden="true">
             <span className="text-xs text-zinc-600">{t("dashboard.heatLow")}</span>
             <div className="flex gap-0.5">
@@ -6657,8 +6658,8 @@ const ratioLabel = ratioAhorro === null
           </div>
         </div>
         <div className="grid grid-cols-7 gap-1 mb-1" aria-hidden="true">
-          {DIAS_SEMANA.map(d => (
-            <p key={d} className="text-center text-[10px] text-zinc-600 font-medium">{d}</p>
+          {DIAS_SEMANA.map((d, i) => (
+            <p key={i} className="text-center text-[10px] text-zinc-600 font-medium">{d}</p>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-1" role="grid" aria-label={t("dashboard.ariaHeatMap")}>
@@ -6689,7 +6690,7 @@ const ratioLabel = ratioAhorro === null
                 {hoveredDay === dia && (
                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
                     <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-center whitespace-nowrap shadow-xl">
-                    <p className="text-xs font-semibold text-zinc-200">
+                      <p className="text-xs font-semibold text-zinc-200">
                         {gasto > 0 ? `${gasto.toFixed(2)}€` : t("dashboard.noExpensesMonth")}
                       </p>
                       <div
@@ -6803,8 +6804,8 @@ const ratioLabel = ratioAhorro === null
 
     linea_gastos: (
       <div key="linea_gastos" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-<p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">{t("dashboard.widgetLineaLabel")}</p>
-<p className="text-xs text-zinc-600 mb-4">{t("dashboard.last12Months")}</p>
+        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">{t("dashboard.widgetLineaLabel")}</p>
+        <p className="text-xs text-zinc-600 mb-4">{t("dashboard.last12Months")}</p>
         <div className="w-full h-[220px]">
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <LineChart data={last12Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -6855,7 +6856,7 @@ const ratioLabel = ratioAhorro === null
       <WidgetCard key="top_categorias">
         <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetTopLabel")}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetTopLabel")}</p>
             <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
           </div>
           {topCategorias.length === 0 ? (
@@ -6897,230 +6898,230 @@ const ratioLabel = ratioAhorro === null
           )}
         </div>
       </WidgetCard>
-),
-objetivo_ahorro: (
-  <WidgetCard key="objetivo_ahorro">
-    <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <PiggyBank className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetObjetivoLabel")}</p>
-        </div>
-        <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-      </div>
-      {!objetivoAhorro ? (
-        <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-          <PiggyBank className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-          <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
-          <p className="text-xs text-zinc-700">{t("dashboard.noPresupuestosHint")}</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-end justify-between">
-            <div>
-            <p className="text-xs text-zinc-500 mb-1">{t("dashboard.objetivoAhorroActual")}</p>
-              <HidableAmount
-                value={Math.max(0, balanceNeto)}
-                className={`text-3xl font-light ${balanceNeto >= 0 ? "text-emerald-400" : "text-red-400"}`}
-              />
+    ),
+    objetivo_ahorro: (
+      <WidgetCard key="objetivo_ahorro">
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <PiggyBank className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetObjetivoLabel")}</p>
             </div>
-            <div className="text-right">
-            <p className="text-xs text-zinc-500 mb-1">{t("dashboard.objetivoMeta")}</p>
-              <HidableAmount value={objetivoAhorro.cantidad} className="text-base font-medium text-zinc-300" />
+            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
+          </div>
+          {!objetivoAhorro ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <PiggyBank className="w-8 h-8 text-zinc-700" aria-hidden="true" />
+              <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
+              <p className="text-xs text-zinc-700">{t("dashboard.noPresupuestosHint")}</p>
             </div>
-          </div>
-          <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${(pctObjetivo ?? 0) >= 100 ? "bg-emerald-400" : (pctObjetivo ?? 0) >= 50 ? "bg-yellow-400" : "bg-red-400"}`}
-              style={{ width: `${Math.max(0, pctObjetivo ?? 0)}%` }}
-              role="progressbar"
-              aria-valuenow={pctObjetivo ?? 0}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-          <p className="text-xs text-zinc-600">
-              {(pctObjetivo ?? 0) >= 100 ? "🎉" : `${pctObjetivo ?? 0}%`}
-            </p>
-            {(pctObjetivo ?? 0) < 100 && (
-              <HidableAmount
-                value={Math.max(0, objetivoAhorro.cantidad - balanceNeto)}
-                prefix={t("dashboard.objetivoFaltan")}
-                className="text-xs text-zinc-500"
-              />
-            )}
-          </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-zinc-500 mb-1">{t("dashboard.objetivoAhorroActual")}</p>
+                  <HidableAmount
+                    value={Math.max(0, balanceNeto)}
+                    className={`text-3xl font-light ${balanceNeto >= 0 ? "text-emerald-400" : "text-red-400"}`}
+                  />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-zinc-500 mb-1">{t("dashboard.objetivoMeta")}</p>
+                  <HidableAmount value={objetivoAhorro.cantidad} className="text-base font-medium text-zinc-300" />
+                </div>
+              </div>
+              <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${(pctObjetivo ?? 0) >= 100 ? "bg-emerald-400" : (pctObjetivo ?? 0) >= 50 ? "bg-yellow-400" : "bg-red-400"}`}
+                  style={{ width: `${Math.max(0, pctObjetivo ?? 0)}%` }}
+                  role="progressbar"
+                  aria-valuenow={pctObjetivo ?? 0}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-zinc-600">
+                  {(pctObjetivo ?? 0) >= 100 ? "🎉" : `${pctObjetivo ?? 0}%`}
+                </p>
+                {(pctObjetivo ?? 0) < 100 && (
+                  <HidableAmount
+                    value={Math.max(0, objetivoAhorro.cantidad - balanceNeto)}
+                    prefix={t("dashboard.objetivoFaltan")}
+                    className="text-xs text-zinc-500"
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  </WidgetCard>
-),
+      </WidgetCard>
+    ),
 
-comparativa_mes: (
-  <WidgetCard key="comparativa_mes">
-    <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-      <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetComparativaLabel")}</p>
-        <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-      </div>
-      <div className="space-y-3">
-      {[
-          { label: t("dashboard.sectionGastos"), actual: totalGastos, prev: gastoPrevMes, diff: diffGastoMes, colorActual: "text-red-400", invertir: true },
-          { label: t("dashboard.sectionIngresos"), actual: totalIngresos, prev: ingPrevMes, diff: diffIngMes, colorActual: "text-emerald-400", invertir: false },
-        ].map(({ label, actual, prev, diff, colorActual, invertir }) => {
-          const mejor = invertir ? diff <= 0 : diff >= 0
-          return (
-            <div key={label} className="bg-zinc-800/60 rounded-xl p-3 space-y-2">
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{label}</p>
-              <div className="flex items-end justify-between gap-2">
-                <HidableAmount value={actual} className={`text-2xl font-light ${colorActual}`} />
-                <div className="flex flex-col items-end gap-0.5">
-                <HidableAmount
+    comparativa_mes: (
+      <WidgetCard key="comparativa_mes">
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetComparativaLabel")}</p>
+            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
+          </div>
+          <div className="space-y-3">
+            {[
+              { label: t("dashboard.sectionGastos"), actual: totalGastos, prev: gastoPrevMes, diff: diffGastoMes, colorActual: "text-red-400", invertir: true },
+              { label: t("dashboard.sectionIngresos"), actual: totalIngresos, prev: ingPrevMes, diff: diffIngMes, colorActual: "text-emerald-400", invertir: false },
+            ].map(({ label, actual, prev, diff, colorActual, invertir }) => {
+              const mejor = invertir ? diff <= 0 : diff >= 0
+              return (
+                <div key={label} className="bg-zinc-800/60 rounded-xl p-3 space-y-2">
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest">{label}</p>
+                  <div className="flex items-end justify-between gap-2">
+                    <HidableAmount value={actual} className={`text-2xl font-light ${colorActual}`} />
+                    <div className="flex flex-col items-end gap-0.5">
+                      <HidableAmount
                         value={Math.abs(diff)}
                         prefix={diff > 0 ? "+" : diff < 0 ? "-" : ""}
                         className={`text-xs font-semibold px-2 py-0.5 rounded-lg tabular-nums ${mejor ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}
                       />
-                  <p className="text-[10px] text-zinc-600">vs <HidableAmount value={prev} className="text-zinc-600" /></p>
+                      <p className="text-[10px] text-zinc-600">vs <HidableAmount value={prev} className="text-zinc-600" /></p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  </WidgetCard>
-),
-
-dia_mas_caro: (
-  <WidgetCard key="dia_mas_caro">
-    <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetDiaMasCaroLabel")}</p>
+              )
+            })}
+          </div>
         </div>
-        <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-      </div>
-      {!diaMasCaro ? (
+      </WidgetCard>
+    ),
+
+    dia_mas_caro: (
+      <WidgetCard key="dia_mas_caro">
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetDiaMasCaroLabel")}</p>
+            </div>
+            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
+          </div>
+          {!diaMasCaro ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
               <CalendarDays className="w-8 h-8 text-zinc-700" aria-hidden="true" />
               <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
             </div>
-      ) : (
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col items-center justify-center flex-shrink-0">
-            <p className="text-2xl font-bold text-red-400 tabular-nums leading-none">{diaMasCaro[0]}</p>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wide mt-0.5">
-            {new Date(sy, sm, parseInt(diaMasCaro[0])).toLocaleDateString(locale, { weekday: "short" })}
-            </p>
-          </div>
-          <div className="flex-1 min-w-0">
-          <p className="text-xs text-zinc-500 mb-1">{t("dashboard.gastoTotalDia")}</p>
-<HidableAmount value={diaMasCaro[1]} className="text-3xl font-light text-red-400" />
-<p className="text-xs text-zinc-600 mt-1">
-  {((diaMasCaro[1] / totalGastos) * 100).toFixed(1)}{t("dashboard.pctGastoMensual")}
-</p>
-          </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col items-center justify-center flex-shrink-0">
+                <p className="text-2xl font-bold text-red-400 tabular-nums leading-none">{diaMasCaro[0]}</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mt-0.5">
+                  {new Date(sy, sm, parseInt(diaMasCaro[0])).toLocaleDateString(locale, { weekday: "short" })}
+                </p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-zinc-500 mb-1">{t("dashboard.gastoTotalDia")}</p>
+                <HidableAmount value={diaMasCaro[1]} className="text-3xl font-light text-red-400" />
+                <p className="text-xs text-zinc-600 mt-1">
+                  {((diaMasCaro[1] / totalGastos) * 100).toFixed(1)}{t("dashboard.pctGastoMensual")}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  </WidgetCard>
-),
+      </WidgetCard>
+    ),
 
-gasto_dia_semana: (
-  <div key="gasto_dia_semana" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-    <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">{t("dashboard.widgetGastoDiaLabel")}</p>
-    {monthGastos.length === 0 ? (
-      <div className="flex flex-col items-center justify-center py-8 gap-2">
-        <BarChart2 className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-        <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
-      </div>
-    ) : (
-      <div className="w-full h-[180px]">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          <BarChart data={dowData} margin={{ top: 5, right: 5, left: -30, bottom: 0 }} barCategoryGap="20%">
-            <XAxis dataKey="dia" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 10 }} tickFormatter={v => `${v}€`} />
-            <Tooltip
-              cursor={{ fill: "rgba(255,255,255,0.04)" }}
-              contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-              itemStyle={{ color: "#f4f4f5" }}
-              formatter={(v) => [`${Number(v ?? 0).toFixed(2)}€`, "Gasto"]}
-            />
-            <Bar dataKey="gasto" radius={[4, 4, 0, 0]}>
-              {dowData.map((entry, i) => (
-                <Cell
-                  key={i}
-                  fill={entry.gasto >= maxGastoDow * 0.8 ? "#ef4444" : entry.gasto >= maxGastoDow * 0.5 ? "#f97316" : "#3b82f6"}
+    gasto_dia_semana: (
+      <div key="gasto_dia_semana" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">{t("dashboard.widgetGastoDiaLabel")}</p>
+        {monthGastos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <BarChart2 className="w-8 h-8 text-zinc-700" aria-hidden="true" />
+            <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
+          </div>
+        ) : (
+          <div className="w-full h-[180px]">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <BarChart data={dowData} margin={{ top: 5, right: 5, left: -30, bottom: 0 }} barCategoryGap="20%">
+                <XAxis dataKey="dia" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 10 }} tickFormatter={v => `${v}€`} />
+                <Tooltip
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                  contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
+                  itemStyle={{ color: "#f4f4f5" }}
+                  formatter={(v) => [`${Number(v ?? 0).toFixed(2)}€`, "Gasto"]}
                 />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+                <Bar dataKey="gasto" radius={[4, 4, 0, 0]}>
+                  {dowData.map((entry, i) => (
+                    <Cell
+                      key={i}
+                      fill={entry.gasto >= maxGastoDow * 0.8 ? "#ef4444" : entry.gasto >= maxGastoDow * 0.5 ? "#f97316" : "#3b82f6"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        <p className="text-xs text-zinc-700 mt-2 text-center">{t("dashboard.acumuladoMesDia")}</p>
       </div>
-    )}
-    <p className="text-xs text-zinc-700 mt-2 text-center">{t("dashboard.acumuladoMesDia")}</p>
-  </div>
-),
+    ),
 
-distribucion_ingreso: (
-  <WidgetCard key="distribucion_ingreso">
-    <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Wallet className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetDistribucionLabel")}</p>
-        </div>
-        <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-      </div>
-      {distribucionPct === null ? (
+    distribucion_ingreso: (
+      <WidgetCard key="distribucion_ingreso">
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetDistribucionLabel")}</p>
+            </div>
+            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
+          </div>
+          {distribucionPct === null ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2">
               <Wallet className="w-8 h-8 text-zinc-700" aria-hidden="true" />
               <p className="text-sm text-zinc-600">{t("dashboard.ratioNoIncome")}</p>
             </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center justify-center gap-6">
-            <div className="text-center">
-              <p className={`text-4xl font-light tabular-nums ${distribucionPct >= 100 ? "text-red-400" : distribucionPct >= 80 ? "text-yellow-400" : "text-emerald-400"}`}>
-                {distribucionPct}%
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-center gap-6">
+                <div className="text-center">
+                  <p className={`text-4xl font-light tabular-nums ${distribucionPct >= 100 ? "text-red-400" : distribucionPct >= 80 ? "text-yellow-400" : "text-emerald-400"}`}>
+                    {distribucionPct}%
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">{t("dashboard.distribucionGastas")}</p>
+                </div>
+                <div className="text-center">
+                  <p className={`text-4xl font-light tabular-nums ${distribucionPct >= 100 ? "text-zinc-600" : "text-emerald-400"}`}>
+                    {Math.max(0, 100 - distribucionPct)}%
+                  </p>
+                  <p className="text-xs text-zinc-500 mt-1">{t("dashboard.distribucionAhorras")}</p>
+                </div>
+              </div>
+              <p className="text-xs text-zinc-600 text-center">
+                {t("dashboard.widgetDistribucionDesc")}
               </p>
-              <p className="text-xs text-zinc-500 mt-1">{t("dashboard.distribucionGastas")}</p>
+              <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden flex">
+                <div
+                  className={`h-full transition-all duration-700 ${distribucionPct >= 100 ? "bg-red-400" : distribucionPct >= 80 ? "bg-yellow-400" : "bg-red-400"}`}
+                  style={{ width: `${Math.min(distribucionPct, 100)}%` }}
+                />
+                <div
+                  className="h-full bg-emerald-400 transition-all duration-700"
+                  style={{ width: `${Math.max(0, 100 - distribucionPct)}%` }}
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <HidableAmount value={totalGastos} prefix={t("dashboard.distribucionGastado")} className="text-xs text-zinc-500 flex-1" />
+                <HidableAmount value={totalIngresos} prefix={t("dashboard.distribucionIngresado")} className="text-xs text-zinc-500 flex-1 text-right" />
+              </div>
             </div>
-            <div className="text-center">
-              <p className={`text-4xl font-light tabular-nums ${distribucionPct >= 100 ? "text-zinc-600" : "text-emerald-400"}`}>
-                {Math.max(0, 100 - distribucionPct)}%
-              </p>
-              <p className="text-xs text-zinc-500 mt-1">{t("dashboard.distribucionAhorras")}</p>
-            </div>
-          </div>
-          <p className="text-xs text-zinc-600 text-center">
-            {t("dashboard.widgetDistribucionDesc")}
-          </p>
-          <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden flex">
-            <div
-              className={`h-full transition-all duration-700 ${distribucionPct >= 100 ? "bg-red-400" : distribucionPct >= 80 ? "bg-yellow-400" : "bg-red-400"}`}
-              style={{ width: `${Math.min(distribucionPct, 100)}%` }}
-            />
-            <div
-              className="h-full bg-emerald-400 transition-all duration-700"
-              style={{ width: `${Math.max(0, 100 - distribucionPct)}%` }}
-            />
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-          <HidableAmount value={totalGastos} prefix={t("dashboard.distribucionGastado")} className="text-xs text-zinc-500 flex-1" />
-          <HidableAmount value={totalIngresos} prefix={t("dashboard.distribucionIngresado")} className="text-xs text-zinc-500 flex-1 text-right" />
-          </div>
+          )}
         </div>
-      )}
-    </div>
-  </WidgetCard>
-),
+      </WidgetCard>
+    ),
 
-racha_ahorro: (
-  <div key="racha_ahorro" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-    <style>{`
+    racha_ahorro: (
+      <div key="racha_ahorro" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
+        <style>{`
       @keyframes flicker1 { 0%,100%{transform:scaleX(1) scaleY(1)} 25%{transform:scaleX(0.88) scaleY(1.08)} 75%{transform:scaleX(1.08) scaleY(0.94)} }
       @keyframes flicker2 { 0%,100%{transform:scaleX(1) scaleY(1)} 33%{transform:scaleX(0.92) scaleY(1.1)} 66%{transform:scaleX(1.06) scaleY(0.9)} }
       @keyframes rise { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
@@ -7129,46 +7130,46 @@ racha_ahorro: (
       .flame-inner { animation: flicker1 0.9s ease-in-out infinite reverse; transform-origin: bottom center; }
       @media (prefers-reduced-motion: reduce) { .flame-outer,.flame-mid,.flame-inner { animation: none; } }
     `}</style>
-    <div className="flex items-center gap-2 mb-4">
-      <svg width="14" height="14" viewBox="0 0 14 18" aria-hidden="true">
-        <g className="flame-outer">
-          <ellipse cx="7" cy="13" rx="5.5" ry="5" fill={rachaDias >= 7 ? "#10b981" : rachaDias >= 3 ? "#f59e0b" : "#71717a"} />
-          <path d="M7 2 C4 6 2 9 2 12 C2 15.3 4.2 17 7 17 C9.8 17 12 15.3 12 12 C12 9 10 6 7 2Z" fill={rachaDias >= 7 ? "#10b981" : rachaDias >= 3 ? "#f59e0b" : "#71717a"} />
-        </g>
-        <g className="flame-mid">
-          <path d="M7 6 C5.5 8.5 4.5 10 4.5 12 C4.5 14 5.5 15.5 7 15.5 C8.5 15.5 9.5 14 9.5 12 C9.5 10 8.5 8.5 7 6Z" fill={rachaDias >= 7 ? "#34d399" : rachaDias >= 3 ? "#fbbf24" : "#52525b"} />
-        </g>
-        <g className="flame-inner">
-          <path d="M7 9 C6.2 10.5 6 11.2 6 12.2 C6 13.4 6.4 14.2 7 14.2 C7.6 14.2 8 13.4 8 12.2 C8 11.2 7.8 10.5 7 9Z" fill={rachaDias >= 7 ? "#a7f3d0" : rachaDias >= 3 ? "#fde68a" : "#3f3f46"} />
-        </g>
-      </svg>
-      <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionRacha")}</p>
-    </div>
-    {rachaDias === 0 ? (
-      <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-        <Flame className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-        <p className="text-sm text-zinc-600">{t("dashboard.rachaNoActive")}</p>
-        <p className="text-xs text-zinc-700">{t("dashboard.rachaNoActiveHint")}</p>
-      </div>
-    ) : (
-      <div className="flex items-center gap-4">
-        <div className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 ${rachaDias >= 7 ? "bg-emerald-500/15 border border-emerald-500/30" : rachaDias >= 3 ? "bg-yellow-500/15 border border-yellow-500/30" : "bg-zinc-800 border border-zinc-700"}`}>
-          <p className={`text-3xl font-bold tabular-nums leading-none ${rachaDias >= 7 ? "text-emerald-400" : rachaDias >= 3 ? "text-yellow-400" : "text-zinc-400"}`}>
-            {rachaDias}
-          </p>
-          <p className="text-[10px] text-zinc-500 mt-0.5">{t("dashboard.rachaDias")}</p>
+        <div className="flex items-center gap-2 mb-4">
+          <svg width="14" height="14" viewBox="0 0 14 18" aria-hidden="true">
+            <g className="flame-outer">
+              <ellipse cx="7" cy="13" rx="5.5" ry="5" fill={rachaDias >= 7 ? "#10b981" : rachaDias >= 3 ? "#f59e0b" : "#71717a"} />
+              <path d="M7 2 C4 6 2 9 2 12 C2 15.3 4.2 17 7 17 C9.8 17 12 15.3 12 12 C12 9 10 6 7 2Z" fill={rachaDias >= 7 ? "#10b981" : rachaDias >= 3 ? "#f59e0b" : "#71717a"} />
+            </g>
+            <g className="flame-mid">
+              <path d="M7 6 C5.5 8.5 4.5 10 4.5 12 C4.5 14 5.5 15.5 7 15.5 C8.5 15.5 9.5 14 9.5 12 C9.5 10 8.5 8.5 7 6Z" fill={rachaDias >= 7 ? "#34d399" : rachaDias >= 3 ? "#fbbf24" : "#52525b"} />
+            </g>
+            <g className="flame-inner">
+              <path d="M7 9 C6.2 10.5 6 11.2 6 12.2 C6 13.4 6.4 14.2 7 14.2 C7.6 14.2 8 13.4 8 12.2 C8 11.2 7.8 10.5 7 9Z" fill={rachaDias >= 7 ? "#a7f3d0" : rachaDias >= 3 ? "#fde68a" : "#3f3f46"} />
+            </g>
+          </svg>
+          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionRacha")}</p>
         </div>
-        <div className="flex-1 min-w-0 space-y-1">
-          <p className="text-sm font-medium text-zinc-200">
-          {rachaDias >= 7 ? t("dashboard.rachaIncreible") : rachaDias >= 3 ? t("dashboard.rachaBuen") : t("dashboard.rachaEmpezando")}
-          </p>
-          <p className="text-xs text-zinc-500">{t("dashboard.rachaConsecut")}</p>
-        </div>
+        {rachaDias === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+            <Flame className="w-8 h-8 text-zinc-700" aria-hidden="true" />
+            <p className="text-sm text-zinc-600">{t("dashboard.rachaNoActive")}</p>
+            <p className="text-xs text-zinc-700">{t("dashboard.rachaNoActiveHint")}</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <div className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 ${rachaDias >= 7 ? "bg-emerald-500/15 border border-emerald-500/30" : rachaDias >= 3 ? "bg-yellow-500/15 border border-yellow-500/30" : "bg-zinc-800 border border-zinc-700"}`}>
+              <p className={`text-3xl font-bold tabular-nums leading-none ${rachaDias >= 7 ? "text-emerald-400" : rachaDias >= 3 ? "text-yellow-400" : "text-zinc-400"}`}>
+                {rachaDias}
+              </p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">{t("dashboard.rachaDias")}</p>
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-sm font-medium text-zinc-200">
+                {rachaDias >= 7 ? t("dashboard.rachaIncreible") : rachaDias >= 3 ? t("dashboard.rachaBuen") : t("dashboard.rachaEmpezando")}
+              </p>
+              <p className="text-xs text-zinc-500">{t("dashboard.rachaConsecut")}</p>
+            </div>
+          </div>
+        )}
       </div>
-    )}
-  </div>
-),
-}
+    ),
+  }
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -7195,8 +7196,8 @@ racha_ahorro: (
             aria-label={t("dashboard.ariaNextMonth")}
             aria-disabled={esHoyMes}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${esHoyMes
-                ? "text-zinc-700 cursor-not-allowed"
-                : "hover:bg-zinc-800 text-zinc-400"
+              ? "text-zinc-700 cursor-not-allowed"
+              : "hover:bg-zinc-800 text-zinc-400"
               }`}
           >
             <ChevronRight className="w-5 h-5" />
@@ -7232,7 +7233,7 @@ racha_ahorro: (
           />
           <div className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex items-center justify-between mb-2">
-            <h3 id="widget-picker-title" className="text-lg font-semibold text-zinc-100">
+              <h3 id="widget-picker-title" className="text-lg font-semibold text-zinc-100">
                 {t("dashboard.customizeTitle")}
               </h3>
               <button
@@ -7256,8 +7257,8 @@ racha_ahorro: (
                     onClick={() => toggleWidget(w.id)}
                     aria-pressed={active}
                     className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left ${active
-                        ? "border-emerald-500/40 bg-emerald-950/20"
-                        : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-600"
+                      ? "border-emerald-500/40 bg-emerald-950/20"
+                      : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-600"
                       }`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-emerald-500/20" : "bg-zinc-700/50"
@@ -8344,7 +8345,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
-const APP_VERSION = 20
+const APP_VERSION = 21
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {

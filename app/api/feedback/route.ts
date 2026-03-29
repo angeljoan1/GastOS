@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     const { data, error } = await resend.emails.send({
       from: 'GastOS App <soporte@angeljoan.com>',
-      to: 'ajgamundi@gmail.com',
+      to: process.env.FEEDBACK_TO_EMAIL!,
       subject: `[GastOS ${tipo}] Nuevo ticket recibido`,
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #333;">

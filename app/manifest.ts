@@ -23,6 +23,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description:      "Registro personal y seguro para el control diario de tus finanzas.",
     start_url:        "/",
     display:          "standalone",
+    ...({"display_override": ["fullscreen", "standalone"]} as object),
     orientation:      "portrait",
     background_color: "#09090b",
     theme_color:      "#09090b",

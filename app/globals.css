@@ -33,7 +33,12 @@
    html, body {
     background: #09090b;
     color:      var(--foreground);
-    overscroll-behavior: none;
+  }
+
+  @media (display-mode: standalone) {
+    html, body {
+      overscroll-behavior: none;
+    }
   }
 
   @layer utilities {

@@ -65,6 +65,31 @@ const DEFAULT_WIDGETS: WidgetId[] = [
   "presupuestos_categoria", "donut_categorias", "barras_6meses",
 ]
 const STORAGE_KEY = "gastos_dashboard_widgets_v3"
+const SALDO_CACHE_KEY = "gastos_saldo_cache_v1"
+const SALDO_CACHE_TTL = 5 * 60 * 1000 // 5 minutos
+
+function getSaldoCache(): Movimiento[] | null {
+  try {
+    const raw = sessionStorage.getItem(SALDO_CACHE_KEY)
+    if (!raw) return null
+    const { data, ts } = JSON.parse(raw)
+    if (Date.now() - ts > SALDO_CACHE_TTL) {
+      sessionStorage.removeItem(SALDO_CACHE_KEY)
+      return null
+    }
+    return data as Movimiento[]
+  } catch { return null }
+}
+
+function setSaldoCache(data: Movimiento[]): void {
+  try {
+    sessionStorage.setItem(SALDO_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
+  } catch { }
+}
+
+export function invalidateSaldoCache(): void {
+  try { sessionStorage.removeItem(SALDO_CACHE_KEY) } catch { }
+}
 const CHART_COLORS = [
   "#ef4444", "#f97316", "#f59e0b", "#3b82f6",
   "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#64748b", "#10b981",
@@ -153,7 +178,7 @@ export default function DashboardTab({
   const t = useTranslations()
   const locale = useLocale()
   const WIDGET_CATALOG = getWidgetCatalog(t)
-  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const [movimientos, setMovimientos] = useState<{ recientes: Movimiento[]; paraSaldo: Movimiento[] }>({ recientes: [], paraSaldo: [] })
   const [hasEncryptedMovs, setHasEncryptedMovs] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -183,36 +208,74 @@ export default function DashboardTab({
   }
 
   useEffect(() => {
-    // 1. Creamos la función asíncrona interna
     const fetchYDesencriptar = async () => {
-      const { data, error } = await supabase
+      // Query 1: últimos 13 meses para widgets y gráficas.
+      const fechaCorte = new Date()
+      fechaCorte.setMonth(fechaCorte.getMonth() - 13)
+      fechaCorte.setDate(1)
+      fechaCorte.setHours(0, 0, 0, 0)
+
+      const { data: dataReciente } = await supabase
         .from("movimientos")
         .select("*")
-        .order("created_at", { ascending: false });
+        .gte("created_at", fechaCorte.toISOString())
+        .order("created_at", { ascending: false })
 
-      if (data) {
-        // 2. Usamos el coordinador para desencriptar todo el arreglo
-        const decryptedData = await Promise.all(
-          data.map(async (m) => {
-            const cantidadStr = await decryptData(m.cantidad)
-            const notaStr = m.nota ? await decryptData(m.nota) : null
-            return {
-              ...m,
-              cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
-              nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
-            }
-          })
-        );
-        setHasEncryptedMovs(decryptedData.some(m => m.cantidad === -1))
-        // Filtramos los irrecuperables de los cálculos para no distorsionar totales
-        setMovimientos(decryptedData.filter(m => m.cantidad !== -1))
+      if (!dataReciente) { setLoading(false); return }
+
+      const decryptedReciente = await Promise.all(
+        dataReciente.map(async (m) => {
+          const cantidadStr = await decryptData(m.cantidad)
+          const notaStr = m.nota ? await decryptData(m.nota) : null
+          return {
+            ...m,
+            cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
+            nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
+          }
+        })
+      )
+
+      // Query 2: solo si el widget saldo_cuentas está activo.
+      // Usamos cache de sessionStorage con TTL de 5 min para no refetchar en cada visita.
+      let decryptedParaSaldo: Movimiento[] = decryptedReciente
+
+      if (activeWidgets.includes("saldo_cuentas")) {
+        const cached = getSaldoCache()
+        if (cached) {
+          decryptedParaSaldo = cached
+        } else {
+          const { data: dataParaSaldo } = await supabase
+            .from("movimientos")
+            .select("id, cantidad, tipo, cuenta_id, cuenta_destino_id, created_at")
+            .order("created_at", { ascending: false })
+
+          if (dataParaSaldo) {
+            const result: Movimiento[] = await Promise.all(
+              (dataParaSaldo as Movimiento[]).map(async (m) => {
+                const cantidadStr = await decryptData(m.cantidad)
+                return {
+                  ...m,
+                  cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
+                  nota: undefined,
+                }
+              })
+            )
+            decryptedParaSaldo = result.filter(m => m.cantidad !== -1)
+            setSaldoCache(decryptedParaSaldo)
+          }
+        }
       }
-      setLoading(false);
-    };
 
-    // 3. La llamamos
-    fetchYDesencriptar();
-  }, []);
+      setHasEncryptedMovs(decryptedReciente.some(m => m.cantidad === -1))
+      setMovimientos({
+        recientes: decryptedReciente.filter(m => m.cantidad !== -1),
+        paraSaldo: decryptedParaSaldo,
+      })
+      setLoading(false)
+    }
+
+    fetchYDesencriptar()
+  }, [activeWidgets])
 
   const sm = selectedDate.getMonth()
   const sy = selectedDate.getFullYear()
@@ -235,7 +298,8 @@ export default function DashboardTab({
     presupuestosConGasto,
     monthLabel, DIAS_SEMANA, NOMBRES_DIA,
   } = useMemo(() => {
-    const monthMovs = movimientos.filter(m => {
+    const { recientes, paraSaldo } = movimientos
+    const monthMovs = recientes.filter(m => {
       const d = new Date(m.created_at)
       const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
       return localD.getUTCMonth() === sm && localD.getUTCFullYear() === sy
@@ -248,7 +312,7 @@ export default function DashboardTab({
 
     const saldos: SaldoCuenta[] = cuentas.map(c => ({
       cuenta: c,
-      saldo_actual: calcularSaldoCuenta(c, movimientos),
+      saldo_actual: calcularSaldoCuenta(c, paraSaldo),
     }))
     const patrimonioTotal = saldos.reduce((a, s) => a + s.saldo_actual, 0)
 
@@ -267,7 +331,7 @@ export default function DashboardTab({
 
     const last12Months = Array.from({ length: 12 }, (_, i) => {
       const d = new Date(sy, sm - (11 - i), 1)
-      const movs = movimientos.filter(m => {
+      const movs = recientes.filter(m => {
         const md = new Date(m.created_at)
         const localMd = new Date(md.getTime() - md.getTimezoneOffset() * 60000)
         return localMd.getUTCMonth() === d.getMonth() && localMd.getUTCFullYear() === d.getFullYear()
@@ -296,7 +360,7 @@ export default function DashboardTab({
     const pctMes = Math.round((diaActual / diasEnMes) * 100)
 
     const mesAntDate = new Date(sy, sm - 1, 1)
-    const mesAntMovs = movimientos.filter(m => {
+    const mesAntMovs = recientes.filter(m => {
       const d = new Date(m.created_at)
       const localD = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
       return localD.getUTCMonth() === mesAntDate.getMonth() && localD.getUTCFullYear() === mesAntDate.getFullYear()

@@ -17,6 +17,7 @@ import { getIcon } from "@/lib/icons"
 import type { Categoria, Movimiento, Cuenta } from "@/types"
 import BottomSheet, { SheetTrigger } from "@/components/ui/BottomSheet"
 import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
+import { invalidateSaldoCache } from "@/components/tabs/DashboardTab"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 function triggerHaptic() {
@@ -183,6 +184,7 @@ function onCategoryClick(catId: string) {
     if (error) {
       setError(t("ingreso.errorSave"))
     } else {
+      invalidateSaldoCache()
       setSuccess(true)
       setDisplay("0")
       setNota("")
@@ -217,6 +219,7 @@ function onCategoryClick(catId: string) {
     if (error) {
       setError(`Error: ${error.message}`)
     } else {
+      invalidateSaldoCache()
       setSuccess(true)
       setDisplay("0")
       setNota("")
@@ -266,6 +269,7 @@ function onCategoryClick(catId: string) {
     }
 
     setPendingSubs(prev => prev.filter(p => p.id !== sub.id))
+    invalidateSaldoCache()
     setSuccess(true)
     setTimeout(() => setSuccess(false), 1800)
     setProcessingSub(null)

@@ -233,8 +233,28 @@ export default function HistorialTab({
     : null
 
   if (loading && page === 0) return (
-    <div className="flex-1 flex items-center justify-center py-20">
-      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+    <div className="flex flex-col h-full">
+      {/* Header filtros skeleton */}
+      <div className="flex flex-col gap-3 px-4 pt-4 pb-3 border-b border-zinc-800/60">
+        <div className="w-full h-10 rounded-xl bg-zinc-900 animate-pulse" />
+        <div className="flex gap-2">
+          <div className="w-[48%] h-10 rounded-xl bg-zinc-900 animate-pulse" />
+          <div className="w-[48%] h-10 rounded-xl bg-zinc-900 animate-pulse" />
+        </div>
+      </div>
+      {/* Lista skeleton */}
+      <div className="flex-1 px-4 py-3 space-y-2 overflow-hidden">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 bg-zinc-900 border border-zinc-800/70 rounded-2xl px-4 py-3">
+            <div className="w-9 h-9 rounded-xl bg-zinc-800 animate-pulse flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="w-28 h-3 rounded-full bg-zinc-800 animate-pulse" />
+              <div className="w-16 h-2.5 rounded-full bg-zinc-800/60 animate-pulse" />
+            </div>
+            <div className="w-16 h-4 rounded-full bg-zinc-800 animate-pulse" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 

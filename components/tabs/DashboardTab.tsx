@@ -419,8 +419,49 @@ export default function DashboardTab({
           : t("dashboard.ratioNegative")
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center py-20">
-      <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      {/* Navegador de mes */}
+      <div className="flex items-center justify-between">
+        <div className="w-8 h-8 rounded-lg bg-zinc-800 animate-pulse" />
+        <div className="w-32 h-4 rounded-full bg-zinc-800 animate-pulse" />
+        <div className="w-8 h-8 rounded-lg bg-zinc-800 animate-pulse" />
+      </div>
+      {/* Skeleton resumen */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4 space-y-3">
+          <div className="w-16 h-3 rounded-full bg-zinc-800 animate-pulse" />
+          <div className="w-24 h-7 rounded-full bg-zinc-800 animate-pulse" />
+        </div>
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4 space-y-3">
+          <div className="w-16 h-3 rounded-full bg-zinc-800 animate-pulse" />
+          <div className="w-24 h-7 rounded-full bg-zinc-800 animate-pulse" />
+        </div>
+      </div>
+      {/* Skeleton balance */}
+      <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4 space-y-3">
+        <div className="w-24 h-3 rounded-full bg-zinc-800 animate-pulse" />
+        <div className="w-32 h-7 rounded-full bg-zinc-800 animate-pulse" />
+      </div>
+      {/* Skeleton widget grande */}
+      <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-4">
+        <div className="w-28 h-3 rounded-full bg-zinc-800 animate-pulse" />
+        <div className="w-full h-2 rounded-full bg-zinc-800 animate-pulse" />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-zinc-800/60 rounded-xl p-3 space-y-2">
+            <div className="w-20 h-3 rounded-full bg-zinc-700 animate-pulse" />
+            <div className="w-16 h-6 rounded-full bg-zinc-700 animate-pulse" />
+          </div>
+          <div className="bg-zinc-800/60 rounded-xl p-3 space-y-2">
+            <div className="w-20 h-3 rounded-full bg-zinc-700 animate-pulse" />
+            <div className="w-16 h-6 rounded-full bg-zinc-700 animate-pulse" />
+          </div>
+        </div>
+      </div>
+      {/* Skeleton donut placeholder */}
+      <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 flex flex-col items-center gap-4">
+        <div className="w-28 h-3 rounded-full bg-zinc-800 animate-pulse self-start" />
+        <div className="w-44 h-44 rounded-full bg-zinc-800 animate-pulse" />
+      </div>
     </div>
   )
 

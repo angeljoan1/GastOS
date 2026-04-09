@@ -34,22 +34,23 @@ export default function IngresoTab({
   cuentas: Cuenta[]
 }) {
   const t = useTranslations()
-  const [display,             setDisplay]             = useState("0")
-  const [nota,                setNota]                = useState("")
-  const [success,             setSuccess]             = useState(false)
-  const [loading,             setLoading]             = useState(false)
-  const [error,               setError]               = useState<string | null>(null)
-  const [tipoMovimiento,      setTipoMovimiento]      = useState<TipoActivo>("gasto")
-  const [cuentaId,            setCuentaId]            = useState<string>("")
-  const [cuentaDestinoId,     setCuentaDestinoId]     = useState<string>("")
-  const [showRecurModal,      setShowRecurModal]      = useState(false)
-  const [pendingCat,          setPendingCat]          = useState<string | null>(null)
-  const [pendingSubs,         setPendingSubs]         = useState<Movimiento[]>([])
-  const [processingSub,       setProcessingSub]       = useState<string | null>(null)
-  const [showCuentaSheet,     setShowCuentaSheet]     = useState(false)
+  const [display, setDisplay] = useState("0")
+  const [nota, setNota] = useState("")
+  const [success, setSuccess] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [tipoMovimiento, setTipoMovimiento] = useState<TipoActivo>("gasto")
+  const [cuentaId, setCuentaId] = useState<string>("")
+  const [cuentaDestinoId, setCuentaDestinoId] = useState<string>("")
+  const [showRecurModal, setShowRecurModal] = useState(false)
+  const [pendingCat, setPendingCat] = useState<string | null>(null)
+  const [pendingSubs, setPendingSubs] = useState<Movimiento[]>([])
+  const [processingSub, setProcessingSub] = useState<string | null>(null)
+  const [showCuentaSheet, setShowCuentaSheet] = useState(false)
   const [showCuentaDestSheet, setShowCuentaDestSheet] = useState(false)
-  const [recurPeriod,         setRecurPeriod]         = useState<'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual'>('monthly')
-  const [showPeriodStep,      setShowPeriodStep]      = useState(false)
+  const [recurPeriod, setRecurPeriod] = useState<'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual'>('monthly')
+  const [showPeriodStep, setShowPeriodStep] = useState(false)
+  const [isRecurringTransfer, setIsRecurringTransfer] = useState(false)
 
   useEffect(() => {
     if (cuentas.length > 0 && !cuentaId) setCuentaId(cuentas[0].id)
@@ -58,7 +59,7 @@ export default function IngresoTab({
   useEffect(() => {
     // Bug 8 FIX: user_id explícito para no depender solo de RLS.
     // Bug 2 FIX: distinguimos DECRYPT_ERROR de dato vacío legítimo.
-    ;(async () => {
+    ; (async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -76,11 +77,11 @@ export default function IngresoTab({
       const decrypted = await Promise.all(
         data.map(async m => {
           const cantidadStr = await decryptData(m.cantidad)
-          const notaStr     = m.nota ? await decryptData(m.nota) : null
+          const notaStr = m.nota ? await decryptData(m.nota) : null
           return {
             ...m,
             cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
-            nota:     notaStr     === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
+            nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
           }
         })
       )
@@ -93,8 +94,8 @@ export default function IngresoTab({
       const pending: Movimiento[] = []
       map.forEach(sub => {
         if (sub.cantidad === -1) return // irrecuperable — no mostrar
-        const ultimo    = new Date(sub.created_at)
-        const meses     = mesesDePeriod(sub.recur_period)
+        const ultimo = new Date(sub.created_at)
+        const meses = mesesDePeriod(sub.recur_period)
         const vencimiento = new Date(
           ultimo.getFullYear(),
           ultimo.getMonth() + meses,
@@ -132,18 +133,23 @@ export default function IngresoTab({
     setDisplay(prev => prev.length <= 1 ? "0" : prev.slice(0, -1))
   }
 
-  function onCategoryClick(catId: string) {
+function onCategoryClick(catId: string) {
+  const cat = categorias.find(c => c.id === catId)
+  if (cat?.can_be_recurring) {
     setPendingCat(catId)
     setShowRecurModal(true)
+  } else {
+    handleGuardar(catId, false)
   }
+}
 
   function mesesDePeriod(period?: string | null): number {
     switch (period) {
-      case 'bimonthly':  return 2
-      case 'quarterly':  return 3
+      case 'bimonthly': return 2
+      case 'quarterly': return 3
       case 'semiannual': return 6
-      case 'annual':     return 12
-      default:           return 1
+      case 'annual': return 12
+      default: return 1
     }
   }
 
@@ -157,25 +163,25 @@ export default function IngresoTab({
     setShowPeriodStep(false)
     const cantidadRaw = parseFloat(display)
     if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
-      setLoading(true)
-      setError(null)
-  
-      const cantidadEncriptada = await encryptData(cantidadRaw)
-      const notaEncriptada     = nota ? await encryptData(nota.trim()) : null
-  
-      const { error } = await supabase.from("movimientos").insert({
-        cantidad:     cantidadEncriptada,
-        categoria:    cat,
-        nota:         notaEncriptada,
-        is_recurring: isRecurring,
-        ...(isRecurring && period ? { recur_period: period } : {}),
-        tipo:         tipoMovimiento,
-        cuenta_id:    cuentaId || null,
-      })
-  
-      setLoading(false)
-      if (error) {
-        setError(t("ingreso.errorSave"))
+    setLoading(true)
+    setError(null)
+
+    const cantidadEncriptada = await encryptData(cantidadRaw)
+    const notaEncriptada = nota ? await encryptData(nota.trim()) : null
+
+    const { error } = await supabase.from("movimientos").insert({
+      cantidad: cantidadEncriptada,
+      categoria: cat,
+      nota: notaEncriptada,
+      is_recurring: isRecurring,
+      ...(isRecurring && period ? { recur_period: period } : {}),
+      tipo: tipoMovimiento,
+      cuenta_id: cuentaId || null,
+    })
+
+    setLoading(false)
+    if (error) {
+      setError(t("ingreso.errorSave"))
     } else {
       setSuccess(true)
       setDisplay("0")
@@ -188,22 +194,22 @@ export default function IngresoTab({
     triggerHaptic()
     const cantidadRaw = parseFloat(display)
     if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
-      if (!cuentaId || !cuentaDestinoId)     return setError(t("ingreso.errorSelectBothAccounts"))
-      if (cuentaId === cuentaDestinoId)      return setError(t("ingreso.errorSameAccount"))
+    if (!cuentaId || !cuentaDestinoId) return setError(t("ingreso.errorSelectBothAccounts"))
+    if (cuentaId === cuentaDestinoId) return setError(t("ingreso.errorSameAccount"))
 
     setLoading(true)
     setError(null)
 
     const cantidadEncriptada = await encryptData(cantidadRaw)
-    const notaEncriptada     = nota ? await encryptData(nota.trim()) : null
+    const notaEncriptada = nota ? await encryptData(nota.trim()) : null
 
     const { error } = await supabase.from("movimientos").insert({
-      cantidad:          cantidadEncriptada,
-      categoria:         "transferencia",
-      nota:              notaEncriptada,
-      is_recurring:      false,
-      tipo:              "transferencia",
-      cuenta_id:         cuentaId,
+      cantidad: cantidadEncriptada,
+      categoria: "transferencia",
+      nota: notaEncriptada,
+      is_recurring: isRecurringTransfer,
+      tipo: "transferencia",
+      cuenta_id: cuentaId,
       cuenta_destino_id: cuentaDestinoId,
     })
 
@@ -215,6 +221,7 @@ export default function IngresoTab({
       setDisplay("0")
       setNota("")
       setCuentaDestinoId("")
+      setIsRecurringTransfer(false)
       setTimeout(() => setSuccess(false), 1800)
     }
   }
@@ -222,10 +229,10 @@ export default function IngresoTab({
   async function handleCobrarSub(sub: Movimiento) {
     setProcessingSub(sub.id)
 
-    const orig  = new Date(sub.created_at)
+    const orig = new Date(sub.created_at)
     const meses = mesesDePeriod(sub.recur_period)
     const maxDay = new Date(orig.getFullYear(), orig.getMonth() + meses + 1, 0).getDate()
-    const dia    = Math.min(orig.getDate(), maxDay)
+    const dia = Math.min(orig.getDate(), maxDay)
 
     // Calculamos created_at en el cliente e insertamos en un solo paso
     // (antes se hacía insert + update separados, lo que podía dejar fecha incorrecta si el update fallaba)
@@ -237,19 +244,19 @@ export default function IngresoTab({
     ).toISOString()
 
     const cantidadEncriptada = await encryptData(sub.cantidad)
-    const notaEncriptada     = sub.nota ? await encryptData(sub.nota) : null
+    const notaEncriptada = sub.nota ? await encryptData(sub.nota) : null
 
     const { error } = await supabase
       .from("movimientos")
       .insert({
-        cantidad:     cantidadEncriptada,
-        categoria:    sub.categoria,
-        nota:         notaEncriptada,
+        cantidad: cantidadEncriptada,
+        categoria: sub.categoria,
+        nota: notaEncriptada,
         is_recurring: true,
         recur_period: sub.recur_period ?? 'monthly',
-        tipo:         sub.tipo ?? "gasto",
-        cuenta_id:    sub.cuenta_id,
-        created_at:   fechaObjetivo,   // ← directo en el insert, sin UPDATE posterior
+        tipo: sub.tipo ?? "gasto",
+        cuenta_id: sub.cuenta_id,
+        created_at: fechaObjetivo,   // ← directo en el insert, sin UPDATE posterior
       })
 
     if (error) {
@@ -274,7 +281,7 @@ export default function IngresoTab({
     setProcessingSub(null)
   }
 
-  const keys       = ["7","8","9","4","5","6","1","2","3",".","0"]
+  const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0"]
   const isDisabled = loading || display === "0" || display === "0."
   const isTransfer = tipoMovimiento === "transferencia"
 
@@ -284,7 +291,7 @@ export default function IngresoTab({
   return (
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-{success && (
+      {success && (
         <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-3 rounded-t-xl animate-in fade-in duration-300">
           <CheckCircle2 className={`w-16 h-16 ${accent.text}`} strokeWidth={1.5} />
           <p className={`font-semibold text-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
@@ -336,20 +343,19 @@ export default function IngresoTab({
                 <p className="text-zinc-500 text-sm mb-4">{t("ingreso.recurPeriodDesc")}</p>
                 <div className="flex flex-col gap-2 mb-4">
                   {([
-                    { value: 'monthly',    label: t("ingreso.recurMonthly"),    sub: t("ingreso.recurMonthlyDesc")    },
-                    { value: 'bimonthly',  label: t("ingreso.recurBimonthly"),  sub: t("ingreso.recurBimonthlyDesc")  },
-                    { value: 'quarterly',  label: t("ingreso.recurQuarterly"),  sub: t("ingreso.recurQuarterlyDesc")  },
+                    { value: 'monthly', label: t("ingreso.recurMonthly"), sub: t("ingreso.recurMonthlyDesc") },
+                    { value: 'bimonthly', label: t("ingreso.recurBimonthly"), sub: t("ingreso.recurBimonthlyDesc") },
+                    { value: 'quarterly', label: t("ingreso.recurQuarterly"), sub: t("ingreso.recurQuarterlyDesc") },
                     { value: 'semiannual', label: t("ingreso.recurSemiannual"), sub: t("ingreso.recurSemiannualDesc") },
-                    { value: 'annual',     label: t("ingreso.recurAnnual"),     sub: t("ingreso.recurAnnualDesc")     },
+                    { value: 'annual', label: t("ingreso.recurAnnual"), sub: t("ingreso.recurAnnualDesc") },
                   ] as const).map(({ value, label, sub }) => (
                     <button
                       key={value}
                       onClick={() => setRecurPeriod(value)}
-                      className={`w-full py-2.5 px-4 rounded-xl text-sm text-left transition-all border flex justify-between items-center ${
-                        recurPeriod === value
-                          ? `${accent.bg} text-zinc-950 font-bold border-transparent`
-                          : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'
-                      }`}
+                      className={`w-full py-2.5 px-4 rounded-xl text-sm text-left transition-all border flex justify-between items-center ${recurPeriod === value
+                        ? `${accent.bg} text-zinc-950 font-bold border-transparent`
+                        : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                        }`}
                     >
                       <span>{label}</span>
                       <span className={`text-xs ${recurPeriod === value ? 'text-zinc-950/60' : 'text-zinc-500'}`}>{sub}</span>
@@ -376,7 +382,7 @@ export default function IngresoTab({
         </div>
       )}
 
-{pendingSubs.length > 0 && (
+      {pendingSubs.length > 0 && (
         <div className="border-b border-zinc-800/60 p-4 bg-zinc-950">
           <div className="flex items-center gap-2 mb-2">
             <CalendarDays className="w-4 h-4 text-zinc-400" aria-hidden="true" />
@@ -387,20 +393,18 @@ export default function IngresoTab({
           <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
             {pendingSubs.map(sub => {
               const esIngreso = sub.tipo === "ingreso"
-              const catLabel  = getCatLabel(sub.categoria)
+              const catLabel = getCatLabel(sub.categoria)
               return (
                 <div
                   key={sub.id}
-                  className={`flex items-center justify-between rounded-xl p-3 border ${
-                    esIngreso
-                      ? "bg-emerald-950/20 border-emerald-900/30"
-                      : "bg-red-950/20 border-red-900/30"
-                  }`}
+                  className={`flex items-center justify-between rounded-xl p-3 border ${esIngreso
+                    ? "bg-emerald-950/20 border-emerald-900/30"
+                    : "bg-red-950/20 border-red-900/30"
+                    }`}
                 >
                   <div className="min-w-0 flex-1 pr-3">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                      esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                    }`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                      }`}>
                       {esIngreso ? t("ingreso.pendingLabelIngreso") : t("ingreso.pendingLabelGasto")}
                     </span>
                     <p className="text-sm text-zinc-200 truncate font-medium mt-1">
@@ -426,11 +430,10 @@ export default function IngresoTab({
                       onClick={() => handleCobrarSub(sub)}
                       disabled={processingSub === sub.id}
                       aria-label={`Cobrar recurrente ${catLabel}`}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                        esIngreso
-                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950"
-                          : "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950"
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${esIngreso
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950"
+                        : "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950"
+                        }`}
                     >
                       {processingSub === sub.id
                         ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -448,17 +451,16 @@ export default function IngresoTab({
       <div className="px-4 pt-4 pb-2">
         <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800" role="group" aria-label={t("ingreso.ariaTypeGroup")}>
           {([
-            { id: "gasto",         label: t("ingreso.typeGasto"),         Icon: TrendingDown,   activeClass: "bg-red-500/15 text-red-400 border border-red-500/30"           },
-            { id: "ingreso",       label: t("ingreso.typeIngreso"),       Icon: TrendingUp,     activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
-            { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30"         },
+            { id: "gasto", label: t("ingreso.typeGasto"), Icon: TrendingDown, activeClass: "bg-red-500/15 text-red-400 border border-red-500/30" },
+            { id: "ingreso", label: t("ingreso.typeIngreso"), Icon: TrendingUp, activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
+            { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30" },
           ] as const).map(({ id, label, Icon, activeClass }) => (
             <button
               key={id}
               onClick={() => { setTipoMovimiento(id); setError(null) }}
               aria-pressed={tipoMovimiento === id}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
-                tipoMovimiento === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
-              }`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${tipoMovimiento === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
+                }`}
             >
               <Icon className="w-3.5 h-3.5" aria-hidden="true" />
               <span className="hidden sm:inline">{label}</span>
@@ -547,6 +549,23 @@ export default function IngresoTab({
                       )
                     })()}
                   </div>
+                  <div className="flex items-center justify-between px-1 py-2">
+                    <div>
+                      <p className="text-xs font-medium text-zinc-300">{t("ingreso.recurringTransferLabel")}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5">{t("ingreso.recurringTransferDesc")}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isRecurringTransfer}
+                      onClick={() => setIsRecurringTransfer(v => !v)}
+                      className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${isRecurringTransfer ? "bg-blue-500" : "bg-zinc-700"
+                        }`}
+                    >
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${isRecurringTransfer ? "left-5" : "left-1"
+                        }`} />
+                    </button>
+                  </div>
                   <button
                     onClick={handleGuardarTransferencia}
                     disabled={isDisabled || !cuentaDestinoId || loading}
@@ -570,7 +589,7 @@ export default function IngresoTab({
                   <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuenta")}</p>
                   <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t("ingreso.ariaSelectCuenta")}>
                     {cuentas.map(c => {
-                      const CIcon    = getIcon(c.icono)
+                      const CIcon = getIcon(c.icono)
                       const selected = cuentaId === c.id
                       return (
                         <button
@@ -579,7 +598,7 @@ export default function IngresoTab({
                           aria-pressed={selected}
                           aria-label={`Cuenta ${c.nombre}`}
                           style={{
-                            borderColor:     selected ? c.color : c.color + "40",
+                            borderColor: selected ? c.color : c.color + "40",
                             backgroundColor: selected ? c.color + "33" : c.color + "12",
                           }}
                           className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all"
@@ -605,7 +624,7 @@ export default function IngresoTab({
                         .filter(c =>
                           tipoMovimiento === "ingreso"
                             ? c.tipo === "ingreso" || c.tipo === "ambos"
-                            : c.tipo === "gasto"   || c.tipo === "ambos"
+                            : c.tipo === "gasto" || c.tipo === "ambos"
                         )
                         .map(c => [c.id, c])
                     ).values()

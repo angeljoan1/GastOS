@@ -41,7 +41,7 @@
     "errorPasswordWeak": "La contraseña debe tener al menos 8 caracteres, incluir letras y números.",
     "errorLoginFailed": "No hemos podido iniciar sesión. Verifica que el correo y la contraseña sean correctos, o crea una cuenta si aún no tienes una.",
     "errorEmailRequired": "Por favor, introduce tu correo electrónico.",
-    "successRegister": "Registro exitoso. Revisa tu correo para confirmar tu cuenta.",
+    "successRegister": "Registro exitoso. Revisa tu correo para confirmar tu cuenta. Si no lo ves, mira la carpeta de spam o correo no deseado.",
     "successResetLink": "Te hemos enviado un enlace para recuperar tu contraseña. Revisa tu bandeja de entrada."
   },
   "pin": {
@@ -147,7 +147,9 @@
     "pendingLabelGasto": "↓ Gasto",
     "pendingCollect": "¿Cobrado?",
     "pendingPay": "Cobrar",
-    "ariaDecimalPoint": "punto decimal"
+    "ariaDecimalPoint": "punto decimal",
+    "recurringTransferLabel": "Transferencia recurrente",
+    "recurringTransferDesc": "Se repetirá cada mes automáticamente"
   },
   "historial": {
     "searchPlaceholder": "Buscar por nota o categoría...",
@@ -349,6 +351,8 @@
     "catAriaName": "Nombre de la nueva categoría",
     "catAriaCreate": "Crear categoría",
     "catSectionIcono": "Icono",
+    "catCanRecurLabel": "Puede ser recurrente",
+    "catCanRecurDesc": "Al registrar un gasto de esta categoría, preguntará si se repite",
     "catErrorCreate": "Error al crear la categoría.",
     "catErrorDelete": "No se pudo borrar. Puede que haya movimientos asociados.",
     "presupuestosHint": "Asigna un límite mensual a tus categorías de <gasto>gasto puro</gasto>. El widget de presupuestos en el <dashboard>Dashboard</dashboard> muestra el progreso de cada límite.",

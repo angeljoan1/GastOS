@@ -45,6 +45,7 @@ export default function SettingsModal({
   const [newCatName, setNewCatName] = useState("")
   const [newCatTipo, setNewCatTipo] = useState<"gasto" | "ingreso" | "ambos">("gasto")
   const [newCatIcono, setNewCatIcono] = useState("Package")
+  const [newCatCanRecur, setNewCatCanRecur] = useState(false)
   const [savingCat, setSavingCat] = useState(false)
   const [deletingCat, setDeletingCat] = useState<string | null>(null)
 
@@ -77,6 +78,7 @@ export default function SettingsModal({
       setEditingObj(false)
       setActiveTab(null)
       setBioError(null)
+      setNewCatCanRecur(false)
       isBiometricAvailable().then(available => {
         setBioAvailable(available)
         setBioEnabled(hasBiometricKey())
@@ -114,6 +116,7 @@ export default function SettingsModal({
         icono: newCatIcono,
         tipo: newCatTipo,
         orden: categorias.length,
+        can_be_recurring: newCatCanRecur,
       })
       .select()
       .single()
@@ -393,6 +396,23 @@ export default function SettingsModal({
                     {tipo === "gasto" ? t("settings.catTypeButtonGasto") : tipo === "ingreso" ? t("settings.catTypeButtonIngreso") : t("settings.catTypeButtonAmbos")}
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center justify-between px-1 py-2">
+                <div>
+                  <p className="text-xs font-medium text-zinc-300">{t("settings.catCanRecurLabel")}</p>
+                  <p className="text-xs text-zinc-600 mt-0.5">{t("settings.catCanRecurDesc")}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={newCatCanRecur}
+                  onClick={() => setNewCatCanRecur(v => !v)}
+                  className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${newCatCanRecur ? "bg-emerald-500" : "bg-zinc-700"
+                    }`}
+                >
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${newCatCanRecur ? "left-5" : "left-1"
+                    }`} />
+                </button>
               </div>
               <div className="flex gap-2">
                 <input

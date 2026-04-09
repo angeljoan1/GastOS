@@ -41,7 +41,7 @@
     "errorPasswordWeak": "La contrasenya ha de tenir almenys 8 caràcters, incloure lletres i números.",
     "errorLoginFailed": "No hem pogut iniciar sessió. Verifica que el correu i la contrasenya siguin correctes, o crea un compte si encara no en tens cap.",
     "errorEmailRequired": "Si us plau, introdueix el teu correu electrònic.",
-    "successRegister": "Registre completat. Revisa el teu correu per confirmar el compte.",
+    "successRegister": "Registre completat. Revisa el teu correu per confirmar el compte. Si no el veus, mira la carpeta de correu brossa o spam.",
     "successResetLink": "T'hem enviat un enllaç per recuperar la contrasenya. Revisa la teva safata d'entrada."
   },
   "pin": {
@@ -147,7 +147,9 @@
     "pendingLabelGasto": "↓ Despesa",
     "pendingCollect": "Cobrat?",
     "pendingPay": "Cobrar",
-    "ariaDecimalPoint": "punt decimal"
+    "ariaDecimalPoint": "punt decimal",
+    "recurringTransferLabel": "Transferència recurrent",
+    "recurringTransferDesc": "Es repetirà automàticament cada mes"
   },
   "historial": {
     "searchPlaceholder": "Cerca per nota o categoria...",
@@ -349,6 +351,8 @@
     "catAriaName": "Nom de la nova categoria",
     "catAriaCreate": "Crear categoria",
     "catSectionIcono": "Icona",
+    "catCanRecurLabel": "Pot ser recurrent",
+    "catCanRecurDesc": "En registrar una despesa d'aquesta categoria, preguntarà si es repeteix",
     "catErrorCreate": "Error en crear la categoria.",
     "catErrorDelete": "No s'ha pogut eliminar. Pot tenir moviments associats.",
     "presupuestosHint": "Assigna un límit mensual a les teves categories de <gasto>despesa pura</gasto>. El widget de pressupostos al <dashboard>Dashboard</dashboard> mostra el progrés de cada límit.",

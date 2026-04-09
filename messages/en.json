@@ -41,7 +41,7 @@
     "errorPasswordWeak": "Password must be at least 8 characters and include letters and numbers.",
     "errorLoginFailed": "We couldn't sign you in. Check that your email and password are correct, or create an account if you don't have one yet.",
     "errorEmailRequired": "Please enter your email address.",
-    "successRegister": "Registration successful. Check your email to confirm your account.",
+    "successRegister": "Registration successful. Check your email to confirm your account. If you don't see it, check your spam or junk folder.",
     "successResetLink": "We've sent you a link to recover your password. Check your inbox."
   },
   "pin": {
@@ -147,7 +147,9 @@
     "pendingLabelGasto": "↓ Expense",
     "pendingCollect": "Received?",
     "pendingPay": "Pay",
-    "ariaDecimalPoint": "decimal point"
+    "ariaDecimalPoint": "decimal point",
+    "recurringTransferLabel": "Recurring transfer",
+    "recurringTransferDesc": "It will repeat automatically every month"
   },
   "historial": {
     "searchPlaceholder": "Search by note or category...",
@@ -349,6 +351,8 @@
     "catAriaName": "New category name",
     "catAriaCreate": "Create category",
     "catSectionIcono": "Icon",
+    "catCanRecurLabel": "Can be recurring",
+    "catCanRecurDesc": "When logging an expense in this category, it will ask if it repeats",
     "catErrorCreate": "Error creating the category.",
     "catErrorDelete": "Could not delete. It may have associated movements.",
     "presupuestosHint": "Assign a monthly limit to your <gasto>pure expense</gasto> categories. The budgets widget on the <dashboard>Dashboard</dashboard> shows the progress of each limit.",

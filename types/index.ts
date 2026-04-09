@@ -22,6 +22,7 @@ export interface Categoria {
   tipo:       TipoCategoria
   orden:      number
   created_at: string
+  can_be_recurring?: boolean
 }
 
 // ─── Presupuesto mensual por categoría ───────────────────────

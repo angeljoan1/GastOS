@@ -158,6 +158,9 @@ export default function DashboardTab({
   const dragIdRef = useRef<WidgetId | null>(null)
   const dragOverIdRef = useRef<WidgetId | null>(null)
   const isDraggingRef = useRef(false)
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null)
+  const [ghostLabel, setGhostLabel] = useState<string>("")
   const [activeWidgets, setActiveWidgets] = useState<WidgetId[]>(() => {
     if (typeof window === "undefined") return DEFAULT_WIDGETS
     try {
@@ -1383,6 +1386,23 @@ export default function DashboardTab({
         )
       })()}
 
+      {/* Fantasma de drag */}
+      {ghostPos && ghostLabel && (
+        <div
+          className="fixed z-[200] pointer-events-none select-none"
+          style={{
+            left: ghostPos.x - 20,
+            top: ghostPos.y - 28,
+            transform: "rotate(2deg) scale(1.05)",
+          }}
+        >
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-500/60 bg-zinc-900 shadow-2xl shadow-black/60">
+            <span className="text-sm font-medium text-zinc-100">{ghostLabel}</span>
+            <span className="text-zinc-500 text-xs">⠿</span>
+          </div>
+        </div>
+      )}
+
       {/* Widget picker */}
       {showWidgetPicker && (
         <div
@@ -1420,21 +1440,33 @@ export default function DashboardTab({
                 const isDraggingThis = dragId === id
                 const isOver = dragOverId === id
 
+                const DRAG_THRESHOLD = 8
+
                 const handlePointerDown = (e: React.PointerEvent) => {
-                  // Ignorar si el click ve del botó de toggle
                   if ((e.target as HTMLElement).closest("button")) return
                   isDraggingRef.current = false
                   dragIdRef.current = w.id
-                  e.currentTarget.setPointerCapture(e.pointerId)
+                  pointerStartRef.current = { x: e.clientX, y: e.clientY }
+                  // NO capturem el pointer aquí — deixem que el scroll funcioni
                 }
 
                 const handlePointerMove = (e: React.PointerEvent) => {
-                  if (!dragIdRef.current) return
+                  if (!dragIdRef.current || !pointerStartRef.current) return
+                  const dx = e.clientX - pointerStartRef.current.x
+                  const dy = e.clientY - pointerStartRef.current.y
+                  const dist = Math.sqrt(dx * dx + dy * dy)
+
                   if (!isDraggingRef.current) {
+                    if (dist < DRAG_THRESHOLD) return
+                    // Threshold superat: activem el drag i capturem el pointer
                     isDraggingRef.current = true
                     setDragId(dragIdRef.current)
+                    setGhostLabel(w.label)
+                    e.currentTarget.setPointerCapture(e.pointerId)
                   }
-                  // Troba l'element sobre el qual estem
+
+                  setGhostPos({ x: e.clientX, y: e.clientY })
+
                   e.currentTarget.releasePointerCapture(e.pointerId)
                   const el = document.elementFromPoint(e.clientX, e.clientY)
                   const target = el?.closest("[data-widget-id]")
@@ -1447,7 +1479,9 @@ export default function DashboardTab({
                 }
 
                 const handlePointerUp = (e: React.PointerEvent) => {
-                  e.currentTarget.releasePointerCapture(e.pointerId)
+                  if (isDraggingRef.current) {
+                    e.currentTarget.releasePointerCapture(e.pointerId)
+                  }
                   if (isDraggingRef.current && dragIdRef.current && dragOverIdRef.current && dragIdRef.current !== dragOverIdRef.current) {
                     const from = dragIdRef.current
                     const to = dragOverIdRef.current
@@ -1464,8 +1498,11 @@ export default function DashboardTab({
                   dragIdRef.current = null
                   dragOverIdRef.current = null
                   isDraggingRef.current = false
+                  pointerStartRef.current = null
                   setDragId(null)
                   setDragOverId(null)
+                  setGhostPos(null)
+                  setGhostLabel("")
                 }
 
                 return (

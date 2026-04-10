@@ -159,8 +159,10 @@ export default function DashboardTab({
   const dragOverIdRef = useRef<WidgetId | null>(null)
   const isDraggingRef = useRef(false)
   const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null)
   const [ghostLabel, setGhostLabel] = useState<string>("")
+  const [ghostIcon, setGhostIcon] = useState<React.ElementType | null>(null)
   const [activeWidgets, setActiveWidgets] = useState<WidgetId[]>(() => {
     if (typeof window === "undefined") return DEFAULT_WIDGETS
     try {
@@ -1387,21 +1389,30 @@ export default function DashboardTab({
       })()}
 
       {/* Fantasma de drag */}
-      {ghostPos && ghostLabel && (
-        <div
-          className="fixed z-[200] pointer-events-none select-none"
-          style={{
-            left: ghostPos.x - 20,
-            top: ghostPos.y - 28,
-            transform: "rotate(2deg) scale(1.05)",
-          }}
-        >
-          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-500/60 bg-zinc-900 shadow-2xl shadow-black/60">
-            <span className="text-sm font-medium text-zinc-100">{ghostLabel}</span>
-            <span className="text-zinc-500 text-xs">⠿</span>
+      {ghostPos && ghostLabel && ghostIcon && (() => {
+        const GhostIcon = ghostIcon as React.ElementType
+        return (
+          <div
+            className="fixed z-[200] pointer-events-none select-none"
+            style={{
+              left: ghostPos.x - 160,
+              top: ghostPos.y - 32,
+              width: "320px",
+              opacity: 0.85,
+            }}
+          >
+            <div className="flex items-center gap-4 px-4 py-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 shadow-2xl shadow-black/60">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
+                <GhostIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-zinc-100">{ghostLabel}</p>
+              </div>
+              <span className="text-zinc-600 text-xs">⠿</span>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Widget picker */}
       {showWidgetPicker && (
@@ -1440,48 +1451,59 @@ export default function DashboardTab({
                 const isDraggingThis = dragId === id
                 const isOver = dragOverId === id
 
-                const DRAG_THRESHOLD = 8
+                const HOLD_MS = 350
 
                 const handlePointerDown = (e: React.PointerEvent) => {
                   if ((e.target as HTMLElement).closest("button")) return
                   isDraggingRef.current = false
                   dragIdRef.current = w.id
                   pointerStartRef.current = { x: e.clientX, y: e.clientY }
-                  // NO capturem el pointer aquí — deixem que el scroll funcioni
+                  // Iniciem el timer de hold — el drag s'activa només si l'usuari
+                  // manté premut HOLD_MS sense moure's més de 6px
+                  holdTimerRef.current = setTimeout(() => {
+                    if (!dragIdRef.current) return
+                    isDraggingRef.current = true
+                    setDragId(dragIdRef.current)
+                    setGhostLabel(w.label)
+                    setGhostIcon(() => WIcon)
+                    if (pointerStartRef.current) {
+                      setGhostPos({ x: pointerStartRef.current.x, y: pointerStartRef.current.y })
+                    }
+                    // Ara sí capturem el pointer per rebre tots els events
+                    const el = document.querySelector(`[data-widget-id="${dragIdRef.current}"]`)
+                    if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
+                  }, HOLD_MS)
                 }
 
                 const handlePointerMove = (e: React.PointerEvent) => {
                   if (!dragIdRef.current || !pointerStartRef.current) return
                   const dx = e.clientX - pointerStartRef.current.x
                   const dy = e.clientY - pointerStartRef.current.y
-                  const dist = Math.sqrt(dx * dx + dy * dy)
-
+                  // Si es mou més de 6px abans del hold, cancel·lem el drag
                   if (!isDraggingRef.current) {
-                    if (dist < DRAG_THRESHOLD) return
-                    // Threshold superat: activem el drag i capturem el pointer
-                    isDraggingRef.current = true
-                    setDragId(dragIdRef.current)
-                    setGhostLabel(w.label)
-                    e.currentTarget.setPointerCapture(e.pointerId)
+                    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                      if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+                      dragIdRef.current = null
+                      pointerStartRef.current = null
+                    }
+                    return
                   }
-
                   setGhostPos({ x: e.clientX, y: e.clientY })
-
                   e.currentTarget.releasePointerCapture(e.pointerId)
                   const el = document.elementFromPoint(e.clientX, e.clientY)
                   const target = el?.closest("[data-widget-id]")
                   const overId = target?.getAttribute("data-widget-id") as WidgetId | null
-                  // Guardem on estem sense reordenar — el reordenament passa al pointerUp
                   if (overId && overId !== dragIdRef.current) {
                     dragOverIdRef.current = overId
+                    setDragOverId(overId)
                   }
                   e.currentTarget.setPointerCapture(e.pointerId)
                 }
 
                 const handlePointerUp = (e: React.PointerEvent) => {
+                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
                   if (isDraggingRef.current) {
                     e.currentTarget.releasePointerCapture(e.pointerId)
-                    // Llegim la posició final per saber on deixem caure
                     const el = document.elementFromPoint(e.clientX, e.clientY)
                     const target = el?.closest("[data-widget-id]")
                     const finalOverId = (target?.getAttribute("data-widget-id") ?? dragOverIdRef.current) as WidgetId | null
@@ -1507,6 +1529,7 @@ export default function DashboardTab({
                   setDragOverId(null)
                   setGhostPos(null)
                   setGhostLabel("")
+                  setGhostIcon(null)
                 }
 
                 return (
@@ -1516,8 +1539,8 @@ export default function DashboardTab({
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none touch-none ${
-                      isDraggingThis ? "opacity-40 cursor-grabbing" : "cursor-grab"
+                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none ${
+                      isDraggingThis ? "opacity-40 cursor-grabbing touch-none" : "cursor-grab"
                     } ${isOver && !isDraggingThis ? "border-emerald-500/60 bg-emerald-950/30" : "border-emerald-500/40 bg-emerald-950/20"}`}
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">

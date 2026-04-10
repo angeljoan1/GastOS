@@ -47,8 +47,9 @@ export default function CuentasModal({
   const dragOverCuentaIdRef = useRef<string | null>(null)
   const isDraggingCuentaRef = useRef(false)
   const pointerCuentaStartRef = useRef<{ x: number; y: number } | null>(null)
+  const holdCuentaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [ghostCuentaPos, setGhostCuentaPos] = useState<{ x: number; y: number } | null>(null)
-  const [ghostCuentaLabel, setGhostCuentaLabel] = useState<string>("")
+  const [ghostCuentaData, setGhostCuentaData] = useState<Cuenta | null>(null)
 
   // Escape para cerrar
   useEffect(() => {

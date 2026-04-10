@@ -60,6 +60,7 @@ export default function IngresoTab({
   const dragOverCatIdRef = useRef<string | null>(null)
   const isDraggingCatRef = useRef(false)
   const pointerCatStartRef = useRef<{ x: number; y: number } | null>(null)
+  const holdCatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [draggingCatId, setDraggingCatId] = useState<string | null>(null)
   const [dragOverCatId, setDragOverCatId] = useState<string | null>(null)
   const [ghostCatPos, setGhostCatPos] = useState<{ x: number; y: number } | null>(null)
@@ -358,11 +359,11 @@ function onCategoryClick(catId: string) {
         style={{
           left: ghostCatPos.x - 40,
           top: ghostCatPos.y - 40,
-          transform: "rotate(2deg) scale(1.05)",
+          opacity: 0.85,
         }}
       >
-        <div className="flex flex-col items-center justify-center gap-1 w-20 h-20 rounded-2xl border border-emerald-500/60 bg-zinc-900 shadow-2xl shadow-black/60">
-          <span className="text-[11px] font-medium text-zinc-100 text-center leading-tight px-1">{ghostCatLabel}</span>
+        <div className="h-20 w-20 rounded-2xl bg-zinc-900 border border-emerald-500/50 flex flex-col items-center justify-center gap-2 shadow-2xl shadow-black/60">
+          <span className="text-[11px] font-medium text-zinc-300 text-center leading-tight px-1">{ghostCatLabel}</span>
         </div>
       </div>
     )}
@@ -757,41 +758,51 @@ function onCategoryClick(catId: string) {
                       const isDraggingThis = draggingCatId === cat.id
                       const isOver = dragOverCatId === cat.id && !isDraggingThis
 
-                      const DRAG_THRESHOLD = 8
+                      const HOLD_MS = 350
 
                       const handlePointerDown = (e: React.PointerEvent) => {
                         isDraggingCatRef.current = false
                         dragCatIdRef.current = cat.id
                         pointerCatStartRef.current = { x: e.clientX, y: e.clientY }
+                        holdCatTimerRef.current = setTimeout(() => {
+                          if (!dragCatIdRef.current) return
+                          isDraggingCatRef.current = true
+                          setDraggingCatId(dragCatIdRef.current)
+                          setGhostCatLabel(cat.label)
+                          if (pointerCatStartRef.current) {
+                            setGhostCatPos({ x: pointerCatStartRef.current.x, y: pointerCatStartRef.current.y })
+                          }
+                          const el = document.querySelector(`[data-cat-id="${dragCatIdRef.current}"]`)
+                          if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
+                        }, HOLD_MS)
                       }
 
                       const handlePointerMove = (e: React.PointerEvent) => {
                         if (!dragCatIdRef.current || !pointerCatStartRef.current) return
                         const dx = e.clientX - pointerCatStartRef.current.x
                         const dy = e.clientY - pointerCatStartRef.current.y
-                        const dist = Math.sqrt(dx * dx + dy * dy)
-
                         if (!isDraggingCatRef.current) {
-                          if (dist < DRAG_THRESHOLD) return
-                          isDraggingCatRef.current = true
-                          setDraggingCatId(dragCatIdRef.current)
-                          setGhostCatLabel(cat.label)
-                          e.currentTarget.setPointerCapture(e.pointerId)
+                          if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                            if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
+                            dragCatIdRef.current = null
+                            pointerCatStartRef.current = null
+                          }
+                          return
                         }
-
                         setGhostCatPos({ x: e.clientX, y: e.clientY })
-
                         e.currentTarget.releasePointerCapture(e.pointerId)
                         const el = document.elementFromPoint(e.clientX, e.clientY)
                         const target = el?.closest("[data-cat-id]")
                         const overId = target?.getAttribute("data-cat-id") ?? null
                         if (overId && overId !== dragCatIdRef.current) {
                           dragOverCatIdRef.current = overId
+                          setDragOverCatId(overId)
                         }
                         e.currentTarget.setPointerCapture(e.pointerId)
                       }
 
                       const handlePointerUp = (e: React.PointerEvent) => {
+                        if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
                         if (isDraggingCatRef.current) {
                           e.currentTarget.releasePointerCapture(e.pointerId)
                           const el = document.elementFromPoint(e.clientX, e.clientY)

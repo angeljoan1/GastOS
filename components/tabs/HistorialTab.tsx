@@ -54,6 +54,10 @@ export default function HistorialTab({
   const [showCatSheet, setShowCatSheet] = useState(false)
   const [showTipoSheet, setShowTipoSheet] = useState(false)
   const [updateError, setUpdateError] = useState<string | null>(null)
+  const [swipeState, setSwipeState] = useState<{ id: string; dx: number } | null>(null)
+  const swipeStartX = useRef<number>(0)
+  const swipeStartY = useRef<number>(0)
+  const swipeLocked = useRef<"horizontal" | "vertical" | null>(null)
 
   // Carga desde BD y desencripta.
   // Cuando forSearch=true carga SIN paginación para buscar en todos los movimientos.
@@ -112,11 +116,23 @@ export default function HistorialTab({
     setIsSearching(false)
   }, [])
 
-  // Re-fetch al cambiar categoría o tipo
+  // Fetch unificado: reacciona a filtros y a searchTerm.
+  // Con debounce de 350ms en searchTerm para evitar queries en cada keystroke.
+  // Cuando hay texto carga todos los movimientos sin paginar (notas cifradas en BD).
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
-    setPage(0)
-    fetchMovimientos(0, selectedCategory, tipoFilter, true)
-  }, [selectedCategory, tipoFilter, fetchMovimientos])
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(0)
+      fetchMovimientos(0, selectedCategory, tipoFilter, true, !!searchTerm.trim())
+    }, searchTerm.trim() ? 350 : 0)
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [searchTerm, selectedCategory, tipoFilter, fetchMovimientos])
 
   const cancelDeleteRef = useRef<HTMLButtonElement>(null)
 
@@ -126,19 +142,6 @@ export default function HistorialTab({
       return () => clearTimeout(t)
     }
   }, [confirmarBorrado])
-
-  // Bug 15 FIX: cuando hay texto de búsqueda, cargamos TODOS los movimientos
-  // (sin paginar) para poder filtrar en memoria, ya que las notas están cifradas
-  // en BD y no se pueden buscar server-side.
-  // Al borrar el término volvemos al fetch paginado normal.
-  useEffect(() => {
-    setPage(0)
-    if (searchTerm.trim()) {
-      fetchMovimientos(0, selectedCategory, tipoFilter, true, true)
-    } else {
-      fetchMovimientos(0, selectedCategory, tipoFilter, true, false)
-    }
-  }, [searchTerm, fetchMovimientos, selectedCategory, tipoFilter])
 
   // Filtrado en memoria por texto (los datos ya están desencriptados)
   const movimientosFiltrados = searchTerm.trim()
@@ -221,7 +224,10 @@ export default function HistorialTab({
   }
 
   function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString("es-ES", {
+    const locale = typeof window !== "undefined"
+      ? (localStorage.getItem("gastos_locale") ?? "es-ES")
+      : "es-ES"
+    return new Date(iso).toLocaleDateString(locale, {
       day: "2-digit",
       month: "short",
     })
@@ -367,12 +373,56 @@ export default function HistorialTab({
 
               const amountPrefix = esTransfer ? "↔" : esIngreso ? "+" : "-"
 
+              const swipeDx = swipeState?.id === m.id ? swipeState.dx : 0
+              const swipeClampedDx = Math.max(-80, Math.min(80, swipeDx))
+
               return (
-                <div
-                  key={m.id}
-                  className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 transition-all duration-200 hover:bg-zinc-800/50 cursor-pointer`}
-                  style={{ opacity: isDeleting ? 0.5 : 1 }}
-                >
+                <div key={m.id} className="relative overflow-hidden rounded-2xl">
+                  {/* Acción izquierda: editar */}
+                  <div className="absolute inset-y-0 left-0 flex items-center justify-start pl-4 w-20 bg-emerald-950/60">
+                    <Edit2 className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  {/* Acción derecha: borrar */}
+                  <div className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 w-20 bg-red-950/60">
+                    <Trash2 className="w-5 h-5 text-red-400" />
+                  </div>
+                  <div
+                    className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 transition-transform duration-150 hover:bg-zinc-800/50 cursor-pointer`}
+                    style={{
+                      opacity: isDeleting ? 0.5 : 1,
+                      transform: `translateX(${swipeClampedDx}px)`,
+                      transition: swipeState?.id === m.id ? "none" : "transform 0.2s ease",
+                    }}
+                    onTouchStart={e => {
+                      swipeStartX.current = e.touches[0].clientX
+                      swipeStartY.current = e.touches[0].clientY
+                      swipeLocked.current = null
+                      setSwipeState({ id: m.id, dx: 0 })
+                    }}
+                    onTouchMove={e => {
+                      const dx = e.touches[0].clientX - swipeStartX.current
+                      const dy = e.touches[0].clientY - swipeStartY.current
+                      if (!swipeLocked.current) {
+                        swipeLocked.current = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical"
+                      }
+                      if (swipeLocked.current === "horizontal") {
+                        e.preventDefault()
+                        setSwipeState({ id: m.id, dx })
+                      }
+                    }}
+                    onTouchEnd={() => {
+                      if (swipeState?.id === m.id) {
+                        const dx = swipeState.dx
+                        if (dx > 60) {
+                          setEditingMov(m)
+                        } else if (dx < -60) {
+                          setConfirmarBorrado(m.id)
+                        }
+                      }
+                      setSwipeState(null)
+                      swipeLocked.current = null
+                    }}
+                  >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${esTransfer ? "bg-blue-500/10" : esIngreso ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
                     {esTransfer
                       ? <ArrowLeftRight className="w-4 h-4 text-blue-400" aria-hidden="true" />
@@ -448,6 +498,7 @@ export default function HistorialTab({
                       : <Trash2 className="w-4 h-4" />
                     }
                   </button>
+                  </div>
                 </div>
               )
             })}

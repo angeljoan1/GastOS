@@ -9,7 +9,7 @@ import FeedbackWidget from "@/components/FeedbackWidget"
 import ImportCSVModal from "@/components/modals/ImportCSVModal"
 import {
   LogOut, Loader2, WalletCards, History,
-  BarChart3, Settings, Menu, Download, Upload, Landmark, RefreshCw,
+  BarChart3, Settings, Menu, Download, Upload, Landmark, RefreshCw, MessageSquare,
 } from "lucide-react"
 import AuthScreen from "@/components/auth/AuthScreen"
 import PinPadScreen from "@/components/auth/PinPadScreen"
@@ -29,17 +29,20 @@ const APP_VERSION = 22
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {
   const t = useTranslations()
-  const [tab, setTab]                   = useState<"ingreso" | "historial" | "dashboard">("ingreso")
-  const [categorias, setCategorias]     = useState<Categoria[]>([])
-  const [cuentas, setCuentas]           = useState<Cuenta[]>([])
+  const [tab, setTab] = useState<"ingreso" | "historial" | "dashboard">("ingreso")
+  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [cuentas, setCuentas] = useState<Cuenta[]>([])
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
-  const [objetivos, setObjetivos]       = useState<Objetivo[]>([])
+  const [objetivos, setObjetivos] = useState<Objetivo[]>([])
   const [showSettings, setShowSettings] = useState(false)
-  const [showCuentas, setShowCuentas]   = useState(false)
-  const [showImport, setShowImport]     = useState(false)
-  const [isMenuOpen, setIsMenuOpen]     = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<"categorias" | "presupuestos" | "objetivos" | "seguridad" | null>(null)
+  const [showCuentas, setShowCuentas] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [historialKey, setHistorialKey] = useState(0)
-  const [exportMsg, setExportMsg]       = useState<string | null>(null)
+  const [exportMsg, setExportMsg] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -66,7 +69,10 @@ function MainApp({ session }: { session: Session }) {
       .select("*")
       .eq("user_id", session.user.id)
       .order("label")
-      .then(({ data }) => { if (data) setCategorias(data) })
+      .then(({ data, error }) => {
+        if (error) setLoadError(true)
+        if (data) setCategorias(data)
+      })
 
     supabase
       .from("cuentas")
@@ -78,14 +84,14 @@ function MainApp({ session }: { session: Session }) {
         const decrypted = await Promise.all(
           data.map(async c => ({
             ...c,
-            nombre:        await decryptData(c.nombre),
+            nombre: await decryptData(c.nombre),
             saldo_inicial: parseFloat(await decryptData(String(c.saldo_inicial))) || 0,
           }))
         )
         setCuentas(decrypted)
       })
 
-      supabase
+    supabase
       .from("presupuestos")
       .select("*")
       .eq("user_id", session.user.id)
@@ -117,11 +123,18 @@ function MainApp({ session }: { session: Session }) {
   }, [session.user.id])
 
   const handleExportCSV = async () => {
-    const { data } = await supabase
-    .from("movimientos")
-    .select("*")
-    .eq("user_id", session.user.id)
-    .order("created_at", { ascending: false })
+    const { data, error: fetchError } = await supabase
+      .from("movimientos")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false })
+
+    if (fetchError) {
+      setExportMsg(t("nav.exportError"))
+      setTimeout(() => setExportMsg(null), 3000)
+      setIsMenuOpen(false)
+      return
+    }
 
     if (!data || data.length === 0) {
       setExportMsg(t("nav.exportNoData"))
@@ -134,27 +147,28 @@ function MainApp({ session }: { session: Session }) {
       data.map(async m => ({
         ...m,
         cantidad: parseFloat(await decryptData(m.cantidad)) || 0,
-        nota:     m.nota ? await decryptData(m.nota) : "",
+        nota: m.nota ? await decryptData(m.nota) : "",
       }))
     )
 
-    // Resolvemos cuenta_id a nombre de cuenta para que el CSV sea legible
+    // Resolvemos cuenta_id y categoria a nombres legibles
     const cuentaMap = Object.fromEntries(cuentas.map(c => [c.id, c.nombre]))
+    const catMap = Object.fromEntries(categorias.map(c => [c.id, c.label]))
 
     const headers = ["ID", "Fecha", "Tipo", "Categoria", "Cantidad", "Nota", "Cuenta"]
     const rows = dec.map(m => [
       m.id,
       new Date(m.created_at).toLocaleString("es-ES"),
       m.tipo ?? "gasto",
-      m.categoria,
+      catMap[m.categoria] ?? m.categoria,
       m.cantidad,
       (m.nota || "").replace(/,/g, ";"),
       cuentaMap[m.cuenta_id] || m.cuenta_id || "",
     ])
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n")
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }))
-    const a   = document.createElement("a")
-    a.href     = url
+    const a = document.createElement("a")
+    a.href = url
     a.download = "gastos_export.csv"
     a.click()
     URL.revokeObjectURL(url)
@@ -165,12 +179,12 @@ function MainApp({ session }: { session: Session }) {
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
       <header className="flex items-center justify-between px-4 pt-safe-top pb-0.5 min-h-10 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm relative z-20">
         <div className="flex items-center gap-2">
-        <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-lg" />
-        <span className="text-lg font-bold tracking-tight text-zinc-100">GastOS</span>
+          <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-lg" />
+          <span className="text-lg font-bold tracking-tight text-zinc-100">GastOS</span>
         </div>
 
         <div className="flex items-center gap-1">
-        <button
+          <button
             onClick={() => setShowCuentas(true)}
             aria-label={t("nav.ariaAccounts")}
             className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
@@ -216,6 +230,13 @@ function MainApp({ session }: { session: Session }) {
                 >
                   <Upload className="w-4 h-4" /> {t("nav.menuImportCSV")}
                 </button>
+                <button
+                  role="menuitem"
+                  onClick={() => { setShowFeedback(true); setIsMenuOpen(false) }}
+                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                >
+                  <MessageSquare className="w-4 h-4" /> {t("nav.menuFeedback")}
+                </button>
                 <div className="h-px bg-zinc-800 my-1 mx-2" />
                 <button
                   role="menuitem"
@@ -230,27 +251,38 @@ function MainApp({ session }: { session: Session }) {
         </div>
       </header>
 
+      {loadError && (
+        <div className="px-4 py-2 bg-yellow-950/40 border-b border-yellow-900/40 flex items-center gap-2">
+          <span className="text-xs text-yellow-400">{t("nav.loadError")}</span>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-yellow-300 underline ml-auto"
+          >
+            {t("nav.loadErrorRetry")}
+          </button>
+        </div>
+      )}
+
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-      {tab === "ingreso"   && <IngresoTab categorias={categorias} cuentas={cuentas} />}
+        {tab === "ingreso" && <IngresoTab categorias={categorias} cuentas={cuentas} />}
         {tab === "historial" && <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />}
-        {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} />}
+        {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} />}
       </main>
 
       <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1 pb-safe-bottom">
         <div className="flex items-end justify-around">
-        {([
-            { id: "ingreso",    Icon: WalletCards, label: t("nav.register")   },
-            { id: "historial",  Icon: History,     label: t("nav.historial")  },
-            { id: "dashboard",  Icon: BarChart3,   label: t("nav.dashboard")  },
+          {([
+            { id: "ingreso", Icon: WalletCards, label: t("nav.register") },
+            { id: "historial", Icon: History, label: t("nav.historial") },
+            { id: "dashboard", Icon: BarChart3, label: t("nav.dashboard") },
           ] as const).map(({ id, Icon, label }) => (
             <button
               key={id}
               onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
               aria-label={label}
               aria-current={tab === id ? "page" : undefined}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 transition-all duration-200 relative ${
-                tab === id ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-400"
-              }`}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 transition-all duration-200 relative ${tab === id ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-400"
+                }`}
             >
               <Icon className="w-5 h-5" />
               <span className="text-[10px] font-medium">{label}</span>
@@ -264,7 +296,8 @@ function MainApp({ session }: { session: Session }) {
 
       <SettingsModal
         isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+        onClose={() => { setShowSettings(false); setSettingsInitialTab(null) }}
+        initialTab={settingsInitialTab}
         categorias={categorias}
         onCategoriesChange={setCategorias}
         presupuestos={presupuestos}
@@ -290,7 +323,7 @@ function MainApp({ session }: { session: Session }) {
           setHistorialKey(k => k + 1)
         }}
       />
-      <FeedbackWidget userId={session.user.id} />
+      <FeedbackWidget userId={session.user.id} isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
     </div>
   )
 }
@@ -316,11 +349,11 @@ function NeedsUpdateScreen() {
 
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function App() {
-  const [session,     setSession]     = useState<Session | null>(null)
-  const [loading,     setLoading]     = useState(true)
-  const [mounted,     setMounted]     = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [needsUpdate, setNeedsUpdate] = useState(false)
-  const [hasKey,      setHasKey]      = useState(false)
+  const [hasKey, setHasKey] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -406,7 +439,7 @@ export default function App() {
     <NeedsUpdateScreen />
   )
 
-  if (!session)  return <AuthScreen />
-  if (!hasKey)   return <PinPadScreen session={session} onUnlocked={handleUnlocked} />
+  if (!session) return <AuthScreen />
+  if (!hasKey) return <PinPadScreen session={session} onUnlocked={handleUnlocked} />
   return <MainApp session={session} />
 }

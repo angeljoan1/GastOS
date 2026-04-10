@@ -93,7 +93,11 @@
     "menuExportCSV": "Exportar CSV",
     "menuImportCSV": "Importar CSV",
     "menuSignOut": "Cerrar Sesión",
-    "exportNoData": "No hay movimientos para exportar"
+    "exportNoData": "No hay movimientos para exportar",
+    "exportError": "Error al exportar. Comprueba tu conexión.",
+    "loadError": "No se pudieron cargar los datos.",
+    "loadErrorRetry": "Reintentar",
+    "menuFeedback": "Enviar sugerencia"
   },
   "ingreso": {
     "typeGasto": "Gasto",
@@ -149,7 +153,12 @@
     "pendingPay": "Cobrar",
     "ariaDecimalPoint": "punto decimal",
     "recurringTransferLabel": "Transferencia recurrente",
-    "recurringTransferDesc": "Se repetirá cada mes automáticamente"
+    "recurringTransferDesc": "Se repetirá cada mes automáticamente",
+    "savedAmount": "Importe",
+    "savedCategory": "Categoría",
+    "savedAccount": "Cuenta",
+    "lastSaved": "Último",
+    "lastSavedEdit": "Editar"
   },
   "historial": {
     "searchPlaceholder": "Buscar por nota o categoría...",
@@ -291,7 +300,13 @@
     "objetivoMeta": "Objetivo",
     "objetivoFaltan": "Faltan ",
     "nombresDia": "Dom,Lun,Mar,Mié,Jue,Vie,Sáb",
-    "diasSemana": "D,L,M,X,J,V,S"
+    "diasSemana": "D,L,M,X,J,V,S",
+    "configureNow": "Configurar ahora",
+    "widgetResumenSemanalLabel": "Resumen semanal",
+    "widgetResumenSemanalDesc": "Comparativa de gasto esta semana vs la anterior",
+    "semanalGastosSemana": "Gasto últimos 7 días",
+    "semanalTopCategoria": "Top categoría",
+    "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del presupuesto"
   },
   "cuentas": {
     "title": "Mis Cuentas",
@@ -451,5 +466,10 @@
   "app": {
     "updateRequired": "Actualización Necesaria",
     "updateButton": "Actualizar ahora"
+  },
+  "edit": {
+    "labelCantidad": "Cantidad (€)",
+    "labelFecha": "Fecha",
+    "importedCategory": "importada"
   }
 }

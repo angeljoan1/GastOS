@@ -15,9 +15,21 @@ import { useState, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 
-export default function FeedbackWidget({ userId }: { userId: string }) {
+export default function FeedbackWidget({
+  userId,
+  isOpen: externalIsOpen,
+  onClose: externalOnClose,
+}: {
+  userId: string
+  isOpen?: boolean
+  onClose?: () => void
+}) {
   const t = useTranslations()
-  const [isOpen,       setIsOpen]       = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const isOpen    = externalIsOpen  !== undefined ? externalIsOpen  : internalIsOpen
+  const setIsOpen = externalOnClose !== undefined
+    ? (v: boolean) => { if (!v) externalOnClose() }
+    : setInternalIsOpen
   const [tipo,         setTipo]         = useState<"Bug" | "Idea">("Idea")
   const [mensaje,      setMensaje]      = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -93,7 +105,8 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
     <>
       {/* BUG #23 FIX: el botón flotante siempre está montado.
           Su visibilidad se gestiona con opacity/pointer-events para que
-          la posición de arrastre (pos) persista entre aperturas del formulario. */}
+          la posición de arrastre (pos) persista entre aperturas del formulario.
+          Se oculta completamente cuando el control es externo (desde el menú). */}
       <button
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -102,12 +115,11 @@ export default function FeedbackWidget({ userId }: { userId: string }) {
         aria-label={t("feedback.ariaOpen")}
         aria-expanded={isOpen}
         style={{
+          display:        externalIsOpen !== undefined ? "none" : undefined,
           transform:      `translate(${pos.x}px, ${pos.y}px)`,
           opacity:        isOpen ? 0 : undefined,
           pointerEvents:  isOpen ? "none" : undefined,
         }}
-        className="fixed bottom-24 right-6 bg-zinc-800 text-zinc-300 p-3 rounded-full shadow-lg border border-zinc-700 transition-opacity duration-300 opacity-50 hover:opacity-100 z-50 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing"
-        title={t("feedback.title")}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

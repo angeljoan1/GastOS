@@ -29,7 +29,7 @@ export default function SettingsModal({
   isOpen, onClose, categorias, onCategoriesChange,
   presupuestos, onPresupuestosChange,
   objetivos, onObjetivosChange,
-  session, userId,
+  session, userId, initialTab,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -41,6 +41,7 @@ export default function SettingsModal({
   onObjetivosChange: (o: Objetivo[]) => void
   session: Session
   userId: string
+  initialTab?: "categorias" | "presupuestos" | "objetivos" | "seguridad" | null
 }) {
   const [newCatName, setNewCatName] = useState("")
   const [newCatTipo, setNewCatTipo] = useState<"gasto" | "ingreso" | "ambos">("gasto")
@@ -76,7 +77,7 @@ export default function SettingsModal({
       setInputPresupuesto("")
       setInputObjetivo("")
       setEditingObj(false)
-      setActiveTab(null)
+      setActiveTab(initialTab ?? null)
       setBioError(null)
       setNewCatCanRecur(false)
       isBiometricAvailable().then(available => {

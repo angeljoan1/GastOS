@@ -93,7 +93,11 @@
     "menuExportCSV": "Export CSV",
     "menuImportCSV": "Import CSV",
     "menuSignOut": "Sign Out",
-    "exportNoData": "No movements to export"
+    "exportNoData": "No movements to export",
+    "exportError": "Export error. Check your connection.",
+    "loadError": "Could not load data.",
+    "loadErrorRetry": "Retry",
+    "menuFeedback": "Send feedback"
   },
   "ingreso": {
     "typeGasto": "Expense",
@@ -149,7 +153,12 @@
     "pendingPay": "Pay",
     "ariaDecimalPoint": "decimal point",
     "recurringTransferLabel": "Recurring transfer",
-    "recurringTransferDesc": "It will repeat automatically every month"
+    "recurringTransferDesc": "It will repeat automatically every month",
+    "savedAmount": "Amount",
+    "savedCategory": "Category",
+    "savedAccount": "Account",
+    "lastSaved": "Last",
+    "lastSavedEdit": "Edit"
   },
   "historial": {
     "searchPlaceholder": "Search by note or category...",
@@ -291,7 +300,13 @@
     "objetivoMeta": "Goal",
     "objetivoFaltan": "Remaining ",
     "nombresDia": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
-    "diasSemana": "S,M,T,W,T,F,S"
+    "diasSemana": "S,M,T,W,T,F,S",
+    "configureNow": "Configure now",
+    "widgetResumenSemanalLabel": "Weekly summary",
+    "widgetResumenSemanalDesc": "Spending comparison this week vs last week",
+    "semanalGastosSemana": "Spending last 7 days",
+    "semanalTopCategoria": "Top category",
+    "semanalAlertaPresupuesto": "⚠️ {cat} at {pct}% of budget"
   },
   "cuentas": {
     "title": "My Accounts",
@@ -451,5 +466,10 @@
   "app": {
     "updateRequired": "Update Required",
     "updateButton": "Update now"
+  },
+  "edit": {
+    "labelCantidad": "Amount (€)",
+    "labelFecha": "Date",
+    "importedCategory": "imported"
   }
 }

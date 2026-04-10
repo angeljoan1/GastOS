@@ -34,6 +34,7 @@ type WidgetId =
   | "media_diaria" | "mapa_calor" | "ratio_ahorro" | "presupuestos_categoria"
   | "objetivo_ahorro" | "comparativa_mes" | "dia_mas_caro"
   | "gasto_dia_semana" | "distribucion_ingreso" | "racha_ahorro"
+  | "resumen_semanal"
 
 interface WidgetMeta { id: WidgetId; label: string; descripcion: string; Icon: React.ElementType }
 
@@ -57,6 +58,7 @@ function getWidgetCatalog(t: ReturnType<typeof useTranslations>): WidgetMeta[] {
     { id: "gasto_dia_semana", label: t("dashboard.widgetGastoDiaLabel"), descripcion: t("dashboard.widgetGastoDiaDesc"), Icon: BarChart2 },
     { id: "distribucion_ingreso", label: t("dashboard.widgetDistribucionLabel"), descripcion: t("dashboard.widgetDistribucionDesc"), Icon: Wallet },
     { id: "racha_ahorro", label: t("dashboard.widgetRachaLabel"), descripcion: t("dashboard.widgetRachaDesc"), Icon: Flame },
+    { id: "resumen_semanal", label: t("dashboard.widgetResumenSemanalLabel"), descripcion: t("dashboard.widgetResumenSemanalDesc"), Icon: CalendarDays },
   ]
 }
 
@@ -167,13 +169,14 @@ function HidableAmount({
 
 // ── DashboardTab ──────────────────────────────────────────────────────────────
 export default function DashboardTab({
-  categorias, cuentas, presupuestos, objetivos, onObjetivosChange,
+  categorias, cuentas, presupuestos, objetivos, onObjetivosChange, onOpenSettings,
 }: {
   categorias: Categoria[]
   cuentas: Cuenta[]
   presupuestos: Presupuesto[]
   objetivos: Objetivo[]
   onObjetivosChange: (o: Objetivo[]) => void
+  onOpenSettings?: (tab: "categorias" | "presupuestos" | "objetivos" | "seguridad") => void
 }) {
   const t = useTranslations()
   const locale = useLocale()
@@ -184,6 +187,8 @@ export default function DashboardTab({
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showWidgetPicker, setShowWidgetPicker] = useState(false)
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
+  const [dragId, setDragId] = useState<WidgetId | null>(null)
+  const [dragOverId, setDragOverId] = useState<WidgetId | null>(null)
   const [activeWidgets, setActiveWidgets] = useState<WidgetId[]>(() => {
     if (typeof window === "undefined") return DEFAULT_WIDGETS
     try {
@@ -537,6 +542,7 @@ export default function DashboardTab({
   ) : null
 
   // ── Definición de widgets ─────────────────────────────────────────────────
+  const { recientes } = movimientos
   const widgets: Partial<Record<WidgetId, React.ReactNode>> = {
 
     resumen_mes: (
@@ -780,6 +786,14 @@ export default function DashboardTab({
               <Target className="w-8 h-8 text-zinc-700" aria-hidden="true" />
               <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
               <p className="text-xs text-zinc-700">{t("dashboard.noPresupuestosHint")}</p>
+              {onOpenSettings && (
+                <button
+                  onClick={() => onOpenSettings("presupuestos")}
+                  className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40"
+                >
+                  {t("dashboard.configureNow")}
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -877,10 +891,13 @@ export default function DashboardTab({
                   } ${esFuturo ? "opacity-25" : ""}`}
                 style={{ backgroundColor: esFuturo ? "#18181b" : heatColor(intensity) }}
               >
-                <span className={`text-[10px] font-medium select-none ${gasto > 0 ? "text-white/80" : "text-zinc-600"
+                <span className={`text-[10px] font-medium select-none ${esHoy ? "text-emerald-300 font-bold" : gasto > 0 ? "text-white/80" : "text-zinc-600"
                   }`}>
                   {dia}
                 </span>
+                {esHoy && (
+                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />
+                )}
                 {hoveredDay === dia && (
                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
                     <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-center whitespace-nowrap shadow-xl">
@@ -1108,6 +1125,14 @@ export default function DashboardTab({
               <PiggyBank className="w-8 h-8 text-zinc-700" aria-hidden="true" />
               <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
               <p className="text-xs text-zinc-700">{t("dashboard.noPresupuestosHint")}</p>
+              {onOpenSettings && (
+                <button
+                  onClick={() => onOpenSettings("objetivos")}
+                  className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40"
+                >
+                  {t("dashboard.configureNow")}
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -1313,6 +1338,68 @@ export default function DashboardTab({
       </WidgetCard>
     ),
 
+    resumen_semanal: (() => {
+      const semanaActual = recientes.filter(m => {
+        const d = new Date(m.created_at)
+        const hace7 = new Date(); hace7.setDate(hace7.getDate() - 7)
+        return d >= hace7 && (m.tipo ?? "gasto") === "gasto"
+      })
+      const semanaAnterior = recientes.filter(m => {
+        const d = new Date(m.created_at)
+        const hace14 = new Date(); hace14.setDate(hace14.getDate() - 14)
+        const hace7 = new Date(); hace7.setDate(hace7.getDate() - 7)
+        return d >= hace14 && d < hace7 && (m.tipo ?? "gasto") === "gasto"
+      })
+      const totalSemana = semanaActual.reduce((a, m) => a + m.cantidad, 0)
+      const totalSemanaAnt = semanaAnterior.reduce((a, m) => a + m.cantidad, 0)
+      const diffSem = totalSemana - totalSemanaAnt
+      const diffSemPct = totalSemanaAnt > 0 ? Math.round((diffSem / totalSemanaAnt) * 100) : null
+
+      const catSemana = semanaActual.reduce((acc, m) => {
+        acc[m.categoria] = (acc[m.categoria] ?? 0) + m.cantidad
+        return acc
+      }, {} as Record<string, number>)
+      const topCatSemana = Object.entries(catSemana).sort(([,a],[,b]) => b - a)[0]
+      const topCatLabel = topCatSemana ? (categorias.find(c => c.id === topCatSemana[0])?.label ?? topCatSemana[0]) : null
+
+      const presupuestoAlerta = presupuestosConGasto.find(p => p.pct >= 80 && esMesActual)
+
+      return (
+        <WidgetCard key="resumen_semanal">
+          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarDays className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
+              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetResumenSemanalLabel")}</p>
+              <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-zinc-500 mb-1">{t("dashboard.semanalGastosSemana")}</p>
+                <HidableAmount value={totalSemana} className="text-2xl font-light text-red-400" />
+              </div>
+              {diffSemPct !== null && (
+                <span className={`text-sm font-semibold px-2.5 py-1 rounded-lg tabular-nums ${diffSem <= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
+                  {diffSem > 0 ? "+" : ""}{diffSemPct}%
+                </span>
+              )}
+            </div>
+            {topCatLabel && (
+              <p className="text-xs text-zinc-500">
+                {t("dashboard.semanalTopCategoria")}: <span className="text-zinc-300 font-medium">{topCatLabel}</span>
+              </p>
+            )}
+            {presupuestoAlerta && (
+              <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-3 py-2">
+                <p className="text-xs text-yellow-400">
+                  {t("dashboard.semanalAlertaPresupuesto", { cat: presupuestoAlerta.cat!.label, pct: Math.round(presupuestoAlerta.pct) })}
+                </p>
+              </div>
+            )}
+          </div>
+        </WidgetCard>
+      )
+    })(),
+
     racha_ahorro: (
       <div key="racha_ahorro" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
         <style>{`
@@ -1442,33 +1529,75 @@ export default function DashboardTab({
               {t("dashboard.customizeHint")}
             </p>
             <div className="space-y-2">
-              {WIDGET_CATALOG.map(w => {
-                const active = activeWidgets.includes(w.id)
+              {/* Widgets activos: reordenables con drag */}
+              {activeWidgets.map(id => {
+                const w = WIDGET_CATALOG.find(x => x.id === id)
+                if (!w) return null
+                const WIcon = w.Icon
+                const isDragging = dragId === id
+                const isOver = dragOverId === id
+                return (
+                  <div
+                    key={w.id}
+                    draggable
+                    onDragStart={() => setDragId(w.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverId(null) }}
+                    onDragOver={e => { e.preventDefault(); setDragOverId(w.id) }}
+                    onDrop={() => {
+                      if (!dragId || dragId === w.id) return
+                      setActiveWidgets(prev => {
+                        const next = [...prev]
+                        const fromIdx = next.indexOf(dragId)
+                        const toIdx = next.indexOf(w.id)
+                        next.splice(fromIdx, 1)
+                        next.splice(toIdx, 0, dragId)
+                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { }
+                        return next
+                      })
+                      setDragId(null)
+                      setDragOverId(null)
+                    }}
+                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left cursor-grab active:cursor-grabbing ${
+                      isDragging ? "opacity-40" : ""
+                    } ${isOver ? "border-emerald-500/60 bg-emerald-950/30" : "border-emerald-500/40 bg-emerald-950/20"}`}
+                  >
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
+                      <WIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-zinc-100">{w.label}</p>
+                      <p className="text-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-zinc-600 text-xs select-none">⠿</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); toggleWidget(w.id) }}
+                        className="w-6 h-6 rounded-full flex items-center justify-center bg-emerald-500 border-2 border-emerald-500"
+                      >
+                        <Check className="w-3.5 h-3.5 text-zinc-950" strokeWidth={3} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              {/* Widgets inactivos */}
+              {WIDGET_CATALOG.filter(w => !activeWidgets.includes(w.id)).map(w => {
                 const WIcon = w.Icon
                 return (
                   <button
                     key={w.id}
                     onClick={() => toggleWidget(w.id)}
-                    aria-pressed={active}
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left ${active
-                      ? "border-emerald-500/40 bg-emerald-950/20"
-                      : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-600"
-                      }`}
+                    aria-pressed={false}
+                    className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left border-zinc-800 bg-zinc-800/40 hover:border-zinc-600"
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-emerald-500/20" : "bg-zinc-700/50"
-                      }`}>
-                      <WIcon className={`w-5 h-5 ${active ? "text-emerald-400" : "text-zinc-500"}`} aria-hidden="true" />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-zinc-700/50">
+                      <WIcon className="w-5 h-5 text-zinc-500" aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${active ? "text-zinc-100" : "text-zinc-400"}`}>
-                        {w.label}
-                      </p>
+                      <p className="text-sm font-medium text-zinc-400">{w.label}</p>
                       <p className="text-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
                     </div>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 border-2 transition-all ${active ? "bg-emerald-500 border-emerald-500" : "border-zinc-600"
-                      }`}>
-                      {active && <Check className="w-3.5 h-3.5 text-zinc-950" strokeWidth={3} />}
-                    </div>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-zinc-600" />
                   </button>
                 )
               })}

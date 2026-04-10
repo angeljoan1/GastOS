@@ -93,7 +93,11 @@
     "menuExportCSV": "Exportar CSV",
     "menuImportCSV": "Importar CSV",
     "menuSignOut": "Tancar Sessió",
-    "exportNoData": "No hi ha moviments per exportar"
+    "exportNoData": "No hi ha moviments per exportar",
+    "exportError": "Error en exportar. Comprova la connexió.",
+    "loadError": "No s'han pogut carregar les dades.",
+    "loadErrorRetry": "Reintentar",
+    "menuFeedback": "Enviar suggeriment"
   },
   "ingreso": {
     "typeGasto": "Despesa",
@@ -149,7 +153,12 @@
     "pendingPay": "Cobrar",
     "ariaDecimalPoint": "punt decimal",
     "recurringTransferLabel": "Transferència recurrent",
-    "recurringTransferDesc": "Es repetirà automàticament cada mes"
+    "recurringTransferDesc": "Es repetirà automàticament cada mes",
+    "savedAmount": "Import",
+    "savedCategory": "Categoria",
+    "savedAccount": "Compte",
+    "lastSaved": "Últim",
+    "lastSavedEdit": "Editar"
   },
   "historial": {
     "searchPlaceholder": "Cerca per nota o categoria...",
@@ -291,7 +300,13 @@
     "objetivoMeta": "Objectiu",
     "objetivoFaltan": "Falten ",
     "nombresDia": "Dmg,Dll,Dmt,Dmc,Djj,Dvd,Dss",
-    "diasSemana": "Dg,Dl,Dt,Dc,Dj,Dv,Ds"
+    "diasSemana": "Dg,Dl,Dt,Dc,Dj,Dv,Ds",
+    "configureNow": "Configurar ara",
+    "widgetResumenSemanalLabel": "Resum setmanal",
+    "widgetResumenSemanalDesc": "Comparativa de despesa aquesta setmana vs l'anterior",
+    "semanalGastosSemana": "Despesa últims 7 dies",
+    "semanalTopCategoria": "Top categoria",
+    "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del pressupost"
   },
   "cuentas": {
     "title": "Els meus Comptes",
@@ -451,5 +466,10 @@
   "app": {
     "updateRequired": "Actualització Necessària",
     "updateButton": "Actualitzar ara"
+  },
+  "edit": {
+    "labelCantidad": "Import (€)",
+    "labelFecha": "Data",
+    "importedCategory": "importada"
   }
 }

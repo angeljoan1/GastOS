@@ -17,23 +17,24 @@ function getLocale(): Locale {
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const MESSAGE_MAP: Record<Locale, Record<string, unknown>> = {
-    es: require("@/messages/es.json"),
-    en: require("@/messages/en.json"),
-    ca: require("@/messages/ca.json"),
-  }
-  
-  async function loadMessages(locale: Locale) {
-    return MESSAGE_MAP[locale]
-  }
+  es: require("@/messages/es.json"),
+  en: require("@/messages/en.json"),
+  ca: require("@/messages/ca.json"),
+}
+
+async function loadMessages(locale: Locale) {
+  return MESSAGE_MAP[locale]
+}
 
 export default function IntlProvider({ children }: { children: ReactNode }) {
-  const [locale,   setLocale]   = useState<Locale>(DEFAULT_LOCALE)
+  const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE)
   const [messages, setMessages] = useState<Record<string, unknown> | null>(null)
 
   useEffect(() => {
     const loc = getLocale()
     setLocale(loc)
     loadMessages(loc).then(setMessages)
+    document.documentElement.lang = loc
   }, [])
 
   // Mientras carga los mensajes no renderizamos nada para evitar

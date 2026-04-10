@@ -52,6 +52,7 @@ export default function IngresoTab({
   const [recurPeriod, setRecurPeriod] = useState<'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual'>('monthly')
   const [showPeriodStep, setShowPeriodStep] = useState(false)
   const [isRecurringTransfer, setIsRecurringTransfer] = useState(false)
+  const [lastSaved, setLastSaved] = useState<{ cantidad: number; catLabel: string; cuentaNombre: string | null; tipo: TipoActivo } | null>(null)
 
   useEffect(() => {
     if (cuentas.length > 0 && !cuentaId) setCuentaId(cuentas[0].id)
@@ -185,10 +186,13 @@ function onCategoryClick(catId: string) {
       setError(t("ingreso.errorSave"))
     } else {
       invalidateSaldoCache()
+      const catLabel = categorias.find(c => c.id === cat)?.label ?? cat
+      const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
+      setLastSaved({ cantidad: cantidadRaw, catLabel, cuentaNombre, tipo: tipoMovimiento })
       setSuccess(true)
       setDisplay("0")
       setNota("")
-      setTimeout(() => setSuccess(false), 1800)
+      setTimeout(() => setSuccess(false), 2500)
     }
   }
 
@@ -220,12 +224,14 @@ function onCategoryClick(catId: string) {
       setError(`Error: ${error.message}`)
     } else {
       invalidateSaldoCache()
+      const cuentaOrigenNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
+      setLastSaved({ cantidad: cantidadRaw, catLabel: t("ingreso.typeTransferencia"), cuentaNombre: cuentaOrigenNombre, tipo: "transferencia" })
       setSuccess(true)
       setDisplay("0")
       setNota("")
       setCuentaDestinoId("")
       setIsRecurringTransfer(false)
-      setTimeout(() => setSuccess(false), 1800)
+      setTimeout(() => setSuccess(false), 2500)
     }
   }
 
@@ -295,10 +301,28 @@ function onCategoryClick(catId: string) {
   return (
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-      {success && (
-        <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-3 rounded-t-xl animate-in fade-in duration-300">
-          <CheckCircle2 className={`w-16 h-16 ${accent.text}`} strokeWidth={1.5} />
+      {success && lastSaved && (
+        <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-4 rounded-t-xl animate-in fade-in duration-300 px-8">
+          <CheckCircle2 className={`w-14 h-14 ${accent.text}`} strokeWidth={1.5} />
           <p className={`font-semibold text-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
+          <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-500">{t("ingreso.savedAmount")}</span>
+              <span className={`font-semibold tabular-nums ${accent.text}`}>
+                {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-500">{t("ingreso.savedCategory")}</span>
+              <span className="text-zinc-200 font-medium">{lastSaved.catLabel}</span>
+            </div>
+            {lastSaved.cuentaNombre && (
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">{t("ingreso.savedAccount")}</span>
+                <span className="text-zinc-200">{lastSaved.cuentaNombre}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -490,6 +514,18 @@ function onCategoryClick(catId: string) {
         </div>
       </div>
 
+      {lastSaved && !success && (
+        <div className="px-4 pt-2 pb-0">
+          <button
+            onClick={() => {/* abre EditMovimientoModal — conectar en Bloque 11 */}}
+            className="w-full flex items-center justify-between bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
+          >
+            <span>{t("ingreso.lastSaved")}: <span className="text-zinc-300">{lastSaved.catLabel} · {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span></span>
+            <span className="text-zinc-600 text-[10px] uppercase tracking-wider ml-2">{t("ingreso.lastSavedEdit")}</span>
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-4 flex flex-col gap-4">
 
@@ -651,9 +687,9 @@ function onCategoryClick(catId: string) {
         {keys.map(k => (
           <button
             key={k}
-            onClick={() => handleDigit(k)}
+            onClick={() => { if (k === ".") triggerHaptic(); handleDigit(k) }}
             aria-label={k === "." ? t("ingreso.ariaDecimalPoint") : k}
-            className="h-14 flex items-center justify-center text-2xl font-light text-zinc-200 active:bg-zinc-800 rounded-xl transition-all tabular-nums"
+            className="h-14 flex items-center justify-center text-2xl font-light text-zinc-200 active:bg-zinc-800 active:scale-95 rounded-xl transition-all duration-75 tabular-nums"
           >
             {k}
           </button>

@@ -1,0 +1,28 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "*.test.*",
+      "*.spec.*",
+      "__tests__/**",
+      "*.config.*",
+      "*.config.mjs",
+      "public/**",
+      ".next/**",
+      "node_modules/**",
+      "package-lock.json",
+      "*.md",
+      "*.svg",
+      "*.png",
+      "*.jpg"
+    ]
+  }
+}

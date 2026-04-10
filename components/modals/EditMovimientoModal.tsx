@@ -11,6 +11,8 @@ import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { X, Loader2 } from "lucide-react"
 import type { Movimiento, Categoria, Cuenta } from "@/types"
+import { getIcon } from "@/lib/icons"
+import BottomSheet from "@/components/ui/BottomSheet"
 
 export default function EditMovimientoModal({
   isOpen, onClose, movimiento, categorias, cuentas, onSave, saveError,
@@ -30,6 +32,7 @@ export default function EditMovimientoModal({
   const [fecha, setFecha] = useState("")
   const [cuentaId, setCuentaId] = useState<string>("")
   const [loading, setLoading] = useState(false)
+  const [showCatSheet, setShowCatSheet] = useState(false)
 
   useEffect(() => {
     if (movimiento) {
@@ -121,7 +124,7 @@ export default function EditMovimientoModal({
           <div className="flex gap-4">
             <div className="flex-1">
               <label htmlFor="edit-cantidad" className="block text-sm font-medium text-zinc-300 mb-2">
-                Cantidad (€)
+                {t("edit.labelCantidad")}
               </label>
               <input
                 id="edit-cantidad"
@@ -135,7 +138,7 @@ export default function EditMovimientoModal({
             </div>
             <div className="flex-1">
               <label htmlFor="edit-fecha" className="block text-sm font-medium text-zinc-300 mb-2">
-                Fecha
+                {t("edit.labelFecha")}
               </label>
               <input
                 id="edit-fecha"
@@ -149,27 +152,45 @@ export default function EditMovimientoModal({
 
           {!esTransfer && (
             <div>
-              <label htmlFor="edit-categoria" className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">
                 {t("ingreso.labelCategoria")}
               </label>
-              <select
-                id="edit-categoria"
-                value={categoria}
-                onChange={e => setCategoria(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
+              {!categoriaEnCatalogo && movimiento.categoria && (
+                <p className="text-xs text-zinc-500 mb-2 px-1">
+                  {movimiento.categoria} ({t("edit.importedCategory")})
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowCatSheet(true)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-left transition-all hover:border-emerald-500/50 flex items-center gap-3"
               >
-                {!categoriaEnCatalogo && movimiento.categoria && (
-                  <option value={movimiento.categoria}>
-                    {movimiento.categoria} (importada)
-                  </option>
+                {categoria && categoriasFiltradas.find(c => c.id === categoria) ? (() => {
+                  const cat = categoriasFiltradas.find(c => c.id === categoria)!
+                  const CatIcon = getIcon(cat.icono)
+                  return (
+                    <>
+                      <CatIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+                      <span className="text-zinc-100">{cat.label}</span>
+                    </>
+                  )
+                })() : (
+                  <span className="text-zinc-500">{t("ingreso.placeholderSelectCuenta")}</span>
                 )}
-                {!categoria && (
-                  <option value="" disabled>{t("ingreso.placeholderSelectCuenta")}</option>
-                )}
-                {categoriasFiltradas.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.label}</option>
-                ))}
-              </select>
+              </button>
+              <BottomSheet
+                isOpen={showCatSheet}
+                onClose={() => setShowCatSheet(false)}
+                title={t("ingreso.labelCategoria")}
+                value={categoria}
+                onChange={v => { setCategoria(v); setShowCatSheet(false) }}
+                options={categoriasFiltradas.map(c => ({
+                  value: c.id,
+                  label: c.label,
+                  icono: c.icono,
+                  tipo: c.tipo,
+                }))}
+              />
             </div>
           )}
 

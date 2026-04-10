@@ -56,3 +56,28 @@
     70%   { transform: translateX(calc(-100% + 70px)); }
     100%  { transform: translateX(calc(-100% + 70px)); }
   }
+
+  @media print {
+    header,
+    nav,
+    button,
+    [data-feedback-widget],
+    .print-hide {
+      display: none !important;
+    }
+
+    html, body {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    main {
+      overflow: visible !important;
+      height: auto !important;
+    }
+
+    .print-widget {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+  }

@@ -46,6 +46,9 @@ export default function CuentasModal({
   const dragCuentaIdRef = useRef<string | null>(null)
   const dragOverCuentaIdRef = useRef<string | null>(null)
   const isDraggingCuentaRef = useRef(false)
+  const pointerCuentaStartRef = useRef<{ x: number; y: number } | null>(null)
+  const [ghostCuentaPos, setGhostCuentaPos] = useState<{ x: number; y: number } | null>(null)
+  const [ghostCuentaLabel, setGhostCuentaLabel] = useState<string>("")
 
   // Escape para cerrar
   useEffect(() => {
@@ -126,6 +129,22 @@ export default function CuentasModal({
   }
 
   return (
+    <>
+    {ghostCuentaPos && ghostCuentaLabel && (
+      <div
+        className="fixed z-[200] pointer-events-none select-none"
+        style={{
+          left: ghostCuentaPos.x - 20,
+          top: ghostCuentaPos.y - 28,
+          transform: "rotate(2deg) scale(1.05)",
+        }}
+      >
+        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-500/60 bg-zinc-900 shadow-2xl shadow-black/60">
+          <span className="text-sm font-medium text-zinc-100">{ghostCuentaLabel}</span>
+          <span className="text-zinc-500 text-xs">⠿</span>
+        </div>
+      </div>
+    )}
     <div
       className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end"
       role="dialog"
@@ -165,19 +184,31 @@ export default function CuentasModal({
               const isDraggingThis = draggingCuentaId === c.id
               const isOver = dragOverCuentaId === c.id && !isDraggingThis
 
+              const DRAG_THRESHOLD = 8
+
               const handlePointerDown = (e: React.PointerEvent) => {
                 if ((e.target as HTMLElement).closest("button")) return
                 isDraggingCuentaRef.current = false
                 dragCuentaIdRef.current = c.id
-                e.currentTarget.setPointerCapture(e.pointerId)
+                pointerCuentaStartRef.current = { x: e.clientX, y: e.clientY }
               }
 
               const handlePointerMove = (e: React.PointerEvent) => {
-                if (!dragCuentaIdRef.current) return
+                if (!dragCuentaIdRef.current || !pointerCuentaStartRef.current) return
+                const dx = e.clientX - pointerCuentaStartRef.current.x
+                const dy = e.clientY - pointerCuentaStartRef.current.y
+                const dist = Math.sqrt(dx * dx + dy * dy)
+
                 if (!isDraggingCuentaRef.current) {
+                  if (dist < DRAG_THRESHOLD) return
                   isDraggingCuentaRef.current = true
                   setDraggingCuentaId(dragCuentaIdRef.current)
+                  setGhostCuentaLabel(c.nombre)
+                  e.currentTarget.setPointerCapture(e.pointerId)
                 }
+
+                setGhostCuentaPos({ x: e.clientX, y: e.clientY })
+
                 e.currentTarget.releasePointerCapture(e.pointerId)
                 const el = document.elementFromPoint(e.clientX, e.clientY)
                 const target = el?.closest("[data-cuenta-id]")
@@ -190,15 +221,20 @@ export default function CuentasModal({
               }
 
               const handlePointerUp = (e: React.PointerEvent) => {
-                e.currentTarget.releasePointerCapture(e.pointerId)
+                if (isDraggingCuentaRef.current) {
+                  e.currentTarget.releasePointerCapture(e.pointerId)
+                }
                 const wasDragging = isDraggingCuentaRef.current
                 const from = dragCuentaIdRef.current
                 const to = dragOverCuentaIdRef.current
                 dragCuentaIdRef.current = null
                 dragOverCuentaIdRef.current = null
                 isDraggingCuentaRef.current = false
+                pointerCuentaStartRef.current = null
                 setDraggingCuentaId(null)
                 setDragOverCuentaId(null)
+                setGhostCuentaPos(null)
+                setGhostCuentaLabel("")
                 if (!wasDragging || !from || !to || from === to) return
                 setCuentaOrder(prev => {
                   const base = prev.length > 0 ? prev : cuentas.map(c => c.id)
@@ -354,5 +390,6 @@ export default function CuentasModal({
         </div>
       </div>
     </div>
+    </>
   )
 }

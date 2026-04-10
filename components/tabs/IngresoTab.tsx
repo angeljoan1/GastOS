@@ -59,8 +59,11 @@ export default function IngresoTab({
   const dragCatIdRef = useRef<string | null>(null)
   const dragOverCatIdRef = useRef<string | null>(null)
   const isDraggingCatRef = useRef(false)
+  const pointerCatStartRef = useRef<{ x: number; y: number } | null>(null)
   const [draggingCatId, setDraggingCatId] = useState<string | null>(null)
   const [dragOverCatId, setDragOverCatId] = useState<string | null>(null)
+  const [ghostCatPos, setGhostCatPos] = useState<{ x: number; y: number } | null>(null)
+  const [ghostCatLabel, setGhostCatLabel] = useState<string>("")
 
   useEffect(() => {
     if (cuentas.length > 0 && !cuentaId) setCuentaId(cuentas[0].id)
@@ -348,6 +351,21 @@ function onCategoryClick(catId: string) {
     categorias.find(c => c.id === catId)?.label ?? catId
 
   return (
+    <>
+    {ghostCatPos && ghostCatLabel && (
+      <div
+        className="fixed z-[200] pointer-events-none select-none"
+        style={{
+          left: ghostCatPos.x - 40,
+          top: ghostCatPos.y - 40,
+          transform: "rotate(2deg) scale(1.05)",
+        }}
+      >
+        <div className="flex flex-col items-center justify-center gap-1 w-20 h-20 rounded-2xl border border-emerald-500/60 bg-zinc-900 shadow-2xl shadow-black/60">
+          <span className="text-[11px] font-medium text-zinc-100 text-center leading-tight px-1">{ghostCatLabel}</span>
+        </div>
+      </div>
+    )}
     <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {success && lastSaved && (
@@ -739,18 +757,30 @@ function onCategoryClick(catId: string) {
                       const isDraggingThis = draggingCatId === cat.id
                       const isOver = dragOverCatId === cat.id && !isDraggingThis
 
+                      const DRAG_THRESHOLD = 8
+
                       const handlePointerDown = (e: React.PointerEvent) => {
                         isDraggingCatRef.current = false
                         dragCatIdRef.current = cat.id
-                        e.currentTarget.setPointerCapture(e.pointerId)
+                        pointerCatStartRef.current = { x: e.clientX, y: e.clientY }
                       }
 
                       const handlePointerMove = (e: React.PointerEvent) => {
-                        if (!dragCatIdRef.current) return
+                        if (!dragCatIdRef.current || !pointerCatStartRef.current) return
+                        const dx = e.clientX - pointerCatStartRef.current.x
+                        const dy = e.clientY - pointerCatStartRef.current.y
+                        const dist = Math.sqrt(dx * dx + dy * dy)
+
                         if (!isDraggingCatRef.current) {
+                          if (dist < DRAG_THRESHOLD) return
                           isDraggingCatRef.current = true
                           setDraggingCatId(dragCatIdRef.current)
+                          setGhostCatLabel(cat.label)
+                          e.currentTarget.setPointerCapture(e.pointerId)
                         }
+
+                        setGhostCatPos({ x: e.clientX, y: e.clientY })
+
                         e.currentTarget.releasePointerCapture(e.pointerId)
                         const el = document.elementFromPoint(e.clientX, e.clientY)
                         const target = el?.closest("[data-cat-id]")
@@ -763,17 +793,21 @@ function onCategoryClick(catId: string) {
                       }
 
                       const handlePointerUp = (e: React.PointerEvent) => {
-                        e.currentTarget.releasePointerCapture(e.pointerId)
+                        if (isDraggingCatRef.current) {
+                          e.currentTarget.releasePointerCapture(e.pointerId)
+                        }
                         const wasDragging = isDraggingCatRef.current
                         const from = dragCatIdRef.current
                         const to = dragOverCatIdRef.current
                         dragCatIdRef.current = null
                         dragOverCatIdRef.current = null
                         isDraggingCatRef.current = false
+                        pointerCatStartRef.current = null
                         setDraggingCatId(null)
                         setDragOverCatId(null)
-                        if (!wasDragging) return
-                        if (!from || !to || from === to) return
+                        setGhostCatPos(null)
+                        setGhostCatLabel("")
+                        if (!wasDragging || !from || !to || from === to) return
                         setCatOrder(prev => {
                           const base = prev.length > 0 ? prev : ordered.map(c => c.id)
                           const next = [...base]
@@ -854,6 +888,7 @@ function onCategoryClick(catId: string) {
         options={cuentas.filter(c => c.id !== cuentaId).map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}
       />
     </div>
+    </>
   )
 }
 

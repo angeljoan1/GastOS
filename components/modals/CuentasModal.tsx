@@ -215,7 +215,6 @@ export default function CuentasModal({
                 const overId = target?.getAttribute("data-cuenta-id") ?? null
                 if (overId && overId !== dragCuentaIdRef.current) {
                   dragOverCuentaIdRef.current = overId
-                  setDragOverCuentaId(overId)
                 }
                 e.currentTarget.setPointerCapture(e.pointerId)
               }
@@ -223,10 +222,24 @@ export default function CuentasModal({
               const handlePointerUp = (e: React.PointerEvent) => {
                 if (isDraggingCuentaRef.current) {
                   e.currentTarget.releasePointerCapture(e.pointerId)
+                  const el = document.elementFromPoint(e.clientX, e.clientY)
+                  const target = el?.closest("[data-cuenta-id]")
+                  const finalOverId = target?.getAttribute("data-cuenta-id") ?? dragOverCuentaIdRef.current
+                  const from = dragCuentaIdRef.current
+                  if (from && finalOverId && from !== finalOverId) {
+                    setCuentaOrder(prev => {
+                      const base = prev.length > 0 ? prev : cuentas.map(c => c.id)
+                      const next = [...base]
+                      const fromIdx = next.indexOf(from)
+                      const toIdx = next.indexOf(finalOverId)
+                      if (fromIdx === -1 || toIdx === -1) return prev
+                      next.splice(fromIdx, 1)
+                      next.splice(toIdx, 0, from)
+                      try { localStorage.setItem(CUENTAS_ORDER_KEY, JSON.stringify(next)) } catch { }
+                      return next
+                    })
+                  }
                 }
-                const wasDragging = isDraggingCuentaRef.current
-                const from = dragCuentaIdRef.current
-                const to = dragOverCuentaIdRef.current
                 dragCuentaIdRef.current = null
                 dragOverCuentaIdRef.current = null
                 isDraggingCuentaRef.current = false
@@ -235,18 +248,6 @@ export default function CuentasModal({
                 setDragOverCuentaId(null)
                 setGhostCuentaPos(null)
                 setGhostCuentaLabel("")
-                if (!wasDragging || !from || !to || from === to) return
-                setCuentaOrder(prev => {
-                  const base = prev.length > 0 ? prev : cuentas.map(c => c.id)
-                  const next = [...base]
-                  const fromIdx = next.indexOf(from)
-                  const toIdx = next.indexOf(to)
-                  if (fromIdx === -1 || toIdx === -1) return prev
-                  next.splice(fromIdx, 1)
-                  next.splice(toIdx, 0, from)
-                  try { localStorage.setItem(CUENTAS_ORDER_KEY, JSON.stringify(next)) } catch { }
-                  return next
-                })
               }
 
               return (

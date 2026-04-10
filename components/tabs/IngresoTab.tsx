@@ -787,7 +787,6 @@ function onCategoryClick(catId: string) {
                         const overId = target?.getAttribute("data-cat-id") ?? null
                         if (overId && overId !== dragCatIdRef.current) {
                           dragOverCatIdRef.current = overId
-                          setDragOverCatId(overId)
                         }
                         e.currentTarget.setPointerCapture(e.pointerId)
                       }
@@ -795,10 +794,24 @@ function onCategoryClick(catId: string) {
                       const handlePointerUp = (e: React.PointerEvent) => {
                         if (isDraggingCatRef.current) {
                           e.currentTarget.releasePointerCapture(e.pointerId)
+                          const el = document.elementFromPoint(e.clientX, e.clientY)
+                          const target = el?.closest("[data-cat-id]")
+                          const finalOverId = target?.getAttribute("data-cat-id") ?? dragOverCatIdRef.current
+                          const from = dragCatIdRef.current
+                          if (from && finalOverId && from !== finalOverId) {
+                            setCatOrder(prev => {
+                              const base = prev.length > 0 ? prev : ordered.map(c => c.id)
+                              const next = [...base]
+                              const fromIdx = next.indexOf(from)
+                              const toIdx = next.indexOf(finalOverId)
+                              if (fromIdx === -1 || toIdx === -1) return prev
+                              next.splice(fromIdx, 1)
+                              next.splice(toIdx, 0, from)
+                              saveCatOrder(next)
+                              return next
+                            })
+                          }
                         }
-                        const wasDragging = isDraggingCatRef.current
-                        const from = dragCatIdRef.current
-                        const to = dragOverCatIdRef.current
                         dragCatIdRef.current = null
                         dragOverCatIdRef.current = null
                         isDraggingCatRef.current = false
@@ -807,18 +820,6 @@ function onCategoryClick(catId: string) {
                         setDragOverCatId(null)
                         setGhostCatPos(null)
                         setGhostCatLabel("")
-                        if (!wasDragging || !from || !to || from === to) return
-                        setCatOrder(prev => {
-                          const base = prev.length > 0 ? prev : ordered.map(c => c.id)
-                          const next = [...base]
-                          const fromIdx = next.indexOf(from)
-                          const toIdx = next.indexOf(to)
-                          if (fromIdx === -1 || toIdx === -1) return prev
-                          next.splice(fromIdx, 1)
-                          next.splice(toIdx, 0, from)
-                          saveCatOrder(next)
-                          return next
-                        })
                       }
 
                       return (

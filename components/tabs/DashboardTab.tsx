@@ -1471,9 +1471,9 @@ export default function DashboardTab({
                   const el = document.elementFromPoint(e.clientX, e.clientY)
                   const target = el?.closest("[data-widget-id]")
                   const overId = target?.getAttribute("data-widget-id") as WidgetId | null
+                  // Guardem on estem sense reordenar — el reordenament passa al pointerUp
                   if (overId && overId !== dragIdRef.current) {
                     dragOverIdRef.current = overId
-                    setDragOverId(overId)
                   }
                   e.currentTarget.setPointerCapture(e.pointerId)
                 }
@@ -1481,19 +1481,23 @@ export default function DashboardTab({
                 const handlePointerUp = (e: React.PointerEvent) => {
                   if (isDraggingRef.current) {
                     e.currentTarget.releasePointerCapture(e.pointerId)
-                  }
-                  if (isDraggingRef.current && dragIdRef.current && dragOverIdRef.current && dragIdRef.current !== dragOverIdRef.current) {
-                    const from = dragIdRef.current
-                    const to = dragOverIdRef.current
-                    setActiveWidgets(prev => {
-                      const next = [...prev]
-                      const fromIdx = next.indexOf(from)
-                      const toIdx = next.indexOf(to)
-                      next.splice(fromIdx, 1)
-                      next.splice(toIdx, 0, from)
-                      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { }
-                      return next
-                    })
+                    // Llegim la posició final per saber on deixem caure
+                    const el = document.elementFromPoint(e.clientX, e.clientY)
+                    const target = el?.closest("[data-widget-id]")
+                    const finalOverId = (target?.getAttribute("data-widget-id") ?? dragOverIdRef.current) as WidgetId | null
+                    if (dragIdRef.current && finalOverId && dragIdRef.current !== finalOverId) {
+                      const from = dragIdRef.current
+                      const to = finalOverId
+                      setActiveWidgets(prev => {
+                        const next = [...prev]
+                        const fromIdx = next.indexOf(from)
+                        const toIdx = next.indexOf(to)
+                        next.splice(fromIdx, 1)
+                        next.splice(toIdx, 0, from)
+                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { }
+                        return next
+                      })
+                    }
                   }
                   dragIdRef.current = null
                   dragOverIdRef.current = null

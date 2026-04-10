@@ -394,7 +394,9 @@
     "bioActivate": "Activar",
     "bioDeactivate": "Desactivar",
     "bioReactivateHint": "Si canvies el teu PIN via recuperació de correu, hauràs de reactivar la biometria.",
-    "bioErrorActivate": "No s'ha pogut activar. Torna-ho a intentar."
+    "bioErrorActivate": "No s'ha pogut activar. Torna-ho a intentar.",
+    "swipeHintLabel": "Animació de lliscament",
+    "swipeHintDesc": "Mostra una animació en obrir l'historial per recordar que pots lliscar"
   },
   "import_csv": {
     "title": "Importar CSV",

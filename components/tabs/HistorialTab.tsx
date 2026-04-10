@@ -58,6 +58,9 @@ export default function HistorialTab({
   const swipeStartX = useRef<number>(0)
   const swipeStartY = useRef<number>(0)
   const swipeLocked = useRef<"horizontal" | "vertical" | null>(null)
+  const [jiggleId, setJiggleId] = useState<string | null>(null)
+
+
 
   // Carga desde BD y desencripta.
   // Cuando forSearch=true carga SIN paginación para buscar en todos los movimientos.
@@ -155,6 +158,21 @@ export default function HistorialTab({
       )
     })
     : movimientos
+
+  const jiggleDone = useRef(false)
+
+  useEffect(() => {
+    if (jiggleDone.current) return
+    if (movimientosFiltrados.length === 0) return
+    jiggleDone.current = true
+    const swipeHintOff = localStorage.getItem("gastos_swipe_hint") === "off"
+    if (swipeHintOff) return
+    const timer = setTimeout(() => {
+      setJiggleId(movimientosFiltrados[0].id)
+      setTimeout(() => setJiggleId(null), 4000)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [movimientosFiltrados])
 
   // BUG #10 FIX: el efecto de theme-color ahora usa una función de cleanup
   // que busca el meta EN EL MOMENTO del cleanup, no en el momento del montaje.
@@ -387,11 +405,16 @@ export default function HistorialTab({
                     <Trash2 className="w-5 h-5 text-red-400" />
                   </div>
                   <div
-                    className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 transition-transform duration-150 hover:bg-zinc-800/50 cursor-pointer`}
+                    className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 hover:bg-zinc-800/50 cursor-pointer`}
                     style={{
                       opacity: isDeleting ? 0.5 : 1,
-                      transform: `translateX(${swipeClampedDx}px)`,
-                      transition: swipeState?.id === m.id ? "none" : "transform 0.2s ease",
+                      ...(jiggleId === m.id
+                        ? { animation: "swipe-hint 2s linear forwards" }
+                        : {
+                            transform: `translateX(${swipeClampedDx}px)`,
+                            transition: swipeState?.id === m.id ? "none" : "transform 0.2s ease",
+                          }
+                      ),
                     }}
                     onTouchStart={e => {
                       swipeStartX.current = e.touches[0].clientX
@@ -478,26 +501,9 @@ export default function HistorialTab({
                     </p>
                   )}
 
-                  <button
-                    onClick={() => setEditingMov(m)}
-                    disabled={isDeleting}
-                    aria-label={t("historial.ariaEdit", { amount: m.cantidad === -1 ? "?" : m.cantidad.toFixed(2) })}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-emerald-400 hover:bg-emerald-950/40 transition-all flex-shrink-0"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => setConfirmarBorrado(m.id)}
-                    disabled={isDeleting}
-                    aria-label={t("historial.ariaDelete", { amount: m.cantidad === -1 ? "?" : m.cantidad.toFixed(2) })}
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-600 hover:text-red-400 hover:bg-red-950/40 transition-all flex-shrink-0"
-                  >
-                    {isDeleting
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <Trash2 className="w-4 h-4" />
-                    }
-                  </button>
+                  {isDeleting && (
+                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 flex-shrink-0" />
+                  )}
                   </div>
                 </div>
               )

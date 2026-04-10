@@ -57,6 +57,19 @@
     100%  { transform: translateX(calc(-100% + 70px)); }
   }
 
+  @keyframes swipe-hint {
+    0%   { transform: translateX(0px); }
+    15%  { transform: translateX(-16px); }
+    30%  { transform: translateX(-32px); }
+    70%  { transform: translateX(32px); }
+    85%  { transform: translateX(16px); }
+    100% { transform: translateX(0px); }
+  }
+
+  .swipe-hint {
+    animation: swipe-hint 0.6s ease-in-out;
+  }
+
   @media print {
     header,
     nav,

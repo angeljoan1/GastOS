@@ -65,6 +65,9 @@ export default function SettingsModal({
   const [bioLoading, setBioLoading] = useState(false)
   const [bioError, setBioError] = useState<string | null>(null)
   const [pendingLocale, setPendingLocale] = useState<Locale | null>(null)
+  const [swipeHintEnabled, setSwipeHintEnabled] = useState<boolean>(
+    typeof window !== "undefined" ? localStorage.getItem("gastos_swipe_hint") !== "off" : true
+  )
   const t = useTranslations()
 
   useEffect(() => {
@@ -572,6 +575,25 @@ export default function SettingsModal({
             <p className="text-xs text-zinc-600">
               {t("settings.seguridadHint")}
             </p>
+            <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-zinc-200">{t("settings.swipeHintLabel")}</p>
+                <p className="text-xs text-zinc-600 mt-0.5">{t("settings.swipeHintDesc")}</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={swipeHintEnabled}
+                onClick={() => {
+                  const next = !swipeHintEnabled
+                  setSwipeHintEnabled(next)
+                  localStorage.setItem("gastos_swipe_hint", next ? "on" : "off")
+                }}
+                className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${swipeHintEnabled ? "bg-emerald-500" : "bg-zinc-700"}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${swipeHintEnabled ? "left-5" : "left-1"}`} />
+              </button>
+            </div>
             {!bioAvailable ? (
               <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
                 <Fingerprint className="w-5 h-5 text-zinc-600 flex-shrink-0" aria-hidden="true" />

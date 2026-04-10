@@ -394,7 +394,9 @@
     "bioActivate": "Activate",
     "bioDeactivate": "Deactivate",
     "bioReactivateHint": "If you change your PIN via email recovery, you'll need to reactivate biometrics.",
-    "bioErrorActivate": "Could not activate. Please try again."
+    "bioErrorActivate": "Could not activate. Please try again.",
+    "swipeHintLabel": "Swipe animation",
+    "swipeHintDesc": "Shows an animation when opening history to remind you that you can swipe"
   },
   "import_csv": {
     "title": "Import CSV",

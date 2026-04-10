@@ -3,11 +3,8 @@
 // components/modals/CuentasModal.tsx
 // ─── Fixes en este archivo ────────────────────────────────────────────────────
 // BUG #1: nombre y saldo_inicial se cifraban pero se guardaban en claro → CORREGIDO
-// BUG #2: decryptData sobre nombre ya en claro → CORREGIDO (los datos de la lista
-//         llegan por prop desde page.tsx ya desencriptados; la cuenta recién creada
-//         se añade al estado con los valores en claro directamente)
-// BUG #20: saldo inicial siempre mostraba 0.00 → CORREGIDO (mismo origen que #1)
-
+// BUG #2: decryptData sobre nombre ya en claro → CORREGIDO
+// BUG #20: saldo inicial siempre mostraba 0.00 → CORREGIDO
 
 import { X, Plus, Loader2, Trash2, Check } from "lucide-react"
 import { useTranslations } from "next-intl"
@@ -71,7 +68,6 @@ export default function CuentasModal({
     const nombreRaw = nombre.trim()
     const saldoRaw = parseFloat(saldoInicial) || 0
 
-    // BUG #1 FIX: ahora sí ciframos antes de insertar en Supabase
     const nombreCifrado = await encryptData(nombreRaw)
     const saldoCifrado = await encryptData(saldoRaw)
 
@@ -79,10 +75,10 @@ export default function CuentasModal({
       .from("cuentas")
       .insert({
         user_id: user.id,
-        nombre: nombreCifrado,   // ← cifrado
+        nombre: nombreCifrado,
         icono,
         color,
-        saldo_inicial: saldoCifrado,    // ← cifrado
+        saldo_inicial: saldoCifrado,
       })
       .select()
       .single()
@@ -90,9 +86,6 @@ export default function CuentasModal({
     if (error) {
       console.error("Error creando cuenta:", error.message)
     } else if (data) {
-      // BUG #2 FIX: añadimos al estado local con valores EN CLARO,
-      // no con los valores cifrados que devuelve Supabase.
-      // Así la lista es consistente con el resto de cuentas (ya desencriptadas).
       const cuentaEnClaro: Cuenta = {
         ...data,
         nombre: nombreRaw,
@@ -131,21 +124,36 @@ export default function CuentasModal({
 
   return (
     <>
-    {ghostCuentaPos && ghostCuentaLabel && (
-      <div
-        className="fixed z-[200] pointer-events-none select-none"
-        style={{
-          left: ghostCuentaPos.x - 20,
-          top: ghostCuentaPos.y - 28,
-          transform: "rotate(2deg) scale(1.05)",
-        }}
-      >
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-emerald-500/60 bg-zinc-900 shadow-2xl shadow-black/60">
-          <span className="text-sm font-medium text-zinc-100">{ghostCuentaLabel}</span>
-          <span className="text-zinc-500 text-xs">⠿</span>
+    {ghostCuentaPos && ghostCuentaData && (() => {
+      const GIcon = getIcon(ghostCuentaData.icono)
+      return (
+        <div
+          className="fixed z-[200] pointer-events-none select-none"
+          style={{
+            left: ghostCuentaPos.x - 160,
+            top: ghostCuentaPos.y - 32,
+            width: "320px",
+            opacity: 0.85,
+          }}
+        >
+          <div className="flex items-center gap-3 bg-zinc-800 border border-emerald-500/50 rounded-xl px-4 py-3 shadow-2xl shadow-black/60">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: ghostCuentaData.color + "22" }}
+            >
+              <GIcon className="w-4 h-4" style={{ color: ghostCuentaData.color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-zinc-200">{ghostCuentaData.nombre}</p>
+              <p className="text-xs text-zinc-500">
+                {t("cuentas.saldoInicial", { amount: (ghostCuentaData.saldo_inicial ?? 0).toFixed(2) })}
+              </p>
+            </div>
+            <span className="text-zinc-600 text-xs mr-1">⠿</span>
+          </div>
         </div>
-      </div>
-    )}
+      )
+    })()}
     <div
       className="fixed inset-0 z-50 bg-zinc-950/80 backdrop-blur-sm flex items-end"
       role="dialog"
@@ -166,10 +174,6 @@ export default function CuentasModal({
           </button>
         </div>
 
-        {/* Lista de cuentas existentes */}
-        {/* BUG #2 FIX: los valores de 'c.nombre' y 'c.saldo_inicial' ya llegan
-            en claro desde el prop (page.tsx los desencripta al cargar).
-            No es necesario llamar a decryptData() aquí. */}
         {cuentas.length > 0 && (
           <div className="space-y-2 mb-6">
             {[...cuentas].sort((a, b) => {
@@ -185,27 +189,39 @@ export default function CuentasModal({
               const isDraggingThis = draggingCuentaId === c.id
               const isOver = dragOverCuentaId === c.id && !isDraggingThis
 
-              const DRAG_THRESHOLD = 8
+              const HOLD_MS = 350
 
               const handlePointerDown = (e: React.PointerEvent) => {
                 if ((e.target as HTMLElement).closest("button")) return
                 isDraggingCuentaRef.current = false
                 dragCuentaIdRef.current = c.id
                 pointerCuentaStartRef.current = { x: e.clientX, y: e.clientY }
+
+                holdCuentaTimerRef.current = setTimeout(() => {
+                  if (!dragCuentaIdRef.current) return
+                  isDraggingCuentaRef.current = true
+                  setDraggingCuentaId(dragCuentaIdRef.current)
+                  setGhostCuentaData(c)
+                  if (pointerCuentaStartRef.current) {
+                    setGhostCuentaPos({ x: pointerCuentaStartRef.current.x, y: pointerCuentaStartRef.current.y })
+                  }
+                  const el = document.querySelector(`[data-cuenta-id="${dragCuentaIdRef.current}"]`)
+                  if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
+                }, HOLD_MS)
               }
 
               const handlePointerMove = (e: React.PointerEvent) => {
                 if (!dragCuentaIdRef.current || !pointerCuentaStartRef.current) return
                 const dx = e.clientX - pointerCuentaStartRef.current.x
                 const dy = e.clientY - pointerCuentaStartRef.current.y
-                const dist = Math.sqrt(dx * dx + dy * dy)
 
                 if (!isDraggingCuentaRef.current) {
-                  if (dist < DRAG_THRESHOLD) return
-                  isDraggingCuentaRef.current = true
-                  setDraggingCuentaId(dragCuentaIdRef.current)
-                  setGhostCuentaLabel(c.nombre)
-                  e.currentTarget.setPointerCapture(e.pointerId)
+                  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                    if (holdCuentaTimerRef.current) clearTimeout(holdCuentaTimerRef.current)
+                    dragCuentaIdRef.current = null
+                    pointerCuentaStartRef.current = null
+                  }
+                  return
                 }
 
                 setGhostCuentaPos({ x: e.clientX, y: e.clientY })
@@ -216,11 +232,13 @@ export default function CuentasModal({
                 const overId = target?.getAttribute("data-cuenta-id") ?? null
                 if (overId && overId !== dragCuentaIdRef.current) {
                   dragOverCuentaIdRef.current = overId
+                  setDragOverCuentaId(overId)
                 }
                 e.currentTarget.setPointerCapture(e.pointerId)
               }
 
               const handlePointerUp = (e: React.PointerEvent) => {
+                if (holdCuentaTimerRef.current) clearTimeout(holdCuentaTimerRef.current)
                 if (isDraggingCuentaRef.current) {
                   e.currentTarget.releasePointerCapture(e.pointerId)
                   const el = document.elementFromPoint(e.clientX, e.clientY)
@@ -248,7 +266,7 @@ export default function CuentasModal({
                 setDraggingCuentaId(null)
                 setDragOverCuentaId(null)
                 setGhostCuentaPos(null)
-                setGhostCuentaLabel("")
+                setGhostCuentaData(null)
               }
 
               return (
@@ -258,9 +276,9 @@ export default function CuentasModal({
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
-                  className={`flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 select-none touch-none transition-all ${
-                    isDraggingThis ? "opacity-40 cursor-grabbing" : "cursor-grab"
-                  } ${isOver ? "border-emerald-500/50 bg-emerald-950/20" : ""}`}
+                  className={`flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 select-none transition-all ${
+                    isDraggingThis ? "opacity-40 cursor-grabbing touch-none" : "cursor-grab"
+                  } ${isOver && !isDraggingThis ? "border-emerald-500/50 bg-emerald-950/20" : ""}`}
                 >
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

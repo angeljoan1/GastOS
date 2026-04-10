@@ -199,6 +199,7 @@ export default function HistorialTab({
   }, [tipoFilter])
 
   async function handleDelete(id: string) {
+    if (deletingId === id) return // Protección contra doble-tap
     setDeletingId(id)
     const { error } = await supabase.from("movimientos").delete().eq("id", id)
     setDeletingId(null)

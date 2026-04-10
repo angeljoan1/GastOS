@@ -6,7 +6,7 @@
 //   - CategoryButton: disabled incluye loading para evitar doble envío
 //   - encryptData/decryptData ahora son async → se usa await
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import {
@@ -14,10 +14,10 @@ import {
   TrendingDown, TrendingUp, ArrowLeftRight,
 } from "lucide-react"
 import { getIcon } from "@/lib/icons"
-import type { Categoria, Movimiento, Cuenta } from "@/types"
+import type { Categoria, Movimiento, Cuenta, Presupuesto } from "@/types"
 import BottomSheet, { SheetTrigger } from "@/components/ui/BottomSheet"
 import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
-import { invalidateSaldoCache } from "@/components/tabs/DashboardTab"
+import { invalidateSaldoCache } from "@/components/dashboard/hooks/useDashboardData"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 
 function triggerHaptic() {
@@ -29,10 +29,12 @@ function triggerHaptic() {
 type TipoActivo = "gasto" | "ingreso" | "transferencia"
 
 export default function IngresoTab({
-  categorias, cuentas,
+  categorias, cuentas, presupuestos, onEditLast,
 }: {
   categorias: Categoria[]
   cuentas: Cuenta[]
+  presupuestos: Presupuesto[]
+  onEditLast?: (mov: Movimiento) => void
 }) {
   const t = useTranslations()
   const [display, setDisplay] = useState("0")
@@ -52,11 +54,27 @@ export default function IngresoTab({
   const [recurPeriod, setRecurPeriod] = useState<'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual'>('monthly')
   const [showPeriodStep, setShowPeriodStep] = useState(false)
   const [isRecurringTransfer, setIsRecurringTransfer] = useState(false)
-  const [lastSaved, setLastSaved] = useState<{ cantidad: number; catLabel: string; cuentaNombre: string | null; tipo: TipoActivo } | null>(null)
+  const [lastSaved, setLastSaved] = useState<{ id: string; cantidad: number; catLabel: string; cuentaNombre: string | null; tipo: TipoActivo } | null>(null)
+  const [catOrder, setCatOrder] = useState<string[]>([])
+  const dragCatIdRef = useRef<string | null>(null)
+  const dragOverCatIdRef = useRef<string | null>(null)
+  const isDraggingCatRef = useRef(false)
+  const [draggingCatId, setDraggingCatId] = useState<string | null>(null)
+  const [dragOverCatId, setDragOverCatId] = useState<string | null>(null)
 
   useEffect(() => {
     if (cuentas.length > 0 && !cuentaId) setCuentaId(cuentas[0].id)
   }, [cuentas, cuentaId])
+
+  useEffect(() => {
+    if (categorias.length > 0) {
+      setCatOrder(
+        [...categorias]
+          .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+          .map(c => c.id)
+      )
+    }
+  }, [categorias])
 
   useEffect(() => {
     // Bug 8 FIX: user_id explícito para no depender solo de RLS.
@@ -118,6 +136,14 @@ export default function IngresoTab({
         ? { text: "text-blue-400", bg: "bg-blue-500", hover: "hover:bg-blue-400", border: "border-blue-500/50", ring: "focus:ring-blue-500/20" }
         : { text: "text-red-400", bg: "bg-red-500", hover: "hover:bg-red-400", border: "border-red-500/50", ring: "focus:ring-red-500/20" }
 
+  async function saveCatOrder(orderedIds: string[]) {
+    await Promise.all(
+      orderedIds.map((id, idx) =>
+        supabase.from("categorias").update({ orden: idx }).eq("id", id)
+      )
+    )
+  }
+
   function handleDigit(d: string) {
     triggerHaptic()
     setError(null)
@@ -165,13 +191,15 @@ function onCategoryClick(catId: string) {
     setShowPeriodStep(false)
     const cantidadRaw = parseFloat(display)
     if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
+    const { getMasterKey } = await import("@/lib/crypto")
+    if (!getMasterKey()) return setError(t("ingreso.errorSessionExpired"))
     setLoading(true)
     setError(null)
 
     const cantidadEncriptada = await encryptData(cantidadRaw)
     const notaEncriptada = nota ? await encryptData(nota.trim()) : null
 
-    const { error } = await supabase.from("movimientos").insert({
+    const { data: insertedRows, error } = await supabase.from("movimientos").insert({
       cantidad: cantidadEncriptada,
       categoria: cat,
       nota: notaEncriptada,
@@ -179,7 +207,7 @@ function onCategoryClick(catId: string) {
       ...(isRecurring && period ? { recur_period: period } : {}),
       tipo: tipoMovimiento,
       cuenta_id: cuentaId || null,
-    })
+    }).select("id")
 
     setLoading(false)
     if (error) {
@@ -188,7 +216,26 @@ function onCategoryClick(catId: string) {
       invalidateSaldoCache()
       const catLabel = categorias.find(c => c.id === cat)?.label ?? cat
       const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
-      setLastSaved({ cantidad: cantidadRaw, catLabel, cuentaNombre, tipo: tipoMovimiento })
+      // Comprovar si s'ha superat el pressupost de la categoria
+      const pressupost = presupuestos.find(p => p.categoria_id === cat)
+      if (pressupost && tipoMovimiento === "gasto") {
+        const { data: movsDelMes } = await supabase
+          .from("movimientos")
+          .select("cantidad")
+          .eq("categoria", cat)
+          .eq("tipo", "gasto")
+          .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+        if (movsDelMes) {
+          const { decryptData: decrypt } = await import("@/lib/crypto")
+          const totalMes = (await Promise.all(
+            movsDelMes.map(async m => parseFloat(await decrypt(m.cantidad)) || 0)
+          )).reduce((a, b) => a + b, 0)
+          if (totalMes > pressupost.cantidad) {
+            setError(t("ingreso.alertBudgetExceeded", { cat: catLabel, amount: pressupost.cantidad.toFixed(2) }))
+          }
+        }
+      }
+      setLastSaved({ id: insertedRows?.[0]?.id ?? "", cantidad: cantidadRaw, catLabel, cuentaNombre, tipo: tipoMovimiento })
       setSuccess(true)
       setDisplay("0")
       setNota("")
@@ -203,13 +250,15 @@ function onCategoryClick(catId: string) {
     if (!cuentaId || !cuentaDestinoId) return setError(t("ingreso.errorSelectBothAccounts"))
     if (cuentaId === cuentaDestinoId) return setError(t("ingreso.errorSameAccount"))
 
+    const { getMasterKey } = await import("@/lib/crypto")
+    if (!getMasterKey()) return setError(t("ingreso.errorSessionExpired"))
     setLoading(true)
     setError(null)
 
     const cantidadEncriptada = await encryptData(cantidadRaw)
     const notaEncriptada = nota ? await encryptData(nota.trim()) : null
 
-    const { error } = await supabase.from("movimientos").insert({
+    const { data: insertedTransfer, error } = await supabase.from("movimientos").insert({
       cantidad: cantidadEncriptada,
       categoria: "transferencia",
       nota: notaEncriptada,
@@ -217,7 +266,7 @@ function onCategoryClick(catId: string) {
       tipo: "transferencia",
       cuenta_id: cuentaId,
       cuenta_destino_id: cuentaDestinoId,
-    })
+    }).select("id")
 
     setLoading(false)
     if (error) {
@@ -225,7 +274,7 @@ function onCategoryClick(catId: string) {
     } else {
       invalidateSaldoCache()
       const cuentaOrigenNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
-      setLastSaved({ cantidad: cantidadRaw, catLabel: t("ingreso.typeTransferencia"), cuentaNombre: cuentaOrigenNombre, tipo: "transferencia" })
+      setLastSaved({ id: insertedTransfer?.[0]?.id ?? "", cantidad: cantidadRaw, catLabel: t("ingreso.typeTransferencia"), cuentaNombre: cuentaOrigenNombre, tipo: "transferencia" })
       setSuccess(true)
       setDisplay("0")
       setNota("")
@@ -517,7 +566,20 @@ function onCategoryClick(catId: string) {
       {lastSaved && !success && (
         <div className="px-4 pt-2 pb-0">
           <button
-            onClick={() => {/* abre EditMovimientoModal — conectar en Bloque 11 */}}
+            onClick={() => {
+              if (!lastSaved?.id || !onEditLast) return
+              onEditLast({
+                id: lastSaved.id,
+                cantidad: lastSaved.cantidad,
+                categoria: "",
+                tipo: lastSaved.tipo,
+                created_at: new Date().toISOString(),
+                cuenta_id: cuentaId || null,
+                cuenta_destino_id: null,
+                nota: nota || null,
+                is_recurring: false,
+              } as Movimiento)
+            }}
             className="w-full flex items-center justify-between bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
           >
             <span>{t("ingreso.lastSaved")}: <span className="text-zinc-300">{lastSaved.catLabel} · {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span></span>
@@ -636,7 +698,7 @@ function onCategoryClick(catId: string) {
                           key={c.id}
                           onClick={() => setCuentaId(c.id)}
                           aria-pressed={selected}
-                          aria-label={`Cuenta ${c.nombre}`}
+                          aria-label={t("ingreso.ariaCuenta", { nombre: c.nombre })}
                           style={{
                             borderColor: selected ? c.color : c.color + "40",
                             backgroundColor: selected ? c.color + "33" : c.color + "12",
@@ -658,24 +720,96 @@ function onCategoryClick(catId: string) {
                   <p className="text-[10px] text-zinc-700">{t("ingreso.manageInSettings")}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  {Array.from(
-                    new Map(
-                      categorias
-                        .filter(c =>
-                          tipoMovimiento === "ingreso"
-                            ? c.tipo === "ingreso" || c.tipo === "ambos"
-                            : c.tipo === "gasto" || c.tipo === "ambos"
-                        )
-                        .map(c => [c.id, c])
-                    ).values()
-                  ).map(cat => (
-                    <CategoryButton
-                      key={cat.id}
-                      cat={cat}
-                      onPress={onCategoryClick}
-                      disabled={isDisabled || loading}
-                    />
-                  ))}
+                  {(() => {
+                    const filtered = Array.from(
+                      new Map(
+                        categorias
+                          .filter(c =>
+                            tipoMovimiento === "ingreso"
+                              ? c.tipo === "ingreso" || c.tipo === "ambos"
+                              : c.tipo === "gasto" || c.tipo === "ambos"
+                          )
+                          .map(c => [c.id, c])
+                      ).values()
+                    )
+                    const ordered = catOrder.length > 0
+                      ? [...filtered].sort((a, b) => catOrder.indexOf(a.id) - catOrder.indexOf(b.id))
+                      : filtered
+                    return ordered.map(cat => {
+                      const isDraggingThis = draggingCatId === cat.id
+                      const isOver = dragOverCatId === cat.id && !isDraggingThis
+
+                      const handlePointerDown = (e: React.PointerEvent) => {
+                        isDraggingCatRef.current = false
+                        dragCatIdRef.current = cat.id
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                      }
+
+                      const handlePointerMove = (e: React.PointerEvent) => {
+                        if (!dragCatIdRef.current) return
+                        if (!isDraggingCatRef.current) {
+                          isDraggingCatRef.current = true
+                          setDraggingCatId(dragCatIdRef.current)
+                        }
+                        e.currentTarget.releasePointerCapture(e.pointerId)
+                        const el = document.elementFromPoint(e.clientX, e.clientY)
+                        const target = el?.closest("[data-cat-id]")
+                        const overId = target?.getAttribute("data-cat-id") ?? null
+                        if (overId && overId !== dragCatIdRef.current) {
+                          dragOverCatIdRef.current = overId
+                          setDragOverCatId(overId)
+                        }
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                      }
+
+                      const handlePointerUp = (e: React.PointerEvent) => {
+                        e.currentTarget.releasePointerCapture(e.pointerId)
+                        const wasDragging = isDraggingCatRef.current
+                        const from = dragCatIdRef.current
+                        const to = dragOverCatIdRef.current
+                        dragCatIdRef.current = null
+                        dragOverCatIdRef.current = null
+                        isDraggingCatRef.current = false
+                        setDraggingCatId(null)
+                        setDragOverCatId(null)
+                        if (!wasDragging) return
+                        if (!from || !to || from === to) return
+                        setCatOrder(prev => {
+                          const base = prev.length > 0 ? prev : ordered.map(c => c.id)
+                          const next = [...base]
+                          const fromIdx = next.indexOf(from)
+                          const toIdx = next.indexOf(to)
+                          if (fromIdx === -1 || toIdx === -1) return prev
+                          next.splice(fromIdx, 1)
+                          next.splice(toIdx, 0, from)
+                          saveCatOrder(next)
+                          return next
+                        })
+                      }
+
+                      return (
+                        <div
+                          key={cat.id}
+                          data-cat-id={cat.id}
+                          onPointerDown={handlePointerDown}
+                          onPointerMove={handlePointerMove}
+                          onPointerUp={handlePointerUp}
+                          className={`touch-none select-none transition-all duration-150 rounded-2xl ${
+                            isDraggingThis ? "opacity-40 scale-95" : ""
+                          } ${isOver ? "ring-2 ring-emerald-500/60" : ""}`}
+                        >
+                          <CategoryButton
+                            cat={cat}
+                            onPress={(id) => {
+                              if (isDraggingCatRef.current) return
+                              onCategoryClick(id)
+                            }}
+                            disabled={isDisabled || loading}
+                          />
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
             </>
@@ -730,12 +864,13 @@ function CategoryButton({
   onPress: (id: string) => void
   disabled: boolean
 }) {
+  const t = useTranslations()
   const CatIcon = getIcon(cat.icono)
   return (
     <button
       onClick={() => onPress(cat.id)}
       disabled={disabled}
-      aria-label={`Categoría ${cat.label}`}
+      aria-label={t("ingreso.ariaCategoria", { label: cat.label })}
       className="h-20 w-full rounded-2xl bg-zinc-900 border border-zinc-800/80 hover:border-zinc-500 hover:bg-zinc-800/80 disabled:opacity-40 transition-all duration-200 flex flex-col items-center justify-center gap-2 select-none p-2"
     >
       <CatIcon className="w-5 h-5 text-zinc-400" aria-hidden="true" />

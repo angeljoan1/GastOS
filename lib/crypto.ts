@@ -218,10 +218,21 @@ export async function decryptData(cipherText: string | number): Promise<string> 
 }
 
 // ─── Biometría (WebAuthn) ─────────────────────────────────────────────────────
-const BIOMETRIC_KEY_STORAGE  = 'gastos_biometric_wrapped_v2'
-const BIOMETRIC_CRED_STORAGE = 'gastos_biometric_cred_id_v2'
-const BIOMETRIC_SALT_STORAGE = 'gastos_biometric_wrap_salt_v2'
-const RP_NAME                = 'GastOS'
+const BIOMETRIC_KEY_STORAGE     = 'gastos_biometric_wrapped_v2'
+const BIOMETRIC_CRED_STORAGE    = 'gastos_biometric_cred_id_v2'
+const BIOMETRIC_SALT_STORAGE    = 'gastos_biometric_wrap_salt_v2'
+const BIOMETRIC_DEVICE_SECRET   = 'gastos_bio_device_secret_v2'
+const RP_NAME                   = 'GastOS'
+
+function getOrCreateDeviceSecret(): string {
+  let secret = localStorage.getItem(BIOMETRIC_DEVICE_SECRET)
+  if (!secret) {
+    const raw = crypto.getRandomValues(new Uint8Array(32))
+    secret = btoa(String.fromCharCode(...raw))
+    localStorage.setItem(BIOMETRIC_DEVICE_SECRET, secret)
+  }
+  return secret
+}
 
 export async function isBiometricAvailable(): Promise<boolean> {
   try {
@@ -292,8 +303,10 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
     localStorage.setItem(BIOMETRIC_SALT_STORAGE, wrapSaltB64)
 
     const enc = new TextEncoder()
+    const deviceSecret = getOrCreateDeviceSecret()
+    const combinedSecret = enc.encode(userId + '|' + deviceSecret)
     const keyMaterial = await crypto.subtle.importKey(
-      'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
+      'raw', combinedSecret, { name: 'PBKDF2' }, false, ['deriveKey']
     )
     const wrapKey = await crypto.subtle.deriveKey(
       {
@@ -323,16 +336,21 @@ export async function saveBiometricKey(userId: string): Promise<boolean> {
   }
 }
 
-// Verifica biometría y recupera la clave maestra
-export async function loadBiometricKey(userId: string): Promise<boolean> {
+export type BiometricResult = 'ok' | 'user_cancel' | 'key_invalid'
+
+// Verifica biometría y recupera la clave maestra.
+// Retorna 'ok' si todo va bien, 'user_cancel' si el lector falla o el usuario
+// cancela (no limpiar nada), 'key_invalid' si la clave guardada es incompatible
+// (limpiar y pedir reactivación).
+export async function loadBiometricKey(userId: string): Promise<BiometricResult> {
+  const stored = localStorage.getItem(BIOMETRIC_KEY_STORAGE)
+  const credIdB64 = localStorage.getItem(BIOMETRIC_CRED_STORAGE)
+  if (!stored || !credIdB64) return 'key_invalid'
+
+  const credIdBytes = Uint8Array.from(atob(credIdB64), c => c.charCodeAt(0))
+  const challenge = crypto.getRandomValues(new Uint8Array(32))
+
   try {
-    const stored = localStorage.getItem(BIOMETRIC_KEY_STORAGE)
-    const credIdB64 = localStorage.getItem(BIOMETRIC_CRED_STORAGE)
-    if (!stored || !credIdB64) return false
-
-    const credIdBytes = Uint8Array.from(atob(credIdB64), c => c.charCodeAt(0))
-    const challenge = crypto.getRandomValues(new Uint8Array(32))
-
     await navigator.credentials.get({
       publicKey: {
         challenge,
@@ -346,21 +364,28 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
         }],
       },
     })
+  } catch {
+    // El lector ha fallat o l'usuari ha cancel·lat — no és culpa de la clau
+    return 'user_cancel'
+  }
 
-    // Biometría OK — descifrar la clave maestra
+  // Biometria OK — intentar desxifrar la clau maestra
+  try {
     const [ivB64, ctB64] = stored.split('.')
-    if (!ivB64 || !ctB64) return false
+    if (!ivB64 || !ctB64) return 'key_invalid'
 
     const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
     const ct = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
 
     const wrapSaltB64 = localStorage.getItem(BIOMETRIC_SALT_STORAGE)
-    if (!wrapSaltB64) return false
+    if (!wrapSaltB64) return 'key_invalid'
     const wrapSaltBytes = Uint8Array.from(atob(wrapSaltB64), c => c.charCodeAt(0))
 
     const enc = new TextEncoder()
+    const deviceSecret = getOrCreateDeviceSecret()
+    const combinedSecret = enc.encode(userId + '|' + deviceSecret)
     const keyMaterial = await crypto.subtle.importKey(
-      'raw', enc.encode(userId), { name: 'PBKDF2' }, false, ['deriveKey']
+      'raw', combinedSecret, { name: 'PBKDF2' }, false, ['deriveKey']
     )
     const wrapKey = await crypto.subtle.deriveKey(
       {
@@ -376,14 +401,14 @@ export async function loadBiometricKey(userId: string): Promise<boolean> {
     )
 
     const rawKey = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrapKey, ct)
-
     const masterKey = await crypto.subtle.importKey(
       'raw', rawKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
     )
 
     saveKey(masterKey)
-    return true
-} catch {
-    return false
+    return 'ok'
+  } catch {
+    // El desxifrat ha fallat — la clau és incompatible
+    return 'key_invalid'
   }
 }

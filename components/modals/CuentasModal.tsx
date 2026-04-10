@@ -15,7 +15,9 @@ import { supabase } from "@/lib/supabase"
 import { getIcon, CUENTA_COLORS, CUENTA_ICON_OPTIONS } from "@/lib/icons"
 import type { Cuenta } from "@/types"
 import { encryptData } from "@/lib/crypto"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+
+const CUENTAS_ORDER_KEY = "gastos_cuentas_order_v1"
 
 export default function CuentasModal({
   isOpen, onClose, cuentas, onCuentasChange,
@@ -33,6 +35,17 @@ export default function CuentasModal({
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [cuentaOrder, setCuentaOrder] = useState<string[]>(() => {
+    try {
+      const s = localStorage.getItem(CUENTAS_ORDER_KEY)
+      return s ? JSON.parse(s) : []
+    } catch { return [] }
+  })
+  const [draggingCuentaId, setDraggingCuentaId] = useState<string | null>(null)
+  const [dragOverCuentaId, setDragOverCuentaId] = useState<string | null>(null)
+  const dragCuentaIdRef = useRef<string | null>(null)
+  const dragOverCuentaIdRef = useRef<string | null>(null)
+  const isDraggingCuentaRef = useRef(false)
 
   // Escape para cerrar
   useEffect(() => {
@@ -139,13 +152,77 @@ export default function CuentasModal({
             No es necesario llamar a decryptData() aquí. */}
         {cuentas.length > 0 && (
           <div className="space-y-2 mb-6">
-            {cuentas.map(c => {
+            {[...cuentas].sort((a, b) => {
+              const ai = cuentaOrder.indexOf(a.id)
+              const bi = cuentaOrder.indexOf(b.id)
+              if (ai === -1 && bi === -1) return 0
+              if (ai === -1) return 1
+              if (bi === -1) return -1
+              return ai - bi
+            }).map(c => {
               const CIcon = getIcon(c.icono)
               const isConfirming = confirmDeleteId === c.id
+              const isDraggingThis = draggingCuentaId === c.id
+              const isOver = dragOverCuentaId === c.id && !isDraggingThis
+
+              const handlePointerDown = (e: React.PointerEvent) => {
+                if ((e.target as HTMLElement).closest("button")) return
+                isDraggingCuentaRef.current = false
+                dragCuentaIdRef.current = c.id
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }
+
+              const handlePointerMove = (e: React.PointerEvent) => {
+                if (!dragCuentaIdRef.current) return
+                if (!isDraggingCuentaRef.current) {
+                  isDraggingCuentaRef.current = true
+                  setDraggingCuentaId(dragCuentaIdRef.current)
+                }
+                e.currentTarget.releasePointerCapture(e.pointerId)
+                const el = document.elementFromPoint(e.clientX, e.clientY)
+                const target = el?.closest("[data-cuenta-id]")
+                const overId = target?.getAttribute("data-cuenta-id") ?? null
+                if (overId && overId !== dragCuentaIdRef.current) {
+                  dragOverCuentaIdRef.current = overId
+                  setDragOverCuentaId(overId)
+                }
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }
+
+              const handlePointerUp = (e: React.PointerEvent) => {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+                const wasDragging = isDraggingCuentaRef.current
+                const from = dragCuentaIdRef.current
+                const to = dragOverCuentaIdRef.current
+                dragCuentaIdRef.current = null
+                dragOverCuentaIdRef.current = null
+                isDraggingCuentaRef.current = false
+                setDraggingCuentaId(null)
+                setDragOverCuentaId(null)
+                if (!wasDragging || !from || !to || from === to) return
+                setCuentaOrder(prev => {
+                  const base = prev.length > 0 ? prev : cuentas.map(c => c.id)
+                  const next = [...base]
+                  const fromIdx = next.indexOf(from)
+                  const toIdx = next.indexOf(to)
+                  if (fromIdx === -1 || toIdx === -1) return prev
+                  next.splice(fromIdx, 1)
+                  next.splice(toIdx, 0, from)
+                  try { localStorage.setItem(CUENTAS_ORDER_KEY, JSON.stringify(next)) } catch { }
+                  return next
+                })
+              }
+
               return (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3"
+                  data-cuenta-id={c.id}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  className={`flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 select-none touch-none transition-all ${
+                    isDraggingThis ? "opacity-40 cursor-grabbing" : "cursor-grab"
+                  } ${isOver ? "border-emerald-500/50 bg-emerald-950/20" : ""}`}
                 >
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -155,13 +232,12 @@ export default function CuentasModal({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    {/* c.nombre ya está en claro */}
                     <p className="text-sm font-medium text-zinc-200">{c.nombre}</p>
-                    {/* BUG #20 FIX: c.saldo_inicial ya es number en claro */}
                     <p className="text-xs text-zinc-500">
                       {t("cuentas.saldoInicial", { amount: (c.saldo_inicial ?? 0).toFixed(2) })}
                     </p>
                   </div>
+                  <span className="text-zinc-600 text-xs pointer-events-none mr-1">⠿</span>
 
                   {isConfirming ? (
                     <div className="flex gap-2">

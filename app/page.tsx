@@ -18,9 +18,10 @@ import CuentasModal from "@/components/modals/CuentasModal"
 import IngresoTab from "@/components/tabs/IngresoTab"
 import HistorialTab from "@/components/tabs/HistorialTab"
 import DashboardTab from "@/components/tabs/DashboardTab"
+import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
-import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
+import type { Categoria, Cuenta, Presupuesto, Objetivo, Movimiento } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
@@ -43,6 +44,8 @@ function MainApp({ session }: { session: Session }) {
   const [exportMsg, setExportMsg] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [editingMovFromIngreso, setEditingMovFromIngreso] = useState<Movimiento | null>(null)
+  const [editUpdateError, setEditUpdateError] = useState<string | null>(null)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -155,7 +158,7 @@ function MainApp({ session }: { session: Session }) {
     const cuentaMap = Object.fromEntries(cuentas.map(c => [c.id, c.nombre]))
     const catMap = Object.fromEntries(categorias.map(c => [c.id, c.label]))
 
-    const headers = ["ID", "Fecha", "Tipo", "Categoria", "Cantidad", "Nota", "Cuenta"]
+    const headers = ["ID", "Fecha", "Tipo", "Categoria", "Cantidad", "Nota", "Cuenta", "Cuenta destino"]
     const rows = dec.map(m => [
       m.id,
       new Date(m.created_at).toLocaleString("es-ES"),
@@ -164,6 +167,7 @@ function MainApp({ session }: { session: Session }) {
       m.cantidad,
       (m.nota || "").replace(/,/g, ";"),
       cuentaMap[m.cuenta_id] || m.cuenta_id || "",
+      cuentaMap[m.cuenta_destino_id] || m.cuenta_destino_id || "",
     ])
     const csv = [headers, ...rows].map(r => r.join(",")).join("\n")
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }))
@@ -264,7 +268,7 @@ function MainApp({ session }: { session: Session }) {
       )}
 
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-        {tab === "ingreso" && <IngresoTab categorias={categorias} cuentas={cuentas} />}
+        {tab === "ingreso" && <IngresoTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} onEditLast={setEditingMovFromIngreso} />}
         {tab === "historial" && <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />}
         {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} />}
       </main>
@@ -324,6 +328,38 @@ function MainApp({ session }: { session: Session }) {
         }}
       />
       <FeedbackWidget userId={session.user.id} isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+        <EditMovimientoModal
+        isOpen={!!editingMovFromIngreso}
+        onClose={() => { setEditingMovFromIngreso(null); setEditUpdateError(null) }}
+        movimiento={editingMovFromIngreso}
+        categorias={categorias}
+        cuentas={cuentas}
+        saveError={editUpdateError}
+        onSave={async (updated) => {
+          setEditUpdateError(null)
+          const { encryptData } = await import("@/lib/crypto")
+          const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
+          const cantidadEncriptada = await encryptData(updated.cantidad)
+          const notaEncriptada = notaRaw ? await encryptData(notaRaw) : null
+          const { error } = await supabase
+            .from("movimientos")
+            .update({
+              cantidad: cantidadEncriptada as string,
+              categoria: updated.categoria,
+              nota: notaEncriptada,
+              tipo: updated.tipo ?? "gasto",
+              created_at: updated.created_at,
+              cuenta_id: updated.cuenta_id,
+              cuenta_destino_id: updated.cuenta_destino_id ?? null,
+            })
+            .eq("id", updated.id)
+          if (error) {
+            setEditUpdateError(error.message)
+          } else {
+            setEditingMovFromIngreso(null)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -390,6 +426,8 @@ export default function App() {
     })
 
     const hiddenAt = { current: null as number | null }
+    const lastVersionCheck = { current: 0 }
+    const VERSION_CHECK_INTERVAL = 60 * 1000 // 1 minuto mínimo entre checks
 
     const handleVisibility = async () => {
       if (document.visibilityState === "hidden") {
@@ -397,17 +435,20 @@ export default function App() {
         return
       }
 
-      // Vuelve a primer plano
       if (document.visibilityState === "visible") {
-        // Check de versión
-        try {
-          const { data: config } = await supabase
-            .from("app_config")
-            .select("min_version")
-            .eq("id", 1)
-            .maybeSingle()
-          if (config && config.min_version > APP_VERSION) setNeedsUpdate(true)
-        } catch { }
+        // Check de versión con throttle — máximo 1 vez por minuto
+        const now = Date.now()
+        if (now - lastVersionCheck.current > VERSION_CHECK_INTERVAL) {
+          lastVersionCheck.current = now
+          try {
+            const { data: config } = await supabase
+              .from("app_config")
+              .select("min_version")
+              .eq("id", 1)
+              .maybeSingle()
+            if (config && config.min_version > APP_VERSION) setNeedsUpdate(true)
+          } catch { }
+        }
 
         // Si lleva más de 5 minutos en segundo plano, limpiar la clave
         const TIMEOUT_MS = 5 * 60 * 1000

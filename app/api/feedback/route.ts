@@ -38,8 +38,10 @@ export async function POST(request: Request) {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
-    const safeMsg  = esc(mensaje)
-    const safeTipo = esc(tipo ?? '')
+    const safeMsg    = esc(mensaje)
+    const safeTipo   = esc(tipo ?? '')
+    const safeEmail  = esc(user.email ?? '')
+    const safeUserId = esc(user.id)
 
     const { data, error } = await resend.emails.send({
       from: 'GastOS App <soporte@angeljoan.com>',
@@ -50,8 +52,8 @@ export async function POST(request: Request) {
           <h2 style="color: ${safeTipo === 'Bug' ? '#ef4444' : '#10b981'};">
             Nuevo ticket de tipo: ${safeTipo}
           </h2>
-          <p><strong>Usuario ID:</strong> ${user.id}</p>
-          <p><strong>Email:</strong> ${user.email}</p>
+          <p><strong>Usuario ID:</strong> ${safeUserId}</p>
+          <p><strong>Email:</strong> ${safeEmail}</p>
           <hr style="border: 1px solid #eee; margin: 20px 0;" />
           <p style="font-size: 16px; line-height: 1.5;">${safeMsg}</p>
         </div>

@@ -81,6 +81,7 @@
     "biometricErrorActivate": "No s'ha pogut activar. Torna-ho a intentar.",
     "biometricErrorRetry": "Biometria fallida. Usa el teu PIN.",
     "biometricUse": "Usar biometria",
+    "errorPinLocked": "Massa intents. Espera {seconds} segons.",
     "biometricVerifying": "Verificant..."
   },
   "nav": {
@@ -158,7 +159,11 @@
     "savedCategory": "Categoria",
     "savedAccount": "Compte",
     "lastSaved": "Últim",
-    "lastSavedEdit": "Editar"
+    "lastSavedEdit": "Editar",
+    "ariaCuenta": "Compte {nombre}",
+    "errorSessionExpired": "Sessió expirada. Torna a introduir el teu PIN.",
+    "alertBudgetExceeded": "Has superat el pressupost de {cat} ({amount}€ aquest mes).",
+    "ariaCategoria": "Categoria {label}"
   },
   "historial": {
     "searchPlaceholder": "Cerca per nota o categoria...",
@@ -304,6 +309,13 @@
     "configureNow": "Configurar ara",
     "widgetResumenSemanalLabel": "Resum setmanal",
     "widgetResumenSemanalDesc": "Comparativa de despesa aquesta setmana vs l'anterior",
+    "widgetPresupuestoGlobalLabel": "Pressupost mensual",
+    "widgetPresupuestoGlobalDesc": "Límit de despesa total del mes",
+    "drillTotalMes": "Total aquest mes",
+    "last6Months": "Últims 6 mesos",
+    "widgetPresupuestoGlobalLimit": "Límit",
+    "widgetPresupuestoGlobalLeft": "Queden ",
+    "widgetPresupuestoGlobalExceeded": "Excedit ",
     "semanalGastosSemana": "Despesa últims 7 dies",
     "semanalTopCategoria": "Top categoria",
     "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del pressupost"
@@ -381,6 +393,8 @@
     "objetivosHint": "Defineix metes d'estalvi mensuals. El widget de <widget>Objectiu d'estalvi</widget> al Dashboard mostrarà el teu progrés. Les dades es xifren amb el teu PIN.",
     "objetivosHintWidget": "Objectiu d'estalvi",
     "objetivoAhorroMensual": "Estalvi mensual",
+    "objetivoGastoTotal": "Límit de despesa mensual",
+    "objetivoGastoTotalPlaceholder": "Límit total del mes (€)",
     "objetivosAdd": "Afegir objectiu",
     "objetivosPlaceholder": "Objectiu mensual (€)",
     "objetivosErrorUpdate": "Error en actualitzar l'objectiu.",

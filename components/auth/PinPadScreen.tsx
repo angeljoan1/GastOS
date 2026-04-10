@@ -31,6 +31,25 @@ import {
     clearBiometricKey,
   } from "@/lib/crypto"
 
+const LOCKOUT_KEY = "gastos_pin_lockout"
+const MAX_ATTEMPTS = 5
+
+function getLockout(): { attempts: number; lockedUntil: number } {
+  try {
+    return JSON.parse(localStorage.getItem(LOCKOUT_KEY) ?? '{"attempts":0,"lockedUntil":0}')
+  } catch { return { attempts: 0, lockedUntil: 0 } }
+}
+
+function setLockout(attempts: number, lockedUntil: number) {
+  try {
+    localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ attempts, lockedUntil }))
+  } catch { }
+}
+
+function clearLockout() {
+  try { localStorage.removeItem(LOCKOUT_KEY) } catch { }
+}
+
 function triggerHaptic(duration?: number | number[]) {
   if (!navigator.vibrate) return
   if (Array.isArray(duration)) navigator.vibrate(duration)
@@ -60,6 +79,7 @@ export default function PinPadScreen({
   const [biometricLoading, setBiometricLoading]     = useState(false)
   const [showBiometricOffer, setShowBiometricOffer] = useState(false)
   const [biometricError, setBiometricError]         = useState<string | null>(null)
+  const [lockoutUntil, setLockoutUntil] = useState<number>(0)
 
   // ─── Carga del vault ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -117,6 +137,10 @@ export default function PinPadScreen({
       }
     }
 
+    // Leer lockout existente
+    const existing = getLockout()
+    if (existing.lockedUntil > Date.now()) setLockoutUntil(existing.lockedUntil)
+
     loadVault()
 
     // Comprobar soporte biométrico
@@ -133,10 +157,15 @@ export default function PinPadScreen({
 
     async function tryBiometric() {
       setBiometricLoading(true)
-      const ok = await loadBiometricKey(session.user.id)
+      const result = await loadBiometricKey(session.user.id)
       setBiometricLoading(false)
-      if (ok) onUnlocked()
-      // si falla, simplemente muestra el PIN — no hacer nada más
+      if (result === 'ok') {
+        onUnlocked()
+      } else if (result === 'key_invalid') {
+        clearBiometricKey()
+        setBiometricEnabled(false)
+      }
+      // 'user_cancel': cara/empremta no llegida, no fer res — l'usuari entra amb PIN
     }
 
     tryBiometric()
@@ -144,6 +173,7 @@ export default function PinPadScreen({
 
   // ─── Teclado ────────────────────────────────────────────────────────────────
   const handleKeyPress = (num: string) => {
+    if (lockoutUntil > Date.now()) return
     if (pinInput.length >= 6 || isUnlocking) return
     triggerHaptic(30)
     const newPin = pinInput + num
@@ -250,11 +280,25 @@ export default function PinPadScreen({
         const valid      = await isKeyValid(derivedKey, vaultToken)
 
         if (valid) {
-            saveKey(derivedKey)
-            onUnlocked()
-          } else {
+          clearLockout()
+          setLockoutUntil(0)
+          saveKey(derivedKey)
+          onUnlocked()
+        } else {
           triggerHaptic([50, 50, 50])
-          setVaultError(t("pin.errorPinIncorrect"))
+          const lockout = getLockout()
+          const newAttempts = lockout.attempts + 1
+          const waitMs = newAttempts >= MAX_ATTEMPTS
+            ? Math.pow(2, newAttempts - MAX_ATTEMPTS) * 30000
+            : 0
+          const lockedUntil = waitMs > 0 ? Date.now() + waitMs : 0
+          setLockout(newAttempts, lockedUntil)
+          if (lockedUntil > 0) setLockoutUntil(lockedUntil)
+          setVaultError(
+            lockedUntil > 0
+              ? t("pin.errorPinLocked", { seconds: Math.ceil(waitMs / 1000) })
+              : t("pin.errorPinIncorrect")
+          )
           setPinInput("")
         }
       }
@@ -317,10 +361,18 @@ export default function PinPadScreen({
   const handleRetryBiometric = async () => {
     setBiometricLoading(true)
     setBiometricError(null)
-    const ok = await loadBiometricKey(session.user.id)
+    const result = await loadBiometricKey(session.user.id)
     setBiometricLoading(false)
-    if (ok) onUnlocked()
-        else setBiometricError(t("pin.biometricErrorRetry"))
+    if (result === 'ok') {
+      onUnlocked()
+    } else if (result === 'key_invalid') {
+      clearBiometricKey()
+      setBiometricEnabled(false)
+      setBiometricError(t("pin.biometricErrorRetry"))
+    } else {
+      // user_cancel: el lector ha fallat, mostrar error lleu sense netejar res
+      setBiometricError(t("pin.biometricErrorRetry"))
+    }
   }
 
   // ─── Renders ────────────────────────────────────────────────────────────────
@@ -470,7 +522,7 @@ export default function PinPadScreen({
       </div>
 
       {/* Indicadores de dígitos */}
-      <div className="flex gap-4 my-10" aria-label={t("pin.ariaPin")} aria-live="polite">
+      <div className="flex gap-4 my-10" aria-label={t("pin.ariaPin")}>
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
@@ -482,6 +534,14 @@ export default function PinPadScreen({
           />
         ))}
       </div>
+      {/* Anuncio para screen readers - visualmente oculto */}
+      <span
+        className="sr-only"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {pinInput.length > 0 ? `${pinInput.length} de 6` : ""}
+      </span>
 
       {/* Teclado numérico */}
       <div className="grid grid-cols-3 gap-x-8 gap-y-6 max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">

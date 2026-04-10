@@ -81,6 +81,7 @@
     "biometricErrorActivate": "Could not activate. Please try again.",
     "biometricErrorRetry": "Biometrics failed. Use your PIN.",
     "biometricUse": "Use biometrics",
+    "errorPinLocked": "Too many attempts. Wait {seconds} seconds.",
     "biometricVerifying": "Verifying..."
   },
   "nav": {
@@ -158,7 +159,11 @@
     "savedCategory": "Category",
     "savedAccount": "Account",
     "lastSaved": "Last",
-    "lastSavedEdit": "Edit"
+    "lastSavedEdit": "Edit",
+    "ariaCuenta": "Account {nombre}",
+    "errorSessionExpired": "Session expired. Please enter your PIN again.",
+    "alertBudgetExceeded": "You've exceeded the {cat} budget ({amount}€ this month).",
+    "ariaCategoria": "Category {label}"
   },
   "historial": {
     "searchPlaceholder": "Search by note or category...",
@@ -304,6 +309,13 @@
     "configureNow": "Configure now",
     "widgetResumenSemanalLabel": "Weekly summary",
     "widgetResumenSemanalDesc": "Spending comparison this week vs last week",
+    "widgetPresupuestoGlobalLabel": "Monthly budget",
+    "widgetPresupuestoGlobalDesc": "Total spending limit for the month",
+    "drillTotalMes": "Total this month",
+    "last6Months": "Last 6 months",
+    "widgetPresupuestoGlobalLimit": "Limit",
+    "widgetPresupuestoGlobalLeft": "Left ",
+    "widgetPresupuestoGlobalExceeded": "Exceeded ",
     "semanalGastosSemana": "Spending last 7 days",
     "semanalTopCategoria": "Top category",
     "semanalAlertaPresupuesto": "⚠️ {cat} at {pct}% of budget"
@@ -381,6 +393,8 @@
     "objetivosHint": "Define monthly savings goals. The <widget>Savings Goal</widget> widget on the Dashboard will show your progress. Data is encrypted with your PIN.",
     "objetivosHintWidget": "Savings Goal",
     "objetivoAhorroMensual": "Monthly savings",
+    "objetivoGastoTotal": "Monthly spending limit",
+    "objetivoGastoTotalPlaceholder": "Total monthly limit (€)",
     "objetivosAdd": "Add goal",
     "objetivosPlaceholder": "Monthly goal (€)",
     "objetivosErrorUpdate": "Error updating the goal.",

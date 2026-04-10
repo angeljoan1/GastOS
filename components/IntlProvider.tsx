@@ -15,15 +15,12 @@ function getLocale(): Locale {
   return DEFAULT_LOCALE
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const MESSAGE_MAP: Record<Locale, Record<string, unknown>> = {
-  es: require("@/messages/es.json"),
-  en: require("@/messages/en.json"),
-  ca: require("@/messages/ca.json"),
-}
-
-async function loadMessages(locale: Locale) {
-  return MESSAGE_MAP[locale]
+async function loadMessages(locale: Locale): Promise<Record<string, unknown>> {
+  switch (locale) {
+    case "en": return (await import("@/messages/en.json")).default
+    case "ca": return (await import("@/messages/ca.json")).default
+    default:   return (await import("@/messages/es.json")).default
+  }
 }
 
 export default function IntlProvider({ children }: { children: ReactNode }) {

@@ -100,6 +100,10 @@ export default function SettingsModal({
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [isOpen, onClose])
 
+  const [editingGastoTotal, setEditingGastoTotal] = useState(false)
+  const [inputGastoTotal, setInputGastoTotal] = useState("")
+  const [savingGastoTotal, setSavingGastoTotal] = useState(false)
+
   if (!isOpen) return null
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -187,6 +191,42 @@ export default function SettingsModal({
   // sobre una categoría mixta daría cifras incorrectas al mezclar ingresos.
   // ── CRUD objetivos ────────────────────────────────────────────────────────
   const objetivoAhorro = objetivos.find(o => o.tipo === "ahorro_mensual")
+  const objetivoGastoTotal = objetivos.find(o => o.tipo === "gasto_total")
+
+  const handleSaveGastoTotal = async () => {
+    const cantidad = parseFloat(inputGastoTotal)
+    if (!cantidad || cantidad <= 0) return
+    setSavingGastoTotal(true)
+    setError(null)
+    const cantidadCifrada = await encryptData(cantidad)
+    if (objetivoGastoTotal) {
+      const { data, error } = await supabase
+        .from("objetivos")
+        .update({ cantidad: cantidadCifrada, updated_at: new Date().toISOString() })
+        .eq("id", objetivoGastoTotal.id)
+        .select()
+        .single()
+      if (error) setError(t("settings.objetivosErrorUpdate"))
+      else if (data) onObjetivosChange(objetivos.map(o => o.id === objetivoGastoTotal.id ? { ...data, cantidad } : o))
+    } else {
+      const { data, error } = await supabase
+        .from("objetivos")
+        .insert({ user_id: userId, tipo: "gasto_total", cantidad: cantidadCifrada })
+        .select()
+        .single()
+      if (error) setError(t("settings.objetivosErrorCreate"))
+      else if (data) onObjetivosChange([...objetivos, { ...data, cantidad }])
+    }
+    setSavingGastoTotal(false)
+    setEditingGastoTotal(false)
+    setInputGastoTotal("")
+  }
+
+  const handleDeleteGastoTotal = async () => {
+    if (!objetivoGastoTotal) return
+    const { error } = await supabase.from("objetivos").delete().eq("id", objetivoGastoTotal.id)
+    if (!error) onObjetivosChange(objetivos.filter(o => o.id !== objetivoGastoTotal.id))
+  }
 
   const handleSaveObjetivo = async () => {
     const cantidad = parseFloat(inputObjetivo)
@@ -529,6 +569,44 @@ export default function SettingsModal({
                 widget: chunks => <strong className="text-zinc-500">{chunks}</strong>,
               })}
             </p>
+            {/* Pressupost global de despesa */}
+            <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                  <Target className="w-4 h-4 text-red-400" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-zinc-200 flex-1">{t("settings.objetivoGastoTotal")}</p>
+                {objetivoGastoTotal && !editingGastoTotal && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-red-400 tabular-nums">{objetivoGastoTotal.cantidad.toFixed(2)}€</span>
+                    <button onClick={() => { setEditingGastoTotal(true); setInputGastoTotal(objetivoGastoTotal.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
+                    <button onClick={handleDeleteGastoTotal} className="text-zinc-600 hover:text-red-400 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                {!objetivoGastoTotal && !editingGastoTotal && (
+                  <button onClick={() => setEditingGastoTotal(true)} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                    <Target className="w-3.5 h-3.5" aria-hidden="true" /> {t("settings.objetivosAdd")}
+                  </button>
+                )}
+              </div>
+              {editingGastoTotal && (
+                <div className="flex gap-2">
+                  <input
+                    type="number" inputMode="decimal" value={inputGastoTotal}
+                    onChange={e => setInputGastoTotal(e.target.value)}
+                    placeholder={t("settings.objetivoGastoTotalPlaceholder")} autoFocus
+                    onKeyDown={e => { if (e.key === "Enter") handleSaveGastoTotal(); if (e.key === "Escape") setEditingGastoTotal(false) }}
+                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500/50 transition-all"
+                  />
+                  <button onClick={handleSaveGastoTotal} disabled={savingGastoTotal} className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-400 disabled:opacity-50 transition-all">
+                    {savingGastoTotal ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
+                  </button>
+                  <button onClick={() => setEditingGastoTotal(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
+                </div>
+              )}
+            </div>
             <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">

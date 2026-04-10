@@ -81,7 +81,8 @@
     "biometricErrorActivate": "No se pudo activar. Inténtalo de nuevo.",
     "biometricErrorRetry": "Biometría fallida. Usa tu PIN.",
     "biometricUse": "Usar biometría",
-    "biometricVerifying": "Verificando..."
+    "biometricVerifying": "Verificando...",
+    "errorPinLocked": "Demasiados intentos. Espera {seconds} segundos."
   },
   "nav": {
     "register": "Registrar",
@@ -158,7 +159,11 @@
     "savedCategory": "Categoría",
     "savedAccount": "Cuenta",
     "lastSaved": "Último",
-    "lastSavedEdit": "Editar"
+    "lastSavedEdit": "Editar",
+    "ariaCuenta": "Cuenta {nombre}",
+    "errorSessionExpired": "Sesión expirada. Vuelve a introducir tu PIN.",
+    "alertBudgetExceeded": "Has superado el presupuesto de {cat} ({amount}€ este mes).",
+    "ariaCategoria": "Categoría {label}"
   },
   "historial": {
     "searchPlaceholder": "Buscar por nota o categoría...",
@@ -304,6 +309,13 @@
     "configureNow": "Configurar ahora",
     "widgetResumenSemanalLabel": "Resumen semanal",
     "widgetResumenSemanalDesc": "Comparativa de gasto esta semana vs la anterior",
+    "widgetPresupuestoGlobalLabel": "Presupuesto mensual",
+    "widgetPresupuestoGlobalDesc": "Límite de gasto total del mes",
+    "drillTotalMes": "Total este mes",
+    "last6Months": "Últimos 6 meses",
+    "widgetPresupuestoGlobalLimit": "Límite",
+    "widgetPresupuestoGlobalLeft": "Quedan ",
+    "widgetPresupuestoGlobalExceeded": "Excedido ",
     "semanalGastosSemana": "Gasto últimos 7 días",
     "semanalTopCategoria": "Top categoría",
     "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del presupuesto"
@@ -381,6 +393,8 @@
     "objetivosHint": "Define metas de ahorro mensuales. El widget de <widget>Objetivo de ahorro</widget> en el Dashboard mostrará tu progreso. Los datos se cifran con tu PIN.",
     "objetivosHintWidget": "Objetivo de ahorro",
     "objetivoAhorroMensual": "Ahorro mensual",
+    "objetivoGastoTotal": "Límite de gasto mensual",
+    "objetivoGastoTotalPlaceholder": "Límite total del mes (€)",
     "objetivosAdd": "Añadir objetivo",
     "objetivosPlaceholder": "Objetivo mensual (€)",
     "objetivosErrorUpdate": "Error al actualizar el objetivo.",

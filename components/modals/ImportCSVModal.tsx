@@ -193,7 +193,6 @@ export default function ImportCSVModal({
     setImporting(true)
     setErrorGlobal(null)
 
-    // El Coordinador (Promise.all) espera a que todos terminen
     const rows = await Promise.all(
       validas.map(async (f) => ({
         cantidad: await encryptData(f.cantidad) as string,
@@ -205,21 +204,33 @@ export default function ImportCSVModal({
         created_at: f.fecha,
         is_recurring: false,
       }))
-    );
+    )
 
     const BATCH = 50
     let errorOcurrido = false
+    let insertedCount = 0
 
     for (let i = 0; i < rows.length; i += BATCH) {
       const { error } = await supabase
         .from("movimientos")
         .insert(rows.slice(i, i + BATCH))
 
-        if (error) {
-          setErrorGlobal(t("import_csv.errorBatch", { batch: Math.floor(i / BATCH) + 1, message: error.message }))
+      if (error) {
+        const msg = t("import_csv.errorBatch", {
+          batch: Math.floor(i / BATCH) + 1,
+          message: error.message,
+        })
+        setErrorGlobal(
+          insertedCount > 0
+            ? `${msg} (${insertedCount} ${t("import_csv.validRows")} ya importadas)`
+            : msg
+        )
         errorOcurrido = true
+        // Notificar al historial si hubo inserciones parciales antes del fallo
+        if (insertedCount > 0) onSuccess?.()
         break
       }
+      insertedCount += rows.slice(i, i + BATCH).length
     }
 
     setImporting(false)

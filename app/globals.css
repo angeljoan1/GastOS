@@ -94,3 +94,34 @@
       page-break-inside: avoid;
     }
   }
+
+  /* ── Animaciones widget racha_ahorro ──────────────────────────────────────── */
+@keyframes flicker1 {
+  0%,100% { transform: scaleX(1) scaleY(1); }
+  25%     { transform: scaleX(0.88) scaleY(1.08); }
+  75%     { transform: scaleX(1.08) scaleY(0.94); }
+}
+@keyframes flicker2 {
+  0%,100% { transform: scaleX(1) scaleY(1); }
+  33%     { transform: scaleX(0.92) scaleY(1.1); }
+  66%     { transform: scaleX(1.06) scaleY(0.9); }
+}
+@keyframes rise {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-3px); }
+}
+.flame-outer {
+  animation: flicker1 1.4s ease-in-out infinite, rise 1.8s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+.flame-mid {
+  animation: flicker2 1.1s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+.flame-inner {
+  animation: flicker1 0.9s ease-in-out infinite reverse;
+  transform-origin: bottom center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flame-outer, .flame-mid, .flame-inner { animation: none; }
+}

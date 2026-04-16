@@ -229,7 +229,7 @@ export default function EditMovimientoModal({
         </div>
 
         {saveError && (
-          <div role="alert" className="mt-4 bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+          <div role="alert" className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
             {saveError}
           </div>
         )}

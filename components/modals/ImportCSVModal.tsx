@@ -287,14 +287,14 @@ export default function ImportCSVModal({
             {errorGlobal && (
               <div
                 role="alert"
-                className="bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400 flex items-start gap-2"
+                className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400 flex items-start gap-2"
               >
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 {errorGlobal}
               </div>
             )}
 
-            <label className="flex flex-col items-center justify-center gap-3 w-full py-10 rounded-2xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 hover:bg-emerald-950/10 transition-all cursor-pointer">
+            <label className="flex flex-col items-center justify-center gap-3 w-full py-10 rounded-2xl border-2 border-dashed border-zinc-700 hover:border-emerald-500/50 hover:bg-emerald-500/8 transition-all cursor-pointer">
               <Upload className="w-8 h-8 text-zinc-600" />
               <span className="text-sm text-zinc-500">
                 {t("import_csv.uploadLabel")}
@@ -315,12 +315,12 @@ export default function ImportCSVModal({
         {step === "preview" && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-emerald-950/30 border border-emerald-900/40 rounded-xl p-3 text-center">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 text-center">
                 <p className="text-2xl font-light text-emerald-400">{validas.length}</p>
                 <p className="text-xs text-zinc-500 mt-0.5">{t("import_csv.validRows")}</p>
               </div>
               <div className={`rounded-xl p-3 text-center border ${invalidas.length > 0
-                ? "bg-red-950/30 border-red-900/40"
+                ? "bg-red-500/10 border-red-500/20"
                 : "bg-zinc-800/50 border-zinc-700/40"
                 }`}>
                 <p className={`text-2xl font-light ${invalidas.length > 0 ? "text-red-400" : "text-zinc-600"}`}>
@@ -331,7 +331,7 @@ export default function ImportCSVModal({
             </div>
 
             {errorGlobal && (
-              <div role="alert" className="bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+              <div role="alert" className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
                 {errorGlobal}
               </div>
             )}
@@ -343,7 +343,7 @@ export default function ImportCSVModal({
                   role="listitem"
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border text-xs ${f.valida
                     ? "bg-zinc-800/60 border-zinc-700/50"
-                    : "bg-red-950/20 border-red-900/40"
+                    : "bg-red-500/10 border-red-500/20"
                     }`}
                 >
                   <div className="flex-1 min-w-0 space-y-0.5">

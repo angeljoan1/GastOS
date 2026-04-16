@@ -68,7 +68,7 @@ export default function EncryptionBadge() {
         <div className="space-y-3 text-sm text-zinc-400 leading-relaxed">
           <p>{t("encryption.para1")}</p>
           <p>{t("encryption.para2")}</p>
-          <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 text-xs text-yellow-400/90">
             <strong className="font-semibold">{t("encryption.warningLabel")}</strong>{" "}
             {t("encryption.warningText")}
           </div>

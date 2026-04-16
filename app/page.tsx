@@ -309,7 +309,7 @@ function MainApp({ session }: { session: Session }) {
                 <button
                   role="menuitem"
                   onClick={() => { clearKey(); clearBiometricKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-950/30 rounded-lg transition-colors w-full"
+                  className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors w-full"
                 >
                   <LogOut className="w-4 h-4" /> {t("nav.menuSignOut")}
                 </button>
@@ -320,7 +320,7 @@ function MainApp({ session }: { session: Session }) {
       </header>
 
       {loadError && (
-        <div className="px-4 py-2 bg-yellow-950/40 border-b border-yellow-900/40 flex items-center gap-2">
+        <div className="px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/20 flex items-center gap-2">
           <span className="text-xs text-yellow-400">{t("nav.loadError")}</span>
           <button
             onClick={() => window.location.reload()}

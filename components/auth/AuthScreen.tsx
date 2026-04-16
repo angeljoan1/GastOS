@@ -235,12 +235,12 @@ export default function AuthScreen() {
             )}
 
             {error && (
-              <div role="alert" className="bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+              <div role="alert" className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-500">
                 {error}
               </div>
             )}
             {success && (
-              <div role="status" className="bg-emerald-950/40 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">
+              <div role="status" className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 text-sm text-emerald-500">
                 {success}
               </div>
             )}

@@ -58,8 +58,8 @@ export default function ProyeccionMesWidget({
           </div>
         </div>
         <div className={`rounded-xl p-4 flex items-center justify-between border ${ahorroProyectado >= 0
-          ? "bg-emerald-950/30 border-emerald-900/40"
-          : "bg-red-950/30 border-red-900/40"
+          ? "bg-emerald-500/8 border-emerald-500/20"
+          : "bg-red-500/8 border-red-500/20"
           }`}>
           <div>
             <p className="text-xs text-zinc-400 mb-0.5 font-medium">{t("dashboard.ahorroEstimado")}</p>

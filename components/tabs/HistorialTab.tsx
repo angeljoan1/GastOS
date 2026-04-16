@@ -444,12 +444,12 @@ export default function HistorialTab() {
               return (
                 <div key={m.id} className="relative overflow-hidden rounded-2xl">
                   {/* Acción izquierda: editar */}
-                  <div className="absolute inset-y-0 left-0 flex items-center justify-start pl-4 w-20 bg-emerald-950/60">
-                    <Edit2 className="w-5 h-5 text-emerald-400" />
+                  <div className="absolute inset-y-0 left-0 flex items-center justify-start pl-4 w-20 bg-emerald-500 rounded-l-2xl">
+                    <Edit2 className="w-5 h-5 text-white" />
                   </div>
                   {/* Acción derecha: borrar */}
-                  <div className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 w-20 bg-red-950/60">
-                    <Trash2 className="w-5 h-5 text-red-400" />
+                  <div className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 w-20 bg-red-500 rounded-r-2xl">
+                    <Trash2 className="w-5 h-5 text-white" />
                   </div>
                   <div
                     className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 hover:bg-zinc-800/50 cursor-pointer`}

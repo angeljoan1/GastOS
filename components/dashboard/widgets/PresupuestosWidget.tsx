@@ -33,7 +33,7 @@ export default function PresupuestosWidget({ presupuestosConGasto, onOpenSetting
             {onOpenSettings && (
               <button
                 onClick={() => onOpenSettings("presupuestos")}
-                className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40"
+                className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
               >
                 {t("dashboard.configureNow")}
               </button>

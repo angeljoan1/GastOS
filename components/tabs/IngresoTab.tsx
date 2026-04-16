@@ -546,8 +546,8 @@ function onCategoryClick(catId: string) {
                 <div
                   key={sub.id}
                   className={`flex items-center justify-between rounded-xl p-3 border ${esIngreso
-                    ? "bg-emerald-950/20 border-emerald-900/30"
-                    : "bg-red-950/20 border-red-900/30"
+                    ? "bg-emerald-500/10 border-emerald-500/20"
+                    : "bg-red-500/10 border-red-500/20"
                     }`}
                 >
                   <div className="min-w-0 flex-1 pr-3">
@@ -686,7 +686,7 @@ function onCategoryClick(catId: string) {
           {isTransfer && (
             <div className="space-y-3">
               {cuentas.length < 2 ? (
-                <div className="bg-blue-950/30 border border-blue-900/40 rounded-xl p-4 text-center">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
                   <p className="text-sm text-blue-300 font-medium mb-1">{t("ingreso.needTwoAccounts")}</p>
                   <p className="text-xs text-zinc-500">{t("ingreso.needTwoAccountsHint")}</p>
                 </div>

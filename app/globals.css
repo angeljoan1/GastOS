@@ -14,18 +14,23 @@
 /* Class-based dark mode: applies when html has .dark or any descendant */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Light mode: remap zinc scale (invert 50↔950, 100↔900, …, leaving 500 unchanged) */
+/* Dark mode: slightly lighter than pure black — "gris muy oscuro" */
+html.dark {
+  --color-zinc-950: oklch(0.158 0.006 285.823);
+}
+
+/* Light mode: warm off-white/bone scale (invert + add warmth so it's not stark white) */
 html:not(.dark) {
-  --color-zinc-50:  oklch(0.141 0.005 285.823);
-  --color-zinc-100: oklch(0.21 0.006 285.885);
-  --color-zinc-200: oklch(0.274 0.006 286.033);
-  --color-zinc-300: oklch(0.37 0.013 285.805);
-  --color-zinc-400: oklch(0.442 0.017 285.786);
-  --color-zinc-600: oklch(0.705 0.015 286.067);
-  --color-zinc-700: oklch(0.871 0.006 286.286);
-  --color-zinc-800: oklch(0.92 0.004 286.32);
-  --color-zinc-900: oklch(0.967 0.001 286.375);
-  --color-zinc-950: oklch(0.985 0.002 247.839);
+  --color-zinc-50:  oklch(0.138 0.004 80);
+  --color-zinc-100: oklch(0.203 0.007 80);
+  --color-zinc-200: oklch(0.268 0.007 80);
+  --color-zinc-300: oklch(0.362 0.013 80);
+  --color-zinc-400: oklch(0.434 0.016 80);
+  --color-zinc-600: oklch(0.692 0.015 80);
+  --color-zinc-700: oklch(0.857 0.009 80);
+  --color-zinc-800: oklch(0.906 0.007 80);
+  --color-zinc-900: oklch(0.944 0.008 80);
+  --color-zinc-950: oklch(0.966 0.008 80);
 }
 
 :root {

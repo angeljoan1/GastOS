@@ -71,7 +71,7 @@ export default function ResumenSemanalWidget({
           </p>
         )}
         {presupuestoAlerta && (
-          <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-3 py-2">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
             <p className="text-xs text-yellow-400">
               {t("dashboard.semanalAlertaPresupuesto", { cat: presupuestoAlerta.cat.label, pct: Math.round(presupuestoAlerta.pct) })}
             </p>

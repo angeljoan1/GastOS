@@ -413,13 +413,13 @@ export default function PinPadScreen({
             {t.rich("pin.recoveryIntro", { email: () => <strong className="text-zinc-200">{session.user.email}</strong> })}
             </p>
 
-            <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-3 text-xs text-yellow-400/90 text-left">
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3 text-xs text-yellow-400/90 text-left">
               <strong className="font-semibold">{t("pin.recoveryWarningLabel")}</strong>{" "}
               {t("pin.recoveryWarning")}
             </div>
 
             {vaultError && (
-              <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-4 py-3">
+              <p className="text-xs text-red-400 bg-red-500/10 rounded-xl px-4 py-3">
                 {vaultError}
               </p>
             )}
@@ -459,7 +459,7 @@ export default function PinPadScreen({
           </p>
         </div>
         {biometricError && (
-          <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-4 py-3 max-w-xs">
+          <p className="text-xs text-red-400 bg-red-500/10 rounded-xl px-4 py-3 max-w-xs">
             {biometricError}
           </p>
         )}

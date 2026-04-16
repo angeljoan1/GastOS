@@ -360,7 +360,7 @@ export default function SettingsModal({
               key={id}
               onClick={() => { setActiveTab(activeTab === id ? null : id); setError(null); setBioError(null) }}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all text-left ${activeTab === id
-                ? "border-emerald-500/40 bg-emerald-950/20"
+                ? "border-emerald-500/40 bg-emerald-500/10"
                 : "border-zinc-800 bg-zinc-800/40 hover:border-zinc-700"
                 }`}
             >
@@ -376,7 +376,7 @@ export default function SettingsModal({
         </div>
 
         {error && (
-          <div role="alert" className="mb-4 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+          <div role="alert" className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
             {error}
           </div>
         )}
@@ -484,7 +484,7 @@ export default function SettingsModal({
                         onClick={() => setNewCatIcono(name)}
                         aria-label={`Icono ${name}`}
                         aria-pressed={newCatIcono === name}
-                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name ? "border-emerald-500/60 bg-emerald-950/30" : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"}`}
+                        className={`aspect-square flex items-center justify-center rounded-lg border transition-all ${newCatIcono === name ? "border-emerald-500/60 bg-emerald-500/12" : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"}`}
                       >
                         <Ico className="w-4 h-4 text-zinc-300" aria-hidden="true" />
                       </button>
@@ -697,7 +697,7 @@ export default function SettingsModal({
                   </button>
                 </div>
                 {bioError && (
-                  <p className="text-xs text-red-400 bg-red-950/30 rounded-xl px-3 py-2">{bioError}</p>
+                  <p className="text-xs text-red-400 bg-red-500/10 rounded-xl px-3 py-2">{bioError}</p>
                 )}
                 {bioEnabled && (
                   <p className="text-xs text-zinc-700">

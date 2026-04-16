@@ -222,7 +222,7 @@ export default function DashboardTab({
   )
 
   const encryptedBanner = hasEncryptedMovs ? (
-    <div className="mx-4 mb-2 flex items-center gap-2 bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-4 py-2.5">
+    <div className="mx-4 mb-2 flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-2.5">
       <span className="text-sm">🔒</span>
       <p className="text-xs text-yellow-400/90">{t("common.encryptedBanner")}</p>
     </div>
@@ -459,7 +459,7 @@ export default function DashboardTab({
               opacity: 0.85,
             }}
           >
-            <div className="flex items-center gap-4 px-4 py-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 shadow-2xl shadow-black/60">
+            <div className="flex items-center gap-4 px-4 py-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 shadow-2xl shadow-black/60">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
                 <GhostIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
               </div>
@@ -599,7 +599,7 @@ export default function DashboardTab({
                     onPointerUp={handlePointerUp}
                     className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none ${
                       isDraggingThis ? "opacity-40 cursor-grabbing touch-none" : "cursor-grab"
-                    } ${isOver && !isDraggingThis ? "border-emerald-500/60 bg-emerald-950/30" : "border-emerald-500/40 bg-emerald-950/20"}`}
+                    } ${isOver && !isDraggingThis ? "border-emerald-500/60 bg-emerald-500/15" : "border-emerald-500/40 bg-emerald-500/10"}`}
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
                       <WIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />

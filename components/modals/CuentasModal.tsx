@@ -282,7 +282,7 @@ export default function CuentasModal({
                   onPointerUp={handlePointerUp}
                   className={`flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 select-none transition-all ${
                     isDraggingThis ? "opacity-40 cursor-grabbing touch-none" : "cursor-grab"
-                  } ${isOver && !isDraggingThis ? "border-emerald-500/50 bg-emerald-950/20" : ""}`}
+                  } ${isOver && !isDraggingThis ? "border-emerald-500/50 bg-emerald-500/10" : ""}`}
                 >
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -370,7 +370,7 @@ export default function CuentasModal({
                     aria-label={`Icono ${iconKeyMap[opt.name] ?? opt.label}`}
                     aria-pressed={icono === opt.name}
                     className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all ${icono === opt.name
-                      ? "border-emerald-500/50 bg-emerald-950/30"
+                      ? "border-emerald-500/50 bg-emerald-500/12"
                       : "border-zinc-700 bg-zinc-800 hover:border-zinc-500"
                       }`}
                       >

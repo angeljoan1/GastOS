@@ -9,7 +9,7 @@ import FeedbackWidget from "@/components/FeedbackWidget"
 import ImportCSVModal from "@/components/modals/ImportCSVModal"
 import {
   LogOut, Loader2, WalletCards, History,
-  BarChart3, Settings, Menu, Download, Upload, Landmark, RefreshCw, MessageSquare,
+  BarChart3, Settings, Menu, Download, Upload, Landmark, RefreshCw, MessageSquare, Sun, Moon,
 } from "lucide-react"
 import AuthScreen from "@/components/auth/AuthScreen"
 import PinPadScreen from "@/components/auth/PinPadScreen"
@@ -51,6 +51,23 @@ function MainApp({ session }: { session: Session }) {
   const [editUpdateError, setEditUpdateError] = useState<string | null>(null)
 
   const menuRef = useRef<HTMLDivElement>(null)
+  const [isDark, setIsDark] = useState(true)
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"))
+  }, [])
+
+  const toggleTheme = () => {
+    const next = !isDark
+    setIsDark(next)
+    if (next) {
+      document.documentElement.classList.add("dark")
+      localStorage.setItem("gastos-theme", "dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+      localStorage.setItem("gastos-theme", "light")
+    }
+  }
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -228,6 +245,15 @@ function MainApp({ session }: { session: Session }) {
 
         <div className="flex items-center gap-1">
           <button
+            onClick={toggleTheme}
+            aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
+          >
+            {isDark
+              ? <Sun className="w-4 h-4 text-zinc-400" />
+              : <Moon className="w-4 h-4 text-zinc-400" />}
+          </button>
+          <button
             onClick={() => setShowCuentas(true)}
             aria-label={t("nav.ariaAccounts")}
             className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
@@ -324,8 +350,8 @@ function MainApp({ session }: { session: Session }) {
         )}
       </main>
 
-      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1 pb-safe-bottom">
-        <div className="flex items-end justify-around">
+      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-3 pb-safe-bottom">
+        <div className="flex items-center justify-around py-1.5 gap-1">
           {([
             { id: "ingreso", Icon: WalletCards, label: t("nav.register") },
             { id: "historial", Icon: History, label: t("nav.historial") },
@@ -336,14 +362,14 @@ function MainApp({ session }: { session: Session }) {
               onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
               aria-label={label}
               aria-current={tab === id ? "page" : undefined}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 transition-all duration-200 relative ${tab === id ? "text-emerald-400" : "text-zinc-600 hover:text-zinc-400"
-                }`}
+              className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-200 ${
+                tab === id
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className={`w-5 h-5 transition-transform duration-200 ${tab === id ? "scale-110" : ""}`} />
               <span className="text-[10px] font-medium">{label}</span>
-              {tab === id && (
-                <span className="absolute bottom-0 block w-10 h-0.5 bg-emerald-400 rounded-full" />
-              )}
             </button>
           ))}
         </div>

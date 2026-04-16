@@ -37,8 +37,13 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Runs before first paint: remove .dark if user picked light mode */}
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('gastos-theme')==='light')document.documentElement.classList.remove('dark')}catch(e){}` }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <IntlProvider>{children}</IntlProvider>
         <Script id="sw-register" strategy="afterInteractive">{`

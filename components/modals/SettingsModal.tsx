@@ -21,28 +21,24 @@ type Locale = typeof SUPPORTED_LOCALES[number]
 import { supabase } from "@/lib/supabase"
 import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
 import { encryptData, isBiometricAvailable, hasBiometricKey, saveBiometricKey, clearBiometricKey } from "@/lib/crypto"
-import type { Categoria, Presupuesto, Objetivo } from "@/types"
+import { useAppData } from "@/contexts/AppDataContext"
 
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
 
 export default function SettingsModal({
-  isOpen, onClose, categorias, onCategoriesChange,
-  presupuestos, onPresupuestosChange,
-  objetivos, onObjetivosChange,
+  isOpen, onClose,
   session, userId, initialTab,
 }: {
   isOpen: boolean
   onClose: () => void
-  categorias: Categoria[]
-  onCategoriesChange: (cats: Categoria[]) => void
-  presupuestos: Presupuesto[]
-  onPresupuestosChange: (p: Presupuesto[]) => void
-  objetivos: Objetivo[]
-  onObjetivosChange: (o: Objetivo[]) => void
   session: Session
   userId: string
   initialTab?: "categorias" | "presupuestos" | "objetivos" | "seguridad" | null
 }) {
+  const { categorias, setCategorias, presupuestos, setPresupuestos, objetivos, setObjetivos } = useAppData()
+  const onCategoriesChange = setCategorias
+  const onPresupuestosChange = setPresupuestos
+  const onObjetivosChange = setObjetivos
   const [newCatName, setNewCatName] = useState("")
   const [newCatTipo, setNewCatTipo] = useState<"gasto" | "ingreso" | "ambos">("gasto")
   const [newCatIcono, setNewCatIcono] = useState("Package")

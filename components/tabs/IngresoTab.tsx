@@ -10,15 +10,17 @@ import { useState, useEffect, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import {
-  CalendarDays, X, Loader2, CheckCircle2, Delete,
+  CalendarDays, X, Loader2, CheckCircle2,
   TrendingDown, TrendingUp, ArrowLeftRight,
 } from "lucide-react"
 import { getIcon } from "@/lib/icons"
-import type { Categoria, Movimiento, Cuenta, Presupuesto } from "@/types"
+import type { Categoria, Movimiento } from "@/types"
 import BottomSheet, { SheetTrigger } from "@/components/ui/BottomSheet"
 import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import { invalidateSaldoCache } from "@/components/dashboard/hooks/useDashboardData"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
+import NumericKeypad from "@/components/ui/NumericKeypad"
+import { useAppData } from "@/contexts/AppDataContext"
 
 function triggerHaptic() {
   if (typeof window !== "undefined" && window.navigator?.vibrate) {
@@ -29,14 +31,12 @@ function triggerHaptic() {
 type TipoActivo = "gasto" | "ingreso" | "transferencia"
 
 export default function IngresoTab({
-  categorias, cuentas, presupuestos, onEditLast,
+  onEditLast,
 }: {
-  categorias: Categoria[]
-  cuentas: Cuenta[]
-  presupuestos: Presupuesto[]
   onEditLast?: (mov: Movimiento) => void
 }) {
   const t = useTranslations()
+  const { categorias, cuentas, presupuestos } = useAppData()
   const [display, setDisplay] = useState("0")
   const [nota, setNota] = useState("")
   const [success, setSuccess] = useState(false)
@@ -344,7 +344,6 @@ function onCategoryClick(catId: string) {
     setProcessingSub(null)
   }
 
-  const keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0"]
   const isDisabled = loading || display === "0" || display === "0."
   const isTransfer = tipoMovimiento === "transferencia"
 
@@ -863,25 +862,7 @@ function onCategoryClick(catId: string) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 px-6 py-3 border-t border-zinc-800/60 bg-zinc-950 shrink-0">
-        {keys.map(k => (
-          <button
-            key={k}
-            onClick={() => { if (k === ".") triggerHaptic(); handleDigit(k) }}
-            aria-label={k === "." ? t("ingreso.ariaDecimalPoint") : k}
-            className="h-14 flex items-center justify-center text-2xl font-light text-zinc-200 active:bg-zinc-800 active:scale-95 rounded-xl transition-all duration-75 tabular-nums"
-          >
-            {k}
-          </button>
-        ))}
-        <button
-          onClick={handleBackspace}
-          aria-label={t("pin.ariaDeleteDigit")}
-          className="h-14 flex items-center justify-center text-zinc-500 hover:text-red-400 active:bg-zinc-800 active:scale-95 rounded-xl transition-all"
-        >
-          <Delete className="w-6 h-6" />
-        </button>
-      </div>
+      <NumericKeypad onDigit={handleDigit} onBackspace={handleBackspace} />
 
       <BottomSheet
         isOpen={showCuentaSheet}

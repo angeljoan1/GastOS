@@ -13,19 +13,19 @@ import { X, Loader2 } from "lucide-react"
 import type { Movimiento, Categoria, Cuenta } from "@/types"
 import { getIcon } from "@/lib/icons"
 import BottomSheet from "@/components/ui/BottomSheet"
+import { useAppData } from "@/contexts/AppDataContext"
 
 export default function EditMovimientoModal({
-  isOpen, onClose, movimiento, categorias, cuentas, onSave, saveError,
+  isOpen, onClose, movimiento, onSave, saveError,
 }: {
   isOpen: boolean
   onClose: () => void
   movimiento: Movimiento | null
-  categorias: Categoria[]
-  cuentas: Cuenta[]
   onSave: (updatedMov: Movimiento) => Promise<void>
   saveError?: string | null
 }) {
   const t = useTranslations()
+  const { categorias, cuentas } = useAppData()
   const [cantidad, setCantidad] = useState("")
   const [categoria, setCategoria] = useState("")
   const [nota, setNota] = useState("")

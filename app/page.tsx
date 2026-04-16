@@ -25,6 +25,7 @@ import type { Categoria, Cuenta, Presupuesto, Objetivo, Movimiento } from "@/typ
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import ErrorBoundary from "@/components/ui/ErrorBoundary"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
+import { AppDataProvider } from "@/contexts/AppDataContext"
 
 const APP_VERSION = 24
 
@@ -181,6 +182,7 @@ function MainApp({ session }: { session: Session }) {
   }
 
   return (
+    <AppDataProvider value={{ categorias, setCategorias, cuentas, setCuentas, presupuestos, setPresupuestos, objetivos, setObjetivos }}>
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
       <header className="flex items-center justify-between px-4 pt-safe-top pb-0.5 min-h-10 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm relative z-20">
         <div className="flex items-center gap-2">
@@ -271,17 +273,17 @@ function MainApp({ session }: { session: Session }) {
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
         {tab === "ingreso" && (
           <ErrorBoundary label="Registro">
-            <IngresoTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} onEditLast={setEditingMovFromIngreso} />
+            <IngresoTab onEditLast={setEditingMovFromIngreso} />
           </ErrorBoundary>
         )}
         {tab === "historial" && (
           <ErrorBoundary label="Historial">
-            <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />
+            <HistorialTab key={historialKey} />
           </ErrorBoundary>
         )}
         {tab === "dashboard" && (
           <ErrorBoundary label="Dashboard">
-            <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} userId={session.user.id} />
+            <DashboardTab onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} userId={session.user.id} />
           </ErrorBoundary>
         )}
       </main>
@@ -315,26 +317,16 @@ function MainApp({ session }: { session: Session }) {
         isOpen={showSettings}
         onClose={() => { setShowSettings(false); setSettingsInitialTab(null) }}
         initialTab={settingsInitialTab}
-        categorias={categorias}
-        onCategoriesChange={setCategorias}
-        presupuestos={presupuestos}
-        onPresupuestosChange={setPresupuestos}
-        objetivos={objetivos}
-        onObjetivosChange={setObjetivos}
         session={session}
         userId={session.user.id}
       />
       <CuentasModal
         isOpen={showCuentas}
         onClose={() => setShowCuentas(false)}
-        cuentas={cuentas}
-        onCuentasChange={setCuentas}
       />
       <ImportCSVModal
         isOpen={showImport}
         onClose={() => setShowImport(false)}
-        categorias={categorias}
-        cuentas={cuentas}
         onSuccess={() => {
           setTab("historial")
           setHistorialKey(k => k + 1)
@@ -345,8 +337,6 @@ function MainApp({ session }: { session: Session }) {
         isOpen={!!editingMovFromIngreso}
         onClose={() => { setEditingMovFromIngreso(null); setEditUpdateError(null) }}
         movimiento={editingMovFromIngreso}
-        categorias={categorias}
-        cuentas={cuentas}
         saveError={editUpdateError}
         onSave={async (updated) => {
           setEditUpdateError(null)
@@ -374,6 +364,7 @@ function MainApp({ session }: { session: Session }) {
         }}
       />
     </div>
+    </AppDataProvider>
   )
 }
 

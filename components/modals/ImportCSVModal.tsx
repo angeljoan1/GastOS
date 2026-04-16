@@ -14,8 +14,8 @@ import {
   X, Upload, AlertTriangle, CheckCircle2, Loader2, FileText, Trash2,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import type { Categoria, Cuenta } from "@/types"
 import { encryptData } from "@/lib/crypto"
+import { useAppData } from "@/contexts/AppDataContext"
 
 interface FilaParseada {
   index: number
@@ -31,15 +31,14 @@ interface FilaParseada {
 }
 
 export default function ImportCSVModal({
-  isOpen, onClose, categorias, cuentas, onSuccess,
+  isOpen, onClose, onSuccess,
 }: {
   isOpen: boolean
   onClose: () => void
-  categorias: Categoria[]
-  cuentas: Cuenta[]
   onSuccess?: () => void   // BUG #5 FIX: callback opcional para notificar al padre
 }) {
   const t = useTranslations()
+  const { categorias, cuentas } = useAppData()
   const [filas, setFilas] = useState<FilaParseada[]>([])
   const [importing, setImporting] = useState(false)
   const [step, setStep] = useState<"upload" | "preview" | "done">("upload")

@@ -13,18 +13,18 @@ import { getIcon, CUENTA_COLORS, CUENTA_ICON_OPTIONS } from "@/lib/icons"
 import type { Cuenta } from "@/types"
 import { encryptData } from "@/lib/crypto"
 import { useState, useEffect, useRef } from "react"
+import { useAppData } from "@/contexts/AppDataContext"
 
 const CUENTAS_ORDER_KEY = "gastos_cuentas_order_v1"
 
 export default function CuentasModal({
-  isOpen, onClose, cuentas, onCuentasChange,
+  isOpen, onClose,
 }: {
   isOpen: boolean
   onClose: () => void
-  cuentas: Cuenta[]
-  onCuentasChange: (cuentas: Cuenta[]) => void
 }) {
   const t = useTranslations()
+  const { cuentas, setCuentas: onCuentasChange } = useAppData()
   const [nombre, setNombre] = useState("")
   const [saldoInicial, setSaldoInicial] = useState("")
   const [icono, setIcono] = useState("Landmark")

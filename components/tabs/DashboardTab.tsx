@@ -23,8 +23,8 @@ import {
   ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line,
 } from "recharts"
 import { getIcon } from "@/lib/icons"
-import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
+import { useAppData } from "@/contexts/AppDataContext"
 
 // ── Widgets extraídos ─────────────────────────────────────────────────────────
 import ResumenMesWidget from "@/components/dashboard/widgets/ResumenMesWidget"
@@ -96,18 +96,14 @@ const CHART_COLORS = [
 
 // ── DashboardTab ──────────────────────────────────────────────────────────────
 export default function DashboardTab({
-  categorias, cuentas, presupuestos, objetivos, onObjetivosChange, onOpenSettings, userId,
+  onOpenSettings, userId,
 }: {
-  categorias: Categoria[]
-  cuentas: Cuenta[]
-  presupuestos: Presupuesto[]
-  objetivos: Objetivo[]
-  onObjetivosChange: (o: Objetivo[]) => void
   onOpenSettings?: (tab: "categorias" | "presupuestos" | "objetivos" | "seguridad") => void
   userId: string
 }) {
   const t = useTranslations()
   const locale = useLocale()
+  const { categorias, cuentas, presupuestos, objetivos } = useAppData()
   const WIDGET_CATALOG = useMemo(() => getWidgetCatalog(t), [t])
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showWidgetPicker, setShowWidgetPicker] = useState(false)

@@ -18,10 +18,11 @@ import {
 } from "lucide-react"
 import { getIcon } from "@/lib/icons"
 import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
-import type { Categoria, Movimiento, Cuenta } from "@/types"
+import type { Movimiento } from "@/types"
 import BottomSheet, { SheetTrigger, type SheetOption } from "@/components/ui/BottomSheet"
 import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
+import { useAppData } from "@/contexts/AppDataContext"
 
 type TipoFilter = "todos" | "gasto" | "ingreso" | "transferencia"
 
@@ -33,13 +34,9 @@ const THEME_COLORS: Record<TipoFilter, string> = {
   transferencia: "#1e3a8a",
 }
 
-export default function HistorialTab({
-  categorias, cuentas,
-}: {
-  categorias: Categoria[]
-  cuentas: Cuenta[]
-}) {
+export default function HistorialTab() {
   const t = useTranslations()
+  const { categorias, cuentas } = useAppData()
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -581,8 +578,6 @@ export default function HistorialTab({
         isOpen={!!editingMov}
         onClose={() => { setEditingMov(null); setUpdateError(null) }}
         movimiento={editingMov}
-        categorias={categorias}
-        cuentas={cuentas}
         onSave={handleUpdateMovimiento}
         saveError={updateError}
       />

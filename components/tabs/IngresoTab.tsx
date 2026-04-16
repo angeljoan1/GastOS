@@ -55,6 +55,7 @@ export default function IngresoTab({
   const [recurPeriod, setRecurPeriod] = useState<'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual'>('monthly')
   const [showPeriodStep, setShowPeriodStep] = useState(false)
   const [isRecurringTransfer, setIsRecurringTransfer] = useState(false)
+  const [budgetWarning, setBudgetWarning] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<{ id: string; cantidad: number; catLabel: string; cuentaNombre: string | null; tipo: TipoActivo } | null>(null)
   const [catOrder, setCatOrder] = useState<string[]>([])
   const dragCatIdRef = useRef<string | null>(null)
@@ -105,6 +106,7 @@ export default function IngresoTab({
           const notaStr = m.nota ? await decryptData(m.nota) : null
           return {
             ...m,
+            tipo: m.tipo ?? "gasto",
             cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
             nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
           }
@@ -121,10 +123,12 @@ export default function IngresoTab({
         if (sub.cantidad === -1) return // irrecuperable — no mostrar
         const ultimo = new Date(sub.created_at)
         const meses = mesesDePeriod(sub.recur_period)
+        const maxDay = new Date(ultimo.getFullYear(), ultimo.getMonth() + meses + 1, 0).getDate()
+        const dia = Math.min(ultimo.getDate(), maxDay)
         const vencimiento = new Date(
           ultimo.getFullYear(),
           ultimo.getMonth() + meses,
-          ultimo.getDate(),
+          dia,
           12, 0, 0, 0
         )
         if (vencimiento <= now) pending.push(sub)
@@ -261,7 +265,8 @@ function onCategoryClick(catId: string) {
           movsDelMes.map(async m => parseFloat(await decrypt(m.cantidad)) || 0)
         )).reduce((a, b) => a + b, 0)
         if (totalMes > pressupost.cantidad) {
-          setError(t("ingreso.alertBudgetExceeded", { cat: catLabel, amount: pressupost.cantidad.toFixed(2) }))
+          setBudgetWarning(t("ingreso.alertBudgetExceeded", { cat: catLabel, amount: pressupost.cantidad.toFixed(2) }))
+          setTimeout(() => setBudgetWarning(null), 5000)
         }
       }
     }
@@ -354,6 +359,7 @@ function onCategoryClick(catId: string) {
         recur_period: sub.recur_period ?? 'monthly',
         tipo: sub.tipo ?? "gasto",
         cuenta_id: sub.cuenta_id,
+        cuenta_destino_id: sub.cuenta_destino_id ?? null,
         created_at: fechaObjetivo,   // ← directo en el insert, sin UPDATE posterior
       })
 
@@ -365,7 +371,13 @@ function onCategoryClick(catId: string) {
 
     setPendingSubs(prev => prev.filter(p => p.id !== sub.id))
     invalidateSaldoCache()
-    if (sub.cuenta_id) {
+    if ((sub.tipo ?? "gasto") === "transferencia") {
+      const deltas = [
+        ...(sub.cuenta_id ? [{ id: sub.cuenta_id, delta: -sub.cantidad }] : []),
+        ...(sub.cuenta_destino_id ? [{ id: sub.cuenta_destino_id, delta: sub.cantidad }] : []),
+      ]
+      if (deltas.length > 0) await actualizarSaldoCuentas(deltas)
+    } else if (sub.cuenta_id) {
       const delta = (sub.tipo ?? "gasto") === "ingreso" ? sub.cantidad : -sub.cantidad
       await actualizarSaldoCuentas([{ id: sub.cuenta_id, delta }])
     }
@@ -541,19 +553,30 @@ function onCategoryClick(catId: string) {
           <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
             {pendingSubs.map(sub => {
               const esIngreso = sub.tipo === "ingreso"
+              const esTransfer = sub.tipo === "transferencia"
               const catLabel = getCatLabel(sub.categoria)
+              const badgeClass = esTransfer
+                ? "bg-blue-500/20 text-blue-400"
+                : esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+              const cardClass = esTransfer
+                ? "bg-blue-500/10 border-blue-500/20"
+                : esIngreso ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
+              const btnClass = esTransfer
+                ? "bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-zinc-950"
+                : esIngreso
+                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950"
+                : "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950"
+              const badgeLabel = esTransfer
+                ? t("ingreso.pendingLabelTransfer")
+                : esIngreso ? t("ingreso.pendingLabelIngreso") : t("ingreso.pendingLabelGasto")
               return (
                 <div
                   key={sub.id}
-                  className={`flex items-center justify-between rounded-xl p-3 border ${esIngreso
-                    ? "bg-emerald-500/10 border-emerald-500/20"
-                    : "bg-red-500/10 border-red-500/20"
-                    }`}
+                  className={`flex items-center justify-between rounded-xl p-3 border ${cardClass}`}
                 >
                   <div className="min-w-0 flex-1 pr-3">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                      }`}>
-                      {esIngreso ? t("ingreso.pendingLabelIngreso") : t("ingreso.pendingLabelGasto")}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badgeClass}`}>
+                      {badgeLabel}
                     </span>
                     <p className="text-sm text-zinc-200 truncate font-medium mt-1">
                       {catLabel}{sub.nota && sub.nota !== DECRYPT_ERROR ? ` · ${sub.nota}` : ""}
@@ -578,10 +601,7 @@ function onCategoryClick(catId: string) {
                       onClick={() => handleCobrarSub(sub)}
                       disabled={processingSub === sub.id}
                       aria-label={`Cobrar recurrente ${catLabel}`}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${esIngreso
-                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950"
-                        : "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950"
-                        }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${btnClass}`}
                     >
                       {processingSub === sub.id
                         ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -620,6 +640,11 @@ function onCategoryClick(catId: string) {
 
       <div className="flex flex-col items-end justify-end px-6 pt-2 pb-2 border-b border-zinc-800/60 bg-zinc-950">
         {error && <p className="text-xs text-red-400 mb-1 self-start" role="alert">{error}</p>}
+        {budgetWarning && (
+          <div className="w-full mb-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2 text-xs text-yellow-400" role="status">
+            {budgetWarning}
+          </div>
+        )}
         <div className="flex items-baseline gap-2">
           <span className={`text-2xl font-light transition-colors duration-200 ${accent.text}`} aria-hidden="true">€</span>
           <span className="text-5xl font-light tracking-tight leading-none tabular-nums text-zinc-100">

@@ -33,6 +33,7 @@ export default function CuentasModal({
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [cuentaOrder, setCuentaOrder] = useState<string[]>(() => {
     try {
       const s = localStorage.getItem(CUENTAS_ORDER_KEY)
@@ -107,6 +108,17 @@ export default function CuentasModal({
 
   const handleDelete = async (id: string) => {
     setDeletingId(id)
+    setDeleteError(null)
+    const { count } = await supabase
+      .from("movimientos")
+      .select("id", { count: "exact", head: true })
+      .or(`cuenta_id.eq.${id},cuenta_destino_id.eq.${id}`)
+    if (count && count > 0) {
+      setDeleteError(t("cuentas.deleteHasMovements"))
+      setDeletingId(null)
+      setConfirmDeleteId(null)
+      return
+    }
     const { error } = await supabase.from("cuentas").delete().eq("id", id)
     if (!error) onCuentasChange(cuentas.filter(c => c.id !== id))
     setDeletingId(null)
@@ -331,6 +343,12 @@ export default function CuentasModal({
                 </div>
               )
             })}
+          </div>
+        )}
+
+        {deleteError && (
+          <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
+            {deleteError}
           </div>
         )}
 

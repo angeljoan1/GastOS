@@ -149,6 +149,7 @@
     "recurAnnualDesc": "Cada any",
     "pendingTitle": "Recurrents pendents",
     "pendingLabelIngreso": "↑ Ingrés",
+    "pendingLabelTransfer": "↔ Transfer",
     "pendingLabelGasto": "↓ Despesa",
     "pendingCollect": "Cobrat?",
     "pendingPay": "Cobrar",
@@ -179,7 +180,9 @@
     "sheetTitleFilterType": "Filtrar per tipus",
     "sheetTitleFilterCategory": "Filtrar per categoria",
     "noResults": "No hi ha resultats per a aquesta cerca",
+    "noResultsFilter": "Sense resultats amb els filtres aplicats",
     "noMovements": "No hi ha moviments",
+    "noMovementsHint": "Registra el teu primer moviment a la pestanya Registrar",
     "loadMore": "Carregar més antics",
     "labelTransfer": "Transferència",
     "badgeTransfer": "Transfer",
@@ -321,7 +324,10 @@
     "widgetPresupuestoGlobalExceeded": "Excedit ",
     "semanalGastosSemana": "Despesa últims 7 dies",
     "semanalTopCategoria": "Top categoria",
-    "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del pressupost"
+    "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del pressupost",
+    "emptyStateTitle": "Benvingut a GastOS!",
+    "emptyStateHint": "Registra el teu primer moviment per veure l'anàlisi aquí.",
+    "emptyStateCta": "Registrar primer moviment"
   },
   "cuentas": {
     "title": "Els meus Comptes",
@@ -346,7 +352,8 @@
     "iconMonedas": "Monedes",
     "iconBilletes": "Bitllets",
     "iconEntidad": "Entitat",
-    "iconOtro": "Altre"
+    "iconOtro": "Altre",
+    "deleteHasMovements": "No pots eliminar un compte amb moviments vinculats."
   },
   "settings": {
     "title": "Configuració",

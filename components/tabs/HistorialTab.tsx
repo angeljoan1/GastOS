@@ -406,14 +406,23 @@ export default function HistorialTab() {
           <div className="flex justify-center py-10">
             <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
           </div>
-        ) : movimientosFiltrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Package className="w-10 h-10 text-zinc-700" aria-hidden="true" />
-            <p className="text-sm text-zinc-600">
-              {searchTerm ? t("historial.noResults") : t("historial.noMovements")}
-            </p>
-          </div>
-        ) : (
+        ) : movimientosFiltrados.length === 0 ? (() => {
+          const hasActiveFilters = !!searchTerm.trim() || !!selectedCategory || tipoFilter !== "todos"
+          return (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-6">
+              <Package className="w-10 h-10 text-zinc-700" aria-hidden="true" />
+              <p className="text-sm text-zinc-500 font-medium">
+                {hasActiveFilters
+                  ? (searchTerm.trim() ? t("historial.noResults") : t("historial.noResultsFilter"))
+                  : t("historial.noMovements")
+                }
+              </p>
+              {!hasActiveFilters && (
+                <p className="text-xs text-zinc-700">{t("historial.noMovementsHint")}</p>
+              )}
+            </div>
+          )
+        })() : (
           <>
             {movimientosFiltrados.map(m => {
               const cat = categorias.find(c => c.id === m.categoria)

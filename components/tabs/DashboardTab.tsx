@@ -352,6 +352,17 @@ export default function DashboardTab({
 
       {encryptedBanner}
 
+      {/* Empty state para nuevos usuarios */}
+      {monthMovs.length === 0 && !loading && esMesActual && (
+        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-6 flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+            <Package className="w-6 h-6 text-emerald-400" aria-hidden="true" />
+          </div>
+          <p className="text-base font-semibold text-zinc-200">{t("dashboard.emptyStateTitle")}</p>
+          <p className="text-sm text-zinc-500">{t("dashboard.emptyStateHint")}</p>
+        </div>
+      )}
+
       {/* Widgets activos */}
       {activeWidgets.map(id => widgets[id] ?? null)}
 

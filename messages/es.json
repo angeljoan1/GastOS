@@ -150,6 +150,7 @@
     "pendingTitle": "Recurrentes pendientes",
     "pendingLabelIngreso": "↑ Ingreso",
     "pendingLabelGasto": "↓ Gasto",
+    "pendingLabelTransfer": "↔ Transfer",
     "pendingCollect": "¿Cobrado?",
     "pendingPay": "Cobrar",
     "ariaDecimalPoint": "punto decimal",
@@ -179,7 +180,9 @@
     "sheetTitleFilterType": "Filtrar por tipo",
     "sheetTitleFilterCategory": "Filtrar por categoría",
     "noResults": "No hay resultados para esa búsqueda",
+    "noResultsFilter": "Sin resultados con los filtros aplicados",
     "noMovements": "No hay movimientos",
+    "noMovementsHint": "Registra tu primer gasto o ingreso en la pestaña Registrar",
     "loadMore": "Cargar más antiguos",
     "labelTransfer": "Transferencia",
     "badgeTransfer": "Transfer",
@@ -321,7 +324,10 @@
     "widgetPresupuestoGlobalExceeded": "Excedido ",
     "semanalGastosSemana": "Gasto últimos 7 días",
     "semanalTopCategoria": "Top categoría",
-    "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del presupuesto"
+    "semanalAlertaPresupuesto": "⚠️ {cat} al {pct}% del presupuesto",
+    "emptyStateTitle": "¡Bienvenido a GastOS!",
+    "emptyStateHint": "Registra tu primer movimiento para ver el análisis aquí.",
+    "emptyStateCta": "Registrar primer movimiento"
   },
   "cuentas": {
     "title": "Mis Cuentas",
@@ -346,7 +352,8 @@
     "iconMonedas": "Monedas",
     "iconBilletes": "Billetes",
     "iconEntidad": "Entidad",
-    "iconOtro": "Otro"
+    "iconOtro": "Otro",
+    "deleteHasMovements": "No puedes eliminar una cuenta con movimientos vinculados."
   },
   "settings": {
     "title": "Configuración",

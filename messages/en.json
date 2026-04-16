@@ -149,6 +149,7 @@
     "recurAnnualDesc": "Every year",
     "pendingTitle": "Pending recurring",
     "pendingLabelIngreso": "↑ Income",
+    "pendingLabelTransfer": "↔ Transfer",
     "pendingLabelGasto": "↓ Expense",
     "pendingCollect": "Received?",
     "pendingPay": "Pay",
@@ -179,7 +180,9 @@
     "sheetTitleFilterType": "Filter by type",
     "sheetTitleFilterCategory": "Filter by category",
     "noResults": "No results for that search",
+    "noResultsFilter": "No results with the applied filters",
     "noMovements": "No movements",
+    "noMovementsHint": "Register your first expense or income in the Register tab",
     "loadMore": "Load older",
     "labelTransfer": "Transfer",
     "badgeTransfer": "Transfer",
@@ -321,7 +324,10 @@
     "widgetPresupuestoGlobalExceeded": "Exceeded ",
     "semanalGastosSemana": "Spending last 7 days",
     "semanalTopCategoria": "Top category",
-    "semanalAlertaPresupuesto": "⚠️ {cat} at {pct}% of budget"
+    "semanalAlertaPresupuesto": "⚠️ {cat} at {pct}% of budget",
+    "emptyStateTitle": "Welcome to GastOS!",
+    "emptyStateHint": "Register your first movement to see the analysis here.",
+    "emptyStateCta": "Register first movement"
   },
   "cuentas": {
     "title": "My Accounts",
@@ -346,7 +352,8 @@
     "iconMonedas": "Coins",
     "iconBilletes": "Bills",
     "iconEntidad": "Entity",
-    "iconOtro": "Other"
+    "iconOtro": "Other",
+    "deleteHasMovements": "You cannot delete an account with linked movements."
   },
   "settings": {
     "title": "Settings",

@@ -77,6 +77,7 @@ export function useDashboardData(activeWidgets: string[], userId: string, cuenta
           const notaStr = m.nota ? await decryptData(m.nota as string) : null
           return {
             ...m,
+            tipo: (m.tipo as string) ?? "gasto",
             cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
             nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
           } as Movimiento

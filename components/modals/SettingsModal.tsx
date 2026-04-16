@@ -13,7 +13,7 @@
 
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
-import { X, Trash2, Loader2, Plus, Target, PiggyBank, ChevronRight, Shield, Fingerprint, Globe } from "lucide-react"
+import { X, Trash2, Loader2, Plus, Target, PiggyBank, ChevronRight, Shield, Fingerprint, Globe, GripHorizontal } from "lucide-react"
 
 const LOCALE_KEY = "gastos_locale"
 const SUPPORTED_LOCALES = ["es", "en", "ca"] as const
@@ -356,6 +356,7 @@ export default function SettingsModal({
             { id: "objetivos", label: t("settings.sectionObjetivos"), desc: t("settings.sectionObjetivosDesc"), Icon: ChevronRight },
             { id: "seguridad", label: t("settings.sectionSeguridad"), desc: t("settings.sectionSeguridadDesc"), Icon: Shield },
           ] as const).map(({ id, label, desc, Icon }) => (
+
             <button
               key={id}
               onClick={() => { setActiveTab(activeTab === id ? null : id); setError(null); setBioError(null) }}
@@ -373,6 +374,29 @@ export default function SettingsModal({
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${activeTab === id ? "text-emerald-400 rotate-90" : "text-zinc-600"}`} />
             </button>
           ))}
+
+          {/* ── Swipe en historial ── */}
+          <div className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-zinc-800 bg-zinc-800/40">
+            <GripHorizontal className="w-4 h-4 text-zinc-600 flex-shrink-0" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-zinc-300">{t("settings.swipeHintLabel")}</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{t("settings.swipeHintDesc")}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={swipeHintEnabled}
+              onClick={() => {
+                const next = !swipeHintEnabled
+                setSwipeHintEnabled(next)
+                localStorage.setItem("gastos_swipe_hint", next ? "on" : "off")
+              }}
+              className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${swipeHintEnabled ? "bg-emerald-500" : "bg-zinc-700"}`}
+            >
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${swipeHintEnabled ? "left-5" : "left-1"}`} />
+            </button>
+          </div>
+
         </div>
 
         {error && (
@@ -649,25 +673,6 @@ export default function SettingsModal({
             <p className="text-xs text-zinc-600">
               {t("settings.seguridadHint")}
             </p>
-            <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-zinc-200">{t("settings.swipeHintLabel")}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">{t("settings.swipeHintDesc")}</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={swipeHintEnabled}
-                onClick={() => {
-                  const next = !swipeHintEnabled
-                  setSwipeHintEnabled(next)
-                  localStorage.setItem("gastos_swipe_hint", next ? "on" : "off")
-                }}
-                className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${swipeHintEnabled ? "bg-emerald-500" : "bg-zinc-700"}`}
-              >
-                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${swipeHintEnabled ? "left-5" : "left-1"}`} />
-              </button>
-            </div>
             {!bioAvailable ? (
               <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
                 <Fingerprint className="w-5 h-5 text-zinc-600 flex-shrink-0" aria-hidden="true" />

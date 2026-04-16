@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import IntlProvider from "@/components/IntlProvider";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +17,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'GastOS',
   description: 'Aplicación personal y segura para el registro diario de gastos.',
+  manifest: '/manifest.json',
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'GastOS' },
 }
 
 export const viewport: Viewport = {
@@ -38,6 +41,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <IntlProvider>{children}</IntlProvider>
+        <Script id="sw-register" strategy="afterInteractive">{`
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js').catch(function() {});
+            });
+          }
+        `}</Script>
       </body>
     </html>
   );

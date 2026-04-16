@@ -28,7 +28,7 @@ import { clearKey, getMasterKey, decryptData, encryptData, clearBiometricKey } f
 import { calcularSaldoCuenta } from "@/lib/calculations"
 import { AppDataProvider } from "@/contexts/AppDataContext"
 
-const APP_VERSION = 24
+const APP_VERSION = 25
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {

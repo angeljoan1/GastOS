@@ -187,7 +187,7 @@ export function useDashboardMemos({
         const cat = categorias.find(c => c.id === p.categoria_id)
         return { ...p, gastado, pct, cat }
       })
-      .filter(p => p.cat)
+      .filter((p): p is typeof p & { cat: Categoria } => p.cat !== undefined)
 
     const monthLabel = selectedDate.toLocaleDateString(locale, { month: "long", year: "numeric" })
     const DIAS_SEMANA = t("dashboard.diasSemana").split(",")

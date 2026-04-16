@@ -499,19 +499,19 @@ export default function PinPadScreen({
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-between py-12 px-8 text-center select-none overflow-hidden">
-      <div className="space-y-3 animate-in fade-in slide-in-from-top-4 duration-700">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-500 ${
-          vaultError ? "bg-red-500/10" : "bg-emerald-500/10"
+      <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5 transition-all duration-500 shadow-lg ${
+          vaultError ? "bg-red-500/10 shadow-red-500/10" : "bg-emerald-500/10 shadow-emerald-500/10"
         }`}>
           <Lock className={`w-6 h-6 ${vaultError ? "text-red-400" : "text-emerald-400"}`} />
         </div>
-        <h2 className="text-xl font-bold text-zinc-100 uppercase tracking-widest">
+        <h2 className="text-xl font-semibold text-zinc-100 tracking-tight">
           {isFirstTime
             ? pinToConfirm !== null ? t("pin.titleConfirm") : t("pin.titleCreate")
             : t("pin.titleUnlock")
           }
         </h2>
-        <p className="text-zinc-500 text-xs max-w-[240px] mx-auto leading-relaxed">
+        <p className={`text-sm max-w-[240px] mx-auto leading-relaxed transition-colors ${vaultError ? "text-red-400" : "text-zinc-500"}`}>
           {isFirstTime
             ? pinToConfirm !== null
               ? vaultError || t("pin.subtitleConfirm")
@@ -522,14 +522,14 @@ export default function PinPadScreen({
       </div>
 
       {/* Indicadores de dígitos */}
-      <div className="flex gap-4 my-10" aria-label={t("pin.ariaPin")}>
+      <div className="flex gap-5 my-10" aria-label={t("pin.ariaPin")}>
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className={`w-3 h-3 rounded-full border-2 transition-all duration-300 ${
+            className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
               i < pinInput.length
-                ? "bg-emerald-500 border-emerald-500 scale-125 shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                : "border-zinc-800 bg-transparent"
+                ? "bg-emerald-500 border-emerald-500 scale-[1.2] shadow-[0_0_12px_rgba(16,185,129,0.5)]"
+                : "border-zinc-700 bg-transparent"
             }`}
           />
         ))}
@@ -544,14 +544,14 @@ export default function PinPadScreen({
       </span>
 
       {/* Teclado numérico */}
-      <div className="grid grid-cols-3 gap-x-8 gap-y-6 max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
+      <div className="grid grid-cols-3 gap-x-8 gap-y-5 max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
         {["1","2","3","4","5","6","7","8","9"].map(num => (
           <button
             key={num}
             onClick={() => handleKeyPress(num)}
             disabled={isUnlocking}
             aria-label={num}
-            className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 active:scale-90 transition-all flex items-center justify-center tabular-nums shadow-sm"
+            className="w-20 h-20 rounded-full bg-zinc-900/70 text-2xl font-light text-zinc-100 border border-zinc-800/60 active:bg-emerald-500/20 active:scale-90 transition-all duration-150 flex items-center justify-center tabular-nums shadow-sm shadow-black/20"
           >
             {num}
           </button>
@@ -561,7 +561,7 @@ export default function PinPadScreen({
           onClick={() => handleKeyPress("0")}
           disabled={isUnlocking}
           aria-label="0"
-          className="w-20 h-20 rounded-full bg-zinc-900/40 text-2xl font-light text-zinc-200 border border-zinc-800/50 active:bg-emerald-500/20 active:scale-90 transition-all flex items-center justify-center tabular-nums"
+          className="w-20 h-20 rounded-full bg-zinc-900/70 text-2xl font-light text-zinc-100 border border-zinc-800/60 active:bg-emerald-500/20 active:scale-90 transition-all duration-150 flex items-center justify-center tabular-nums shadow-sm shadow-black/20"
         >
           0
         </button>
@@ -569,19 +569,19 @@ export default function PinPadScreen({
           onClick={handleBackspace}
           disabled={isUnlocking || pinInput.length === 0}
           aria-label={t("pin.ariaDeleteDigit")}
-          className="w-20 h-20 rounded-full flex items-center justify-center text-zinc-600 hover:text-red-400 active:scale-75 transition-all"
+          className="w-20 h-20 rounded-full flex items-center justify-center text-zinc-500 hover:text-zinc-300 active:scale-75 transition-all duration-150"
         >
-          <Delete className="w-7 h-7" />
+          <Delete className="w-6 h-6" />
         </button>
       </div>
 
-      <div className="mt-8 flex flex-col items-center gap-4">
+      <div className="mt-6 flex flex-col items-center gap-3">
         <EncryptionBadge />
         {!isFirstTime && biometricEnabled && (
           <button
             onClick={handleRetryBiometric}
             disabled={biometricLoading}
-            className="text-[10px] text-zinc-500 uppercase tracking-[0.15em] hover:text-zinc-300 transition-colors"
+            className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-3 py-1 rounded-lg"
           >
             {biometricLoading ? t("pin.biometricVerifying") : t("pin.biometricUse")}
           </button>
@@ -592,14 +592,14 @@ export default function PinPadScreen({
         {!isFirstTime && (
           <button
             onClick={() => setShowRecovery(true)}
-            className="text-[10px] text-zinc-600 uppercase tracking-[0.15em] hover:text-zinc-400 transition-colors"
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded-lg"
           >
             {t("pin.forgotPin")}
           </button>
         )}
         <button
           onClick={() => supabase.auth.signOut()}
-          className="text-[10px] text-zinc-700 uppercase tracking-[0.2em] hover:text-zinc-500 transition-colors"
+          className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors px-3 py-1 rounded-lg"
         >
           {t("pin.signOut")}
         </button>

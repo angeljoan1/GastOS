@@ -50,7 +50,39 @@ html, body {
   color:      var(--foreground);
 }
 
-  @media (display-mode: standalone) {
+/* Smooth background transition on theme switch */
+html { transition: background-color 250ms ease; }
+body { transition: background-color 250ms ease, color 250ms ease; }
+
+/* Premium selection highlight */
+::selection { background: oklch(0.696 0.17 162.48 / 0.25); }
+
+/* Refined scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-zinc-700); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-600); }
+
+/* Input focus: consistent across all inputs */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: oklch(0.696 0.17 162.48 / 0.5);
+  box-shadow: 0 0 0 3px oklch(0.696 0.17 162.48 / 0.08);
+}
+
+/* Primary button shadow utility */
+.btn-shadow {
+  box-shadow: 0 4px 14px oklch(0.696 0.17 162.48 / 0.25), 0 1px 3px oklch(0 0 0 / 0.2);
+}
+.btn-shadow:hover {
+  box-shadow: 0 6px 20px oklch(0.696 0.17 162.48 / 0.35), 0 1px 3px oklch(0 0 0 / 0.2);
+}
+.btn-shadow:active {
+  box-shadow: 0 2px 8px oklch(0.696 0.17 162.48 / 0.2);
+  transform: translateY(1px);
+}
+
+@media (display-mode: standalone) {
     html, body {
       overscroll-behavior: none;
     }

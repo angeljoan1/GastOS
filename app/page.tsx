@@ -237,22 +237,13 @@ function MainApp({ session }: { session: Session }) {
   return (
     <AppDataProvider value={{ categorias, setCategorias, cuentas, setCuentas, presupuestos, setPresupuestos, objetivos, setObjetivos }}>
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
-      <header className="flex items-center justify-between px-4 pt-safe-top pb-0.5 min-h-10 border-b border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm relative z-20">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-lg" />
-          <span className="text-lg font-bold tracking-tight text-zinc-100">GastOS</span>
+      <header className="flex items-center justify-between px-4 pt-safe-top py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />
+          <span className="text-[17px] font-bold tracking-[-0.02em] text-zinc-100">GastOS</span>
         </div>
 
         <div className="flex items-center gap-1">
-          <button
-            onClick={toggleTheme}
-            aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
-          >
-            {isDark
-              ? <Sun className="w-4 h-4 text-zinc-400" />
-              : <Moon className="w-4 h-4 text-zinc-400" />}
-          </button>
           <button
             onClick={() => setShowCuentas(true)}
             aria-label={t("nav.ariaAccounts")}
@@ -305,6 +296,14 @@ function MainApp({ session }: { session: Session }) {
                   className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
                 >
                   <MessageSquare className="w-4 h-4" /> {t("nav.menuFeedback")}
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => { toggleTheme(); setIsMenuOpen(false) }}
+                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                >
+                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  {isDark ? "Modo claro" : "Modo oscuro"}
                 </button>
                 <div className="h-px bg-zinc-800 my-1 mx-2" />
                 <button

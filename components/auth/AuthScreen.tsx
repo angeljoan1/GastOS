@@ -12,7 +12,7 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
 
 export default function AuthScreen() {
     const t = useTranslations()
@@ -84,178 +84,182 @@ export default function AuthScreen() {
     setPassword("")
   }
 
-  return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
+  const inputClass = "w-full bg-zinc-900/60 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 transition-all duration-200 focus:outline-none focus:border-emerald-500/50 focus:bg-zinc-900"
 
-        {/* Logo + título */}
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute inset-0 flex items-start justify-center overflow-hidden">
+        <div className="w-[600px] h-[300px] rounded-full bg-emerald-500/5 blur-[100px] -translate-y-1/2 mt-20" />
+      </div>
+
+      <div className="w-full max-w-sm animate-in fade-in slide-in-from-bottom-3 duration-500 relative">
+
+        {/* Logo + title */}
         <div className="flex flex-col items-center mb-10">
-          <div className="mb-4">
+          <div className="mb-5 relative">
+            <div className="absolute inset-0 rounded-3xl bg-emerald-500/20 blur-xl scale-110" />
             <img
               src="/icon.png"
               alt={t("auth.logoAlt")}
-              className="w-20 h-20 rounded-3xl shadow-lg shadow-emerald-400/30"
+              className="relative w-20 h-20 rounded-3xl ring-1 ring-white/10"
             />
           </div>
-          <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">GastOS</h1>
-          <p className="text-sm text-zinc-400 mt-1">{t("auth.appTagline")}</p>
+          <h1 className="text-2xl font-bold text-zinc-100 tracking-[-0.02em]">GastOS</h1>
+          <p className="text-sm text-zinc-500 mt-1.5">{t("auth.appTagline")}</p>
         </div>
 
-        {/* Tabs login / registro — ocultos en modo recuperación */}
-        {!isResettingPassword && (
-          <div className="flex rounded-xl bg-zinc-900 p-1 mb-6 border border-zinc-800" role="tablist">
-            <button
-              role="tab"
-              aria-selected={isLogin}
-              onClick={() => { setIsLogin(true);  resetModeState() }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                isLogin
-                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-              >
-              {t("auth.tabLogin")}
-            </button>
-            <button
-              role="tab"
-              aria-selected={!isLogin}
-              onClick={() => { setIsLogin(false); resetModeState() }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                !isLogin
-                  ? "bg-zinc-700 text-zinc-100 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              {t("auth.tabRegister")}
-            </button>
-          </div>
-        )}
+        {/* Form card */}
+        <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-2xl p-6 backdrop-blur-sm shadow-xl shadow-black/20">
 
-        {/* Formulario */}
-        <form
-          onSubmit={isResettingPassword ? handleResetPassword : handleSubmit}
-          className="space-y-4"
-          aria-label={
-            isResettingPassword
-              ? t("auth.ariaFormReset")
-              : isLogin
-              ? t("auth.ariaFormLogin")
-              : t("auth.ariaFormRegister")
-          }
-        >
-          {/* BUG #16 FIX: label con contraste suficiente (text-zinc-300, text-xs)
-              y htmlFor vinculado al id del input correspondiente */}
-          <div>
-            <label
-              htmlFor="auth-email"
-              className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-              >
-              {t("auth.labelEmail")}
-            </label>
-            <input
-              id="auth-email"
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder={t("auth.placeholderEmail")}
-              autoComplete="email"
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-            />
-          </div>
-
+          {/* Tabs login / registro */}
           {!isResettingPassword && (
-            <>
-              <div>
-                <label
-                  htmlFor="auth-password"
-                  className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
-                  >
-                  {t("auth.labelPassword")}
-                </label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder={t("auth.placeholderPassword")}
-                  autoComplete={isLogin ? "current-password" : "new-password"}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
-                />
-              </div>
+            <div className="flex rounded-xl bg-zinc-950/60 p-1 mb-6 border border-zinc-800/60 gap-1" role="tablist">
+              <button
+                role="tab"
+                aria-selected={isLogin}
+                onClick={() => { setIsLogin(true);  resetModeState() }}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  isLogin
+                    ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {t("auth.tabLogin")}
+              </button>
+              <button
+                role="tab"
+                aria-selected={!isLogin}
+                onClick={() => { setIsLogin(false); resetModeState() }}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  !isLogin
+                    ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {t("auth.tabRegister")}
+              </button>
+            </div>
+          )}
 
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => { setIsResettingPassword(true); resetModeState() }}
-                    className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors"
-                  >
-                    {t("auth.forgotPassword")}
-                  </button>
-                </div>
-              )}
+          {/* Recovery mode header */}
+          {isResettingPassword && (
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                type="button"
+                onClick={() => { setIsResettingPassword(false); resetModeState() }}
+                className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium text-zinc-300">{t("auth.forgotPassword")}</span>
+            </div>
+          )}
 
-              {!isLogin && (
-                <div className="animate-in fade-in duration-300">
-                  <label
-                    htmlFor="auth-confirm-password"
-                    className="block text-xs font-medium text-zinc-300 mb-1.5 tracking-wide"
->
-                    {t("auth.labelConfirmPassword")}
-                  </label>
+          {/* Form */}
+          <form
+            onSubmit={isResettingPassword ? handleResetPassword : handleSubmit}
+            className="space-y-4"
+            aria-label={
+              isResettingPassword
+                ? t("auth.ariaFormReset")
+                : isLogin
+                ? t("auth.ariaFormLogin")
+                : t("auth.ariaFormRegister")
+            }
+          >
+            <div>
+              <label htmlFor="auth-email" className="block text-xs font-medium text-zinc-400 mb-1.5 tracking-wide">
+                {t("auth.labelEmail")}
+              </label>
+              <input
+                id="auth-email"
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder={t("auth.placeholderEmail")}
+                autoComplete="email"
+                className={inputClass}
+              />
+            </div>
+
+            {!isResettingPassword && (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="auth-password" className="block text-xs font-medium text-zinc-400 tracking-wide">
+                      {t("auth.labelPassword")}
+                    </label>
+                    {isLogin && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsResettingPassword(true); resetModeState() }}
+                        className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors"
+                      >
+                        {t("auth.forgotPassword")}
+                      </button>
+                    )}
+                  </div>
                   <input
-                    id="auth-confirm-password"
+                    id="auth-password"
                     type="password"
                     required
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
+                    minLength={6}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
                     placeholder={t("auth.placeholderPassword")}
-                    autoComplete="new-password"
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    className={inputClass}
                   />
                 </div>
-              )}
-            </>
-          )}
 
-          {error && (
-            <div role="alert" className="bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
-              {error}
-            </div>
-          )}
-          {success && (
-            <div role="status" className="bg-emerald-950/50 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">
-              {success}
-            </div>
-          )}
+                {!isLogin && (
+                  <div className="animate-in fade-in duration-300">
+                    <label htmlFor="auth-confirm-password" className="block text-xs font-medium text-zinc-400 mb-1.5 tracking-wide">
+                      {t("auth.labelConfirmPassword")}
+                    </label>
+                    <input
+                      id="auth-confirm-password"
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder={t("auth.placeholderPassword")}
+                      autoComplete="new-password"
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+              </>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2"
-          >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
-            {isResettingPassword
-              ? t("auth.submitResetLink")
-              : isLogin
-              ? t("auth.submitLogin")
-              : t("auth.submitRegister")
-            }
-          </button>
+            {error && (
+              <div role="alert" className="bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div role="status" className="bg-emerald-950/40 border border-emerald-900/50 rounded-xl px-4 py-3 text-sm text-emerald-400">
+                {success}
+              </div>
+            )}
 
-          {isResettingPassword && (
             <button
-              type="button"
-              onClick={() => { setIsResettingPassword(false); resetModeState() }}
-              className="w-full text-sm text-zinc-400 hover:text-zinc-200 transition-colors py-2"
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-950 font-semibold py-3.5 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 mt-2 btn-shadow active:translate-y-px"
             >
-              {t("auth.backToLogin")}
+              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+              {isResettingPassword
+                ? t("auth.submitResetLink")
+                : isLogin
+                ? t("auth.submitLogin")
+                : t("auth.submitRegister")
+              }
             </button>
-          )}
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   )

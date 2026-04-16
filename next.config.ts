@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -36,7 +38,8 @@ const nextConfig: NextConfig = {
           {
             // Content Security Policy:
             // - default-src 'self': solo recursos del propio dominio
-            // - script-src: permite scripts propios + inline (Next.js los necesita) + cdnjs para recharts
+            // - script-src: permite scripts propios + inline (Next.js los necesita)
+            //   'unsafe-eval' solo se incluye en desarrollo (Next.js HMR lo requiere)
             // - connect-src: permite llamadas a Supabase y Resend
             // - style-src: permite estilos propios e inline (Tailwind los necesita)
             // - img-src: permite imágenes propias y data URIs
@@ -44,7 +47,7 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",   // unsafe-eval necesario para Next.js dev; en prod puedes quitarlo
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",

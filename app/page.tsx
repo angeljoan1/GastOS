@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import type { Categoria, Cuenta, Presupuesto, Objetivo, Movimiento } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
+import ErrorBoundary from "@/components/ui/ErrorBoundary"
 import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
 
 const APP_VERSION = 24
@@ -268,9 +269,21 @@ function MainApp({ session }: { session: Session }) {
       )}
 
       <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-        {tab === "ingreso" && <IngresoTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} onEditLast={setEditingMovFromIngreso} />}
-        {tab === "historial" && <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />}
-        {tab === "dashboard" && <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} />}
+        {tab === "ingreso" && (
+          <ErrorBoundary label="Registro">
+            <IngresoTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} onEditLast={setEditingMovFromIngreso} />
+          </ErrorBoundary>
+        )}
+        {tab === "historial" && (
+          <ErrorBoundary label="Historial">
+            <HistorialTab key={historialKey} categorias={categorias} cuentas={cuentas} />
+          </ErrorBoundary>
+        )}
+        {tab === "dashboard" && (
+          <ErrorBoundary label="Dashboard">
+            <DashboardTab categorias={categorias} cuentas={cuentas} presupuestos={presupuestos} objetivos={objetivos} onObjetivosChange={setObjetivos} onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} userId={session.user.id} />
+          </ErrorBoundary>
+        )}
       </main>
 
       <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-4 py-1 pb-safe-bottom">

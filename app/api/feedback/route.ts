@@ -2,9 +2,34 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 
+// ── Rate limiter en memoria ───────────────────────────────────────────────────
+// Map<userId, { count: number; resetAt: number }>
+// Máximo MAX_REQUESTS por usuario dentro de la ventana WINDOW_MS.
+// En Vercel cada instancia de función tiene su propio mapa; para un volumen
+// alto de usuarios convendría Redis, pero para feedback doméstico esto es suficiente.
+const WINDOW_MS = 60 * 60 * 1000  // 1 hora
+const MAX_REQUESTS = 5
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+function isRateLimited(userId: string): boolean {
+  const now = Date.now()
+  const entry = rateLimitMap.get(userId)
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + WINDOW_MS })
+    return false
+  }
+
+  if (entry.count >= MAX_REQUESTS) return true
+
+  entry.count += 1
+  return false
+}
+
 export async function POST(request: Request) {
   try {
-    // 1. Inicializar DENTRO del handler. 
+    // 1. Inicializar DENTRO del handler.
     // Esto evita que Next.js tire error durante el proceso de build.
     const resend = new Resend(process.env.RESEND_API_KEY);
     const supabaseAdmin = createClient(
@@ -23,6 +48,14 @@ export async function POST(request: Request) {
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Sesión inválida' }, { status: 401 })
+    }
+
+    // 2. Comprobar rate limit DESPUÉS de autenticar para evitar timing attacks
+    if (isRateLimited(user.id)) {
+      return NextResponse.json(
+        { error: 'Demasiadas peticiones. Máximo 5 por hora.' },
+        { status: 429 }
+      )
     }
 
     const body = await request.json();

@@ -9,24 +9,44 @@
 //          el color suavemente. En iOS el soporte es limitado, pero en Android
 //          Chrome la transición funciona. Al menos eliminamos el parpadeo brusco
 //          gestionando el cambio con un pequeño debounce.
-// ACCESIBILIDAD: HidableAmount añade aria-pressed y aria-label al botón toggle.
 
-import { useState, useMemo, createContext, useContext, useRef } from "react"
+import { useState, useMemo, useRef } from "react"
 import { useTranslations, useLocale } from "next-intl"
-import { useDashboardData, invalidateSaldoCache } from "@/components/dashboard/hooks/useDashboardData"
+import { useDashboardData } from "@/components/dashboard/hooks/useDashboardData"
 import { useDashboardMemos } from "@/components/dashboard/hooks/useDashboardMemos"
 import {
-  Loader2, Package, ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
-  Wallet, ArrowLeftRight, Eye, EyeOff, Plus, X, Check, Flame, Target,
+  Package, ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
+  Wallet, ArrowLeftRight, Plus, X, Check, Flame, Target,
   PiggyBank, CalendarDays, BarChart2,
 } from "lucide-react"
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar,
-  XAxis, YAxis, Tooltip, LineChart, Line, AreaChart, Area,
+  ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line,
 } from "recharts"
 import { getIcon } from "@/lib/icons"
-import type { Categoria, Movimiento, Cuenta, Presupuesto, Objetivo } from "@/types"
+import type { Categoria, Cuenta, Presupuesto, Objetivo } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
+
+// ── Widgets extraídos ─────────────────────────────────────────────────────────
+import ResumenMesWidget from "@/components/dashboard/widgets/ResumenMesWidget"
+import SaldoCuentasWidget from "@/components/dashboard/widgets/SaldoCuentasWidget"
+import ProyeccionMesWidget from "@/components/dashboard/widgets/ProyeccionMesWidget"
+import MediaDiariaWidget from "@/components/dashboard/widgets/MediaDiariaWidget"
+import RatioAhorroWidget from "@/components/dashboard/widgets/RatioAhorroWidget"
+import PresupuestosWidget from "@/components/dashboard/widgets/PresupuestosWidget"
+import MapaCalorWidget from "@/components/dashboard/widgets/MapaCalorWidget"
+import DonutCategoriasWidget from "@/components/dashboard/widgets/DonutCategoriasWidget"
+import Barras6MesesWidget from "@/components/dashboard/widgets/Barras6MesesWidget"
+import LineaGastosWidget from "@/components/dashboard/widgets/LineaGastosWidget"
+import AreaBalanceWidget from "@/components/dashboard/widgets/AreaBalanceWidget"
+import TopCategoriasWidget from "@/components/dashboard/widgets/TopCategoriasWidget"
+import ObjetivoAhorroWidget from "@/components/dashboard/widgets/ObjetivoAhorroWidget"
+import ComparativaMesWidget from "@/components/dashboard/widgets/ComparativaMesWidget"
+import DiaMasCaroWidget from "@/components/dashboard/widgets/DiaMasCaroWidget"
+import GastoDiaSemanaWidget from "@/components/dashboard/widgets/GastoDiaSemanaWidget"
+import DistribucionIngresoWidget from "@/components/dashboard/widgets/DistribucionIngresoWidget"
+import ResumenSemanalWidget from "@/components/dashboard/widgets/ResumenSemanalWidget"
+import PresupuestoGlobalWidget from "@/components/dashboard/widgets/PresupuestoGlobalWidget"
+import RachaAhorroWidget from "@/components/dashboard/widgets/RachaAhorroWidget"
 
 type WidgetId =
   | "resumen_mes" | "saldo_cuentas" | "donut_categorias" | "barras_6meses"
@@ -74,70 +94,9 @@ const CHART_COLORS = [
   "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16", "#64748b", "#10b981",
 ]
 
-function heatColor(intensity: number): string {
-  if (intensity === 0) return "#18181b"
-  if (intensity < 0.4) return `rgba(251,191,36,${0.15 + intensity * 0.5})`
-  if (intensity < 0.75) return `rgba(249,115,22,${0.2 + intensity * 0.4})`
-  return `rgba(239,68,68,${0.25 + intensity * 0.45})`
-}
-
-// ── Widget visibility context ─────────────────────────────────────────────────
-const WidgetHiddenCtx = createContext<{ hidden: boolean; toggle: () => void; contentId: string }>({
-  hidden: true,
-  toggle: () => { },
-  contentId: "",
-})
-
-function WidgetCard({ children }: { children: React.ReactNode }) {
-  const [hidden, setHidden] = useState(true)
-  const contentId = useRef(`widget-content-${Math.random().toString(36).slice(2, 9)}`).current
-  return (
-    <WidgetHiddenCtx.Provider value={{ hidden, toggle: () => setHidden(h => !h), contentId }}>
-      {children}
-    </WidgetHiddenCtx.Provider>
-  )
-}
-
-function WidgetEyeButton({ labelShow, labelHide }: { labelShow: string; labelHide: string }) {
-  const { hidden, toggle, contentId } = useContext(WidgetHiddenCtx)
-  return (
-    <button
-      onClick={toggle}
-      aria-pressed={!hidden}
-      aria-controls={contentId}
-      aria-label={hidden ? labelShow : labelHide}
-      className="text-zinc-600 hover:text-zinc-400 transition-colors"
-    >
-      {hidden
-        ? <EyeOff className="w-3.5 h-3.5" aria-hidden="true" />
-        : <Eye className="w-3.5 h-3.5" aria-hidden="true" />
-      }
-    </button>
-  )
-}
-
-// ── HidableAmount ─────────────────────────────────────────────────────────────
-function HidableAmount({
-  value, className = "", prefix = "", suffix = "€", decimals = 2,
-}: {
-  value: number; className?: string; prefix?: string
-  suffix?: string; decimals?: number
-}) {
-  const { hidden } = useContext(WidgetHiddenCtx)
-  const fmt = value.toLocaleString("es-ES", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })
-  return (
-    <span className={`tabular-nums ${className}`}>
-      {hidden ? "••••••" : `${prefix}${fmt}${suffix}`}
-    </span>
-  )
-}
-
 // ── DashboardTab ──────────────────────────────────────────────────────────────
 export default function DashboardTab({
-  categorias, cuentas, presupuestos, objetivos, onObjetivosChange, onOpenSettings,
+  categorias, cuentas, presupuestos, objetivos, onObjetivosChange, onOpenSettings, userId,
 }: {
   categorias: Categoria[]
   cuentas: Cuenta[]
@@ -145,6 +104,7 @@ export default function DashboardTab({
   objetivos: Objetivo[]
   onObjetivosChange: (o: Objetivo[]) => void
   onOpenSettings?: (tab: "categorias" | "presupuestos" | "objetivos" | "seguridad") => void
+  userId: string
 }) {
   const t = useTranslations()
   const locale = useLocale()
@@ -185,7 +145,7 @@ export default function DashboardTab({
     })
   }
 
-  const { movimientos, hasEncryptedMovs, loading } = useDashboardData(activeWidgets)
+  const { movimientos, hasEncryptedMovs, loading } = useDashboardData(activeWidgets, userId)
 
   const sm = selectedDate.getMonth()
   const sy = selectedDate.getFullYear()
@@ -275,986 +235,82 @@ export default function DashboardTab({
   const widgets: Partial<Record<WidgetId, React.ReactNode>> = {
 
     resumen_mes: (
-      <WidgetCard key="resumen_mes">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4">
-              <div className="flex items-center gap-1.5 mb-3">
-                <TrendingDown className="w-3.5 h-3.5 text-red-400" aria-hidden="true" />
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionGastos")}</p>
-              </div>
-              <HidableAmount value={totalGastos} className="text-2xl font-light text-red-400" />
-            </div>
-            <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4">
-              <div className="flex items-center gap-1.5 mb-3">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionIngresos")}</p>
-              </div>
-              <HidableAmount value={totalIngresos} className="text-2xl font-light text-emerald-400" />
-            </div>
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-zinc-400" aria-hidden="true" />
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionBalanceNeto")}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <HidableAmount
-                  value={Math.abs(balanceNeto)}
-                  prefix={balanceNeto > 0 ? "+" : balanceNeto < 0 ? "-" : ""}
-                  className={`text-2xl font-light ${balanceNeto >= 0 ? "text-emerald-400" : "text-red-400"}`}
-                />
-                <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </WidgetCard>
+      <ResumenMesWidget key="resumen_mes" totalGastos={totalGastos} totalIngresos={totalIngresos} balanceNeto={balanceNeto} />
     ),
 
-    saldo_cuentas: saldos.length > 0 ? (
-      <WidgetCard key="saldo_cuentas">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionSaldoCuenta")}</p>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          <div className="space-y-3">
-            {saldos.map(({ cuenta, saldo_actual }) => {
-              const CIcon = getIcon(cuenta.icono)
-              return (
-                <div key={cuenta.id} className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: cuenta.color + "22" }}
-                  >
-                    <CIcon className="w-4 h-4" style={{ color: cuenta.color }} aria-hidden="true" />
-                  </div>
-                  <p className="flex-1 text-sm font-medium text-zinc-200 truncate">{cuenta.nombre}</p>
-                  <HidableAmount
-                    value={Math.abs(saldo_actual)}
-                    prefix={saldo_actual < 0 ? "-" : ""}
-                    className={`text-sm font-semibold ${saldo_actual >= 0 ? "text-zinc-100" : "text-red-400"}`}
-                  />
-                </div>
-              )
-            })}
-            <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between">
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionPatrimonio")}</p>
-              <HidableAmount
-                value={Math.abs(patrimonioTotal)}
-                prefix={patrimonioTotal < 0 ? "-" : ""}
-                className={`text-base font-semibold ${patrimonioTotal >= 0 ? "text-emerald-400" : "text-red-400"}`}
-              />
-            </div>
-          </div>
-        </div>
-      </WidgetCard>
-    ) : null,
+    saldo_cuentas: (
+      <SaldoCuentasWidget key="saldo_cuentas" saldos={saldos} patrimonioTotal={patrimonioTotal} />
+    ),
 
     proyeccion_mes: (
-      <WidgetCard key="proyeccion_mes">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionProyeccion")}</p>
-            <div className="flex items-center gap-2">
-              <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-              <span className="text-xs text-zinc-600 bg-zinc-800 px-2 py-1 rounded-lg tabular-nums">
-                {t("dashboard.dayProgress", { current: diaActual, total: diasEnMes })}
-              </span>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-emerald-500/50 transition-all duration-700"
-                style={{ width: `${pctMes}%` }}
-                role="progressbar"
-                aria-valuenow={pctMes}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label={`${pctMes}% del mes transcurrido`}
-              />
-            </div>
-            <p className="text-xs text-zinc-600">
-              {t("dashboard.pctMes", { pct: pctMes, days: diasRestantes })}
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-zinc-800/60 rounded-xl p-3 space-y-1.5">
-              <p className="text-xs text-zinc-500">{t("dashboard.gastoDiarioMedio")}</p>
-              <HidableAmount value={gastoDiario} className="text-lg font-light text-zinc-200" />
-            </div>
-            <div className="bg-zinc-800/60 rounded-xl p-3 space-y-1.5">
-              <p className="text-xs text-zinc-500">{t("dashboard.gastoProyectado")}</p>
-              <HidableAmount value={gastoProyectado} className="text-lg font-light text-red-400" />
-            </div>
-          </div>
-          <div className={`rounded-xl p-4 flex items-center justify-between border ${ahorroProyectado >= 0
-            ? "bg-emerald-950/30 border-emerald-900/40"
-            : "bg-red-950/30 border-red-900/40"
-            }`}>
-            <div>
-              <p className="text-xs text-zinc-400 mb-0.5 font-medium">{t("dashboard.ahorroEstimado")}</p>
-              <p className="text-xs text-zinc-600">{t("dashboard.ahorroRitmoActual")}</p>
-            </div>
-            <HidableAmount
-              value={Math.abs(ahorroProyectado)}
-              prefix={ahorroProyectado >= 0 ? "+" : "-"}
-              className={`text-2xl font-light ${ahorroProyectado >= 0 ? "text-emerald-400" : "text-red-400"}`}
-            />
-          </div>
-          {totalIngresos === 0 && (
-            <p className="text-xs text-zinc-600 text-center">
-              {t("dashboard.noIncomesForProjection")}
-            </p>
-          )}
-        </div>
-      </WidgetCard>
+      <ProyeccionMesWidget key="proyeccion_mes" diaActual={diaActual} diasEnMes={diasEnMes} diasRestantes={diasRestantes} pctMes={pctMes} gastoDiario={gastoDiario} gastoProyectado={gastoProyectado} ahorroProyectado={ahorroProyectado} totalIngresos={totalIngresos} />
     ),
 
     media_diaria: (
-      <WidgetCard key="media_diaria">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionMediaDiaria")}</p>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          <div className="flex items-end justify-between gap-3">
-            <div className="space-y-1">
-              <HidableAmount value={gastoDiario} className="text-4xl font-light text-zinc-100" />
-              <p className="text-xs text-zinc-600">{t("dashboard.porDiaMes")}</p>
-            </div>
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-              <span className={`text-sm font-semibold tabular-nums px-2.5 py-1 rounded-lg ${diffMedia <= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
-                }`}>
-                {diffMedia > 0 ? "+" : ""}{diffPct}%
-              </span>
-              <p className="text-xs text-zinc-600">{t("dashboard.vsMesAnterior")}</p>
-              <HidableAmount value={mediaDiariaAnt} suffix="€/día" className="text-xs text-zinc-700" />
-            </div>
-          </div>
-        </div>
-      </WidgetCard>
+      <MediaDiariaWidget key="media_diaria" gastoDiario={gastoDiario} mediaDiariaAnt={mediaDiariaAnt} diffMedia={diffMedia} diffPct={diffPct} />
     ),
 
     ratio_ahorro: (
-      <WidgetCard key="ratio_ahorro">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionRatioAhorro")}</p>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          <div className="flex items-center gap-5">
-            <div className="relative w-24 h-24 flex-shrink-0" role="img" aria-label={`Ratio de ahorro: ${ratioAhorro ?? 0}%`}>
-              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r="38" fill="none" stroke="#27272a" strokeWidth="10" />
-                <circle
-                  cx="50" cy="50" r="38" fill="none"
-                  stroke={
-                    ratioAhorro === null ? "#27272a"
-                      : ratioAhorro >= 20 ? "#10b981"
-                        : ratioAhorro >= 5 ? "#f59e0b"
-                          : "#ef4444"
-                  }
-                  strokeWidth="10"
-                  strokeDasharray={`${2 * Math.PI * 38}`}
-                  strokeDashoffset={`${2 * Math.PI * 38 * (1 - Math.max(0, Math.min(100, ratioAhorro ?? 0)) / 100)}`}
-                  strokeLinecap="round"
-                  style={{ transition: "stroke-dashoffset 0.8s ease" }}
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className={`text-xl font-semibold tabular-nums ${ratioColor}`}>
-                  {ratioAhorro === null ? "—" : `${Math.max(0, ratioAhorro)}%`}
-                </p>
-              </div>
-            </div>
-            <div className="flex-1 space-y-2 min-w-0">
-              <p className={`text-sm font-medium leading-tight ${ratioColor}`}>{ratioLabel}</p>
-              <div className="space-y-1.5 pt-1">
-                <div className="flex justify-between items-center text-xs gap-2">
-                  <span className="text-zinc-600 flex-shrink-0">{t("dashboard.sectionIngresosTotales")}</span>
-                  <HidableAmount value={totalIngresos} className="text-zinc-400" />
-                </div>
-                <div className="flex justify-between items-center text-xs gap-2">
-                  <span className="text-zinc-600 flex-shrink-0">{t("dashboard.sectionGastosTotales")}</span>
-                  <HidableAmount value={totalGastos} className="text-zinc-400" />
-                </div>
-                <div className="flex justify-between items-center text-xs gap-2 pt-1.5 border-t border-zinc-800">
-                  <span className="text-zinc-500 flex-shrink-0">{t("dashboard.sectionAhorroNeto")}</span>
-                  <HidableAmount
-                    value={Math.abs(balanceNeto)}
-                    prefix={balanceNeto >= 0 ? "+" : "-"}
-                    className={`font-medium ${balanceNeto >= 0 ? "text-emerald-400" : "text-red-400"}`}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-zinc-700 mt-4 text-center">
-            {t("dashboard.objetivoRecomendado")}
-          </p>
-        </div>
-      </WidgetCard>
+      <RatioAhorroWidget key="ratio_ahorro" ratioAhorro={ratioAhorro} ratioColor={ratioColor} ratioLabel={ratioLabel} totalGastos={totalGastos} totalIngresos={totalIngresos} balanceNeto={balanceNeto} />
     ),
 
     presupuestos_categoria: (
-      <WidgetCard key="presupuestos_categoria">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Target className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionPresupuestosMes")}</p>
-            </div>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          {presupuestosConGasto.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-              <Target className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
-              <p className="text-xs text-zinc-700">{t("dashboard.noPresupuestosHint")}</p>
-              {onOpenSettings && (
-                <button
-                  onClick={() => onOpenSettings("presupuestos")}
-                  className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40"
-                >
-                  {t("dashboard.configureNow")}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {presupuestosConGasto.map(p => {
-                const CatIcon = getIcon(p.cat!.icono)
-                const superado = p.gastado > p.cantidad
-                const cercano = !superado && p.pct >= 80
-                const barColor = superado ? "#ef4444" : cercano ? "#f59e0b" : "#10b981"
-                return (
-                  <div key={p.id} className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CatIcon className="w-4 h-4 text-zinc-500 flex-shrink-0" aria-hidden="true" />
-                        <span className="text-sm text-zinc-300 truncate">{p.cat!.label}</span>
-                        {superado && (
-                          <span className="text-[10px] font-bold text-red-400 bg-red-500/15 px-1.5 py-0.5 rounded flex-shrink-0">
-                            {t("dashboard.badgeSuperado")}
-                          </span>
-                        )}
-                        {cercano && (
-                          <span className="text-[10px] font-bold text-yellow-400 bg-yellow-500/15 px-1.5 py-0.5 rounded flex-shrink-0">
-                            {t("dashboard.badgeAtencion")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0 text-xs">
-                        <HidableAmount
-                          value={p.gastado}
-                          className={superado ? "text-red-400 font-medium" : "text-zinc-300"}
-                        />
-                        <span className="text-zinc-600">/</span>
-                        <HidableAmount value={p.cantidad} className="text-zinc-500" />
-                      </div>
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${p.pct}%`, backgroundColor: barColor }}
-                        role="progressbar"
-                        aria-valuenow={Math.round(p.pct)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`${p.cat!.label}: ${Math.round(p.pct)}% del presupuesto utilizado`}
-                      />
-                    </div>
-                    <p className="text-xs text-zinc-600 text-right tabular-nums">
-                      {t("dashboard.pctUtilizado", { pct: Math.round(p.pct) })}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </WidgetCard>
+      <PresupuestosWidget key="presupuestos_categoria" presupuestosConGasto={presupuestosConGasto} onOpenSettings={onOpenSettings} />
     ),
 
     mapa_calor: (
-      <div key="mapa_calor" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionMapaCalor")}</p>
-          <div className="flex items-center gap-1.5" aria-hidden="true">
-            <span className="text-xs text-zinc-600">{t("dashboard.heatLow")}</span>
-            <div className="flex gap-0.5">
-              {[0.1, 0.35, 0.6, 0.85, 1].map(v => (
-                <span key={v} className="w-3 h-3 rounded-sm" style={{ backgroundColor: heatColor(v) }} />
-              ))}
-            </div>
-            <span className="text-xs text-zinc-600">{t("dashboard.heatHigh")}</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-7 gap-1 mb-1" aria-hidden="true">
-          {DIAS_SEMANA.map((d, i) => (
-            <p key={i} className="text-center text-[10px] text-zinc-600 font-medium">{d}</p>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1" role="grid" aria-label={t("dashboard.ariaHeatMap")}>
-          {diasGrid.map((dia, i) => {
-            if (dia === null) return <div key={`e-${i}`} role="gridcell" />
-            const gasto = gastoPorDia[dia] ?? 0
-            const intensity = gasto > 0 ? Math.min(gasto / maxGastoDia, 1) : 0
-            const esHoy = esMesActual && dia === hoy.getDate()
-            const esFuturo = esMesActual && dia > hoy.getDate()
-            return (
-              <div
-                key={dia}
-                role="gridcell"
-                aria-label={t("dashboard.ariaDay", { day: dia, amount: gasto > 0 ? `${gasto.toFixed(2)}€` : t("dashboard.ariaDayNoExpense") })}
-                tabIndex={esFuturo ? -1 : 0}
-                onMouseEnter={() => setHoveredDay(dia)}
-                onMouseLeave={() => setHoveredDay(null)}
-                onFocus={() => setHoveredDay(dia)}
-                onBlur={() => setHoveredDay(null)}
-                className={`aspect-square rounded-md flex items-center justify-center transition-all duration-200 relative cursor-default ${esHoy ? "ring-1 ring-emerald-500/70" : ""
-                  } ${esFuturo ? "opacity-25" : ""}`}
-                style={{ backgroundColor: esFuturo ? "#18181b" : heatColor(intensity) }}
-              >
-                <span className={`text-[10px] font-medium select-none ${esHoy ? "text-emerald-300 font-bold" : gasto > 0 ? "text-white/80" : "text-zinc-600"
-                  }`}>
-                  {dia}
-                </span>
-                {esHoy && (
-                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />
-                )}
-                {hoveredDay === dia && (
-                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-                    <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-center whitespace-nowrap shadow-xl">
-                      <p className="text-xs font-semibold text-zinc-200">
-                        {gasto > 0 ? `${gasto.toFixed(2)}€` : t("dashboard.noExpensesMonth")}
-                      </p>
-                      <div
-                        className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-                        style={{
-                          borderLeft: "4px solid transparent",
-                          borderRight: "4px solid transparent",
-                          borderTop: "4px solid #3f3f46",
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-        <div className="mt-3 flex justify-between text-xs text-zinc-700">
-          <span className="capitalize">{monthLabel}</span>
-          {Object.keys(gastoPorDia).length > 0 && (
-            <span>{t("dashboard.heatPicoDia", { amount: maxGastoDia.toFixed(2) })}</span>
-          )}
-        </div>
-      </div>
+      <MapaCalorWidget key="mapa_calor" gastoPorDia={gastoPorDia} maxGastoDia={maxGastoDia} diasGrid={diasGrid} DIAS_SEMANA={DIAS_SEMANA} monthLabel={monthLabel} esMesActual={esMesActual} selectedYear={sy} selectedMonth={sm} />
     ),
 
     donut_categorias: (
-      <div key="donut_categorias" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">{t("dashboard.sectionDonut")}</p>
-        {pieData.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-2">
-            <Package className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-            <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
-          </div>
-        ) : (
-          <>
-            <div className="w-full h-[240px]">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%" cy="50%"
-                    innerRadius={60} outerRadius={90}
-                    paddingAngle={2} dataKey="value" stroke="none"
-                    onClick={(entry) => entry?.name && setSelectedCat(entry.name)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-                    itemStyle={{ color: "#f4f4f5" }}
-                    formatter={(v, name) => [
-                      `${Number(v ?? 0).toFixed(2)}€`,
-                      categorias.find(c => c.id === String(name))?.label ?? String(name ?? ""),
-                    ]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-wrap gap-3 mt-3 justify-center">
-              {pieData.map((entry, i) => (
-                <button
-                  key={entry.name}
-                  onClick={() => entry.name && setSelectedCat(entry.name)}
-                  className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
-                  aria-label={`${categorias.find(c => c.id === entry.name)?.label ?? entry.name}: ${entry.value.toFixed(2)}€`}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
-                    aria-hidden="true"
-                  />
-                  <span className="text-xs text-zinc-400">
-                    {categorias.find(c => c.id === entry.name)?.label ?? entry.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      <DonutCategoriasWidget key="donut_categorias" pieData={pieData} categorias={categorias} onSelectCat={setSelectedCat} />
     ),
 
     barras_6meses: (
-      <div key="barras_6meses" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">{t("dashboard.sectionBarras")}</p>
-        <div className="flex items-center gap-4 mb-4" aria-hidden="true">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-            <span className="text-xs text-zinc-500">{t("dashboard.legendGastos")}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="text-xs text-zinc-500">{t("dashboard.legendIngresos")}</span>
-          </div>
-        </div>
-        <div className="w-full h-[220px]">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <BarChart data={last6Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barCategoryGap="25%">
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={v => `${v}€`} />
-              <Tooltip
-                cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-                itemStyle={{ color: "#f4f4f5" }}
-                formatter={(v, name) => [`${Number(v ?? 0).toFixed(2)}€`, name === "gastos" ? t("dashboard.sectionGastos") : t("dashboard.sectionIngresos")]}
-              />
-              <Bar dataKey="gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <Barras6MesesWidget key="barras_6meses" last6Months={last6Months} />
     ),
 
     linea_gastos: (
-      <div key="linea_gastos" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">{t("dashboard.widgetLineaLabel")}</p>
-        <p className="text-xs text-zinc-600 mb-4">{t("dashboard.last12Months")}</p>
-        <div className="w-full h-[220px]">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <LineChart data={last12Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 10 }} interval={2} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={v => `${v}€`} />
-              <Tooltip
-                cursor={{ stroke: "rgba(255,255,255,0.1)" }}
-                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-                itemStyle={{ color: "#f4f4f5" }}
-                formatter={(v) => [`${Number(v ?? 0).toFixed(2)}€`, t("dashboard.sectionGastos")]}
-              />
-              <Line type="monotone" dataKey="gastos" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "#ef4444" }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <LineaGastosWidget key="linea_gastos" last12Months={last12Months} />
     ),
 
     area_balance: (
-      <div key="area_balance" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">{t("dashboard.widgetAreaLabel")}</p>
-        <p className="text-xs text-zinc-600 mb-4">{t("dashboard.last12Months")}</p>
-        <div className="w-full h-[220px]">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <AreaChart data={last12Months} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="balanceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 10 }} interval={2} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} tickFormatter={v => `${v}€`} />
-              <Tooltip
-                cursor={{ stroke: "rgba(255,255,255,0.1)" }}
-                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-                itemStyle={{ color: "#f4f4f5" }}
-                formatter={(v) => [`${Number(v ?? 0).toFixed(2)}€`, t("dashboard.sectionBalanceNeto")]}
-              />
-              <Area type="monotone" dataKey="balance" stroke="#10b981" strokeWidth={2} fill="url(#balanceGrad)" dot={false} activeDot={{ r: 4, fill: "#10b981" }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      <AreaBalanceWidget key="area_balance" last12Months={last12Months} />
     ),
 
     top_categorias: (
-      <WidgetCard key="top_categorias">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetTopLabel")}</p>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          {topCategorias.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <Package className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {topCategorias.map((entry, i) => {
-                const cat = categorias.find(c => c.id === entry.name)
-                const CatIcon = getIcon(cat?.icono ?? "Package")
-                const pct = Math.round((entry.value / maxTopVal) * 100)
-                return (
-                  <button
-                    key={entry.name}
-                    onClick={() => setSelectedCat(entry.name)}
-                    className="w-full space-y-1.5 text-left hover:opacity-70 transition-opacity"
-                    aria-label={`${cat?.label ?? entry.name}: ${entry.value.toFixed(2)}€`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CatIcon className="w-4 h-4 text-zinc-500 flex-shrink-0" aria-hidden="true" />
-                        <span className="text-sm text-zinc-300 truncate">
-                          {cat?.label ?? entry.name}
-                        </span>
-                      </div>
-                      <HidableAmount value={entry.value} className="text-sm font-medium text-zinc-200" />
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
-                        role="progressbar"
-                        aria-valuenow={pct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </WidgetCard>
+      <TopCategoriasWidget key="top_categorias" topCategorias={topCategorias} maxTopVal={maxTopVal} categorias={categorias} onSelectCat={setSelectedCat} />
     ),
     objetivo_ahorro: (
-      <WidgetCard key="objetivo_ahorro">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <PiggyBank className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetObjetivoLabel")}</p>
-            </div>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          {!objetivoAhorro ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-              <PiggyBank className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
-              <p className="text-xs text-zinc-700">{t("dashboard.noPresupuestosHint")}</p>
-              {onOpenSettings && (
-                <button
-                  onClick={() => onOpenSettings("objetivos")}
-                  className="mt-2 text-xs text-emerald-400 hover:text-emerald-300 transition-colors px-3 py-1.5 rounded-lg bg-emerald-950/30 border border-emerald-900/40"
-                >
-                  {t("dashboard.configureNow")}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-xs text-zinc-500 mb-1">{t("dashboard.objetivoAhorroActual")}</p>
-                  <HidableAmount
-                    value={Math.max(0, balanceNeto)}
-                    className={`text-3xl font-light ${balanceNeto >= 0 ? "text-emerald-400" : "text-red-400"}`}
-                  />
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-zinc-500 mb-1">{t("dashboard.objetivoMeta")}</p>
-                  <HidableAmount value={objetivoAhorro.cantidad} className="text-base font-medium text-zinc-300" />
-                </div>
-              </div>
-              <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${(pctObjetivo ?? 0) >= 100 ? "bg-emerald-400" : (pctObjetivo ?? 0) >= 50 ? "bg-yellow-400" : "bg-red-400"}`}
-                  style={{ width: `${Math.max(0, pctObjetivo ?? 0)}%` }}
-                  role="progressbar"
-                  aria-valuenow={pctObjetivo ?? 0}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-zinc-600">
-                  {(pctObjetivo ?? 0) >= 100 ? "🎉" : `${pctObjetivo ?? 0}%`}
-                </p>
-                {(pctObjetivo ?? 0) < 100 && (
-                  <HidableAmount
-                    value={Math.max(0, objetivoAhorro.cantidad - balanceNeto)}
-                    prefix={t("dashboard.objetivoFaltan")}
-                    className="text-xs text-zinc-500"
-                  />
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </WidgetCard>
+      <ObjetivoAhorroWidget key="objetivo_ahorro" objetivoAhorro={objetivoAhorro} pctObjetivo={pctObjetivo} balanceNeto={balanceNeto} onOpenSettings={onOpenSettings} />
     ),
 
     comparativa_mes: (
-      <WidgetCard key="comparativa_mes">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetComparativaLabel")}</p>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          <div className="space-y-3">
-            {[
-              { label: t("dashboard.sectionGastos"), actual: totalGastos, prev: gastoPrevMes, diff: diffGastoMes, colorActual: "text-red-400", invertir: true },
-              { label: t("dashboard.sectionIngresos"), actual: totalIngresos, prev: ingPrevMes, diff: diffIngMes, colorActual: "text-emerald-400", invertir: false },
-            ].map(({ label, actual, prev, diff, colorActual, invertir }) => {
-              const mejor = invertir ? diff <= 0 : diff >= 0
-              return (
-                <div key={label} className="bg-zinc-800/60 rounded-xl p-3 space-y-2">
-                  <p className="text-xs text-zinc-500 uppercase tracking-widest">{label}</p>
-                  <div className="flex items-end justify-between gap-2">
-                    <HidableAmount value={actual} className={`text-2xl font-light ${colorActual}`} />
-                    <div className="flex flex-col items-end gap-0.5">
-                      <HidableAmount
-                        value={Math.abs(diff)}
-                        prefix={diff > 0 ? "+" : diff < 0 ? "-" : ""}
-                        className={`text-xs font-semibold px-2 py-0.5 rounded-lg tabular-nums ${mejor ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}
-                      />
-                      <p className="text-[10px] text-zinc-600">vs <HidableAmount value={prev} className="text-zinc-600" /></p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </WidgetCard>
+      <ComparativaMesWidget key="comparativa_mes" totalGastos={totalGastos} totalIngresos={totalIngresos} gastoPrevMes={gastoPrevMes} ingPrevMes={ingPrevMes} diffGastoMes={diffGastoMes} diffIngMes={diffIngMes} />
     ),
 
     dia_mas_caro: (
-      <WidgetCard key="dia_mas_caro">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetDiaMasCaroLabel")}</p>
-            </div>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          {!diaMasCaro ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <CalendarDays className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col items-center justify-center flex-shrink-0">
-                <p className="text-2xl font-bold text-red-400 tabular-nums leading-none">{diaMasCaro[0]}</p>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-wide mt-0.5">
-                  {new Date(sy, sm, parseInt(diaMasCaro[0])).toLocaleDateString(locale, { weekday: "short" })}
-                </p>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-zinc-500 mb-1">{t("dashboard.gastoTotalDia")}</p>
-                <HidableAmount value={diaMasCaro[1]} className="text-3xl font-light text-red-400" />
-                <p className="text-xs text-zinc-600 mt-1">
-                  {((diaMasCaro[1] / totalGastos) * 100).toFixed(1)}{t("dashboard.pctGastoMensual")}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </WidgetCard>
+      <DiaMasCaroWidget key="dia_mas_caro" diaMasCaro={diaMasCaro} totalGastos={totalGastos} selectedYear={sy} selectedMonth={sm} locale={locale} />
     ),
 
     gasto_dia_semana: (
-      <div key="gasto_dia_semana" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <p className="text-xs text-zinc-500 uppercase tracking-widest mb-4">{t("dashboard.widgetGastoDiaLabel")}</p>
-        {monthGastos.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <BarChart2 className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-            <p className="text-sm text-zinc-600">{t("dashboard.noExpensesMonth")}</p>
-          </div>
-        ) : (
-          <div className="w-full h-[180px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <BarChart data={dowData} margin={{ top: 5, right: 5, left: -30, bottom: 0 }} barCategoryGap="20%">
-                <XAxis dataKey="dia" axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 11 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 10 }} tickFormatter={v => `${v}€`} />
-                <Tooltip
-                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                  contentStyle={{ backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "12px", fontSize: "12px" }}
-                  itemStyle={{ color: "#f4f4f5" }}
-                  formatter={(v) => [`${Number(v ?? 0).toFixed(2)}€`, "Gasto"]}
-                />
-                <Bar dataKey="gasto" radius={[4, 4, 0, 0]}>
-                  {dowData.map((entry, i) => (
-                    <Cell
-                      key={i}
-                      fill={entry.gasto >= maxGastoDow * 0.8 ? "#ef4444" : entry.gasto >= maxGastoDow * 0.5 ? "#f97316" : "#3b82f6"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-        <p className="text-xs text-zinc-700 mt-2 text-center">{t("dashboard.acumuladoMesDia")}</p>
-      </div>
+      <GastoDiaSemanaWidget key="gasto_dia_semana" monthGastos={monthGastos} dowData={dowData} maxGastoDow={maxGastoDow} />
     ),
 
     distribucion_ingreso: (
-      <WidgetCard key="distribucion_ingreso">
-        <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Wallet className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetDistribucionLabel")}</p>
-            </div>
-            <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-          </div>
-          {distribucionPct === null ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <Wallet className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-600">{t("dashboard.ratioNoIncome")}</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-center gap-6">
-                <div className="text-center">
-                  <p className={`text-4xl font-light tabular-nums ${distribucionPct >= 100 ? "text-red-400" : distribucionPct >= 80 ? "text-yellow-400" : "text-emerald-400"}`}>
-                    {distribucionPct}%
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">{t("dashboard.distribucionGastas")}</p>
-                </div>
-                <div className="text-center">
-                  <p className={`text-4xl font-light tabular-nums ${distribucionPct >= 100 ? "text-zinc-600" : "text-emerald-400"}`}>
-                    {Math.max(0, 100 - distribucionPct)}%
-                  </p>
-                  <p className="text-xs text-zinc-500 mt-1">{t("dashboard.distribucionAhorras")}</p>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-600 text-center">
-                {t("dashboard.widgetDistribucionDesc")}
-              </p>
-              <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden flex">
-                <div
-                  className={`h-full transition-all duration-700 ${distribucionPct >= 100 ? "bg-red-400" : distribucionPct >= 80 ? "bg-yellow-400" : "bg-red-400"}`}
-                  style={{ width: `${Math.min(distribucionPct, 100)}%` }}
-                />
-                <div
-                  className="h-full bg-emerald-400 transition-all duration-700"
-                  style={{ width: `${Math.max(0, 100 - distribucionPct)}%` }}
-                />
-              </div>
-              <div className="flex items-center gap-2 pt-1">
-                <HidableAmount value={totalGastos} prefix={t("dashboard.distribucionGastado")} className="text-xs text-zinc-500 flex-1" />
-                <HidableAmount value={totalIngresos} prefix={t("dashboard.distribucionIngresado")} className="text-xs text-zinc-500 flex-1 text-right" />
-              </div>
-            </div>
-          )}
-        </div>
-      </WidgetCard>
+      <DistribucionIngresoWidget key="distribucion_ingreso" distribucionPct={distribucionPct} totalGastos={totalGastos} totalIngresos={totalIngresos} />
     ),
 
-    resumen_semanal: (() => {
-      const semanaActual = recientes.filter(m => {
-        const d = new Date(m.created_at)
-        const hace7 = new Date(); hace7.setDate(hace7.getDate() - 7)
-        return d >= hace7 && (m.tipo ?? "gasto") === "gasto"
-      })
-      const semanaAnterior = recientes.filter(m => {
-        const d = new Date(m.created_at)
-        const hace14 = new Date(); hace14.setDate(hace14.getDate() - 14)
-        const hace7 = new Date(); hace7.setDate(hace7.getDate() - 7)
-        return d >= hace14 && d < hace7 && (m.tipo ?? "gasto") === "gasto"
-      })
-      const totalSemana = semanaActual.reduce((a, m) => a + m.cantidad, 0)
-      const totalSemanaAnt = semanaAnterior.reduce((a, m) => a + m.cantidad, 0)
-      const diffSem = totalSemana - totalSemanaAnt
-      const diffSemPct = totalSemanaAnt > 0 ? Math.round((diffSem / totalSemanaAnt) * 100) : null
+    resumen_semanal: (
+      <ResumenSemanalWidget key="resumen_semanal" recientes={recientes} categorias={categorias} presupuestosConGasto={presupuestosConGasto} esMesActual={esMesActual} />
+    ),
 
-      const catSemana = semanaActual.reduce((acc, m) => {
-        acc[m.categoria] = (acc[m.categoria] ?? 0) + m.cantidad
-        return acc
-      }, {} as Record<string, number>)
-      const topCatSemana = Object.entries(catSemana).sort(([,a],[,b]) => b - a)[0]
-      const topCatLabel = topCatSemana ? (categorias.find(c => c.id === topCatSemana[0])?.label ?? topCatSemana[0]) : null
-
-      const presupuestoAlerta = presupuestosConGasto.find(p => p.pct >= 80 && esMesActual)
-
-      return (
-        <WidgetCard key="resumen_semanal">
-          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarDays className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetResumenSemanalLabel")}</p>
-              <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">{t("dashboard.semanalGastosSemana")}</p>
-                <HidableAmount value={totalSemana} className="text-2xl font-light text-red-400" />
-              </div>
-              {diffSemPct !== null && (
-                <span className={`text-sm font-semibold px-2.5 py-1 rounded-lg tabular-nums ${diffSem <= 0 ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"}`}>
-                  {diffSem > 0 ? "+" : ""}{diffSemPct}%
-                </span>
-              )}
-            </div>
-            {topCatLabel && (
-              <p className="text-xs text-zinc-500">
-                {t("dashboard.semanalTopCategoria")}: <span className="text-zinc-300 font-medium">{topCatLabel}</span>
-              </p>
-            )}
-            {presupuestoAlerta && (
-              <div className="bg-yellow-950/30 border border-yellow-900/40 rounded-xl px-3 py-2">
-                <p className="text-xs text-yellow-400">
-                  {t("dashboard.semanalAlertaPresupuesto", { cat: presupuestoAlerta.cat!.label, pct: Math.round(presupuestoAlerta.pct) })}
-                </p>
-              </div>
-            )}
-          </div>
-        </WidgetCard>
-      )
-    })(),
-
-    presupuesto_global: (() => {
-      const objetivoGastoTotal = objetivos.find(o => o.tipo === "gasto_total")
-      if (!objetivoGastoTotal) return (
-        <WidgetCard key="presupuesto_global">
-          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetPresupuestoGlobalLabel")}</p>
-            </div>
-            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-              <Target className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-600">{t("dashboard.noPresupuestos")}</p>
-              {onOpenSettings && (
-                <button
-                  onClick={() => onOpenSettings("objetivos")}
-                  className="mt-2 text-xs text-red-400 hover:text-red-300 transition-colors px-3 py-1.5 rounded-lg bg-red-950/30 border border-red-900/40"
-                >
-                  {t("dashboard.configureNow")}
-                </button>
-              )}
-            </div>
-          </div>
-        </WidgetCard>
-      )
-      const limit = objetivoGastoTotal.cantidad
-      const pct = Math.min(Math.round((totalGastos / limit) * 100), 100)
-      const restant = Math.max(0, limit - totalGastos)
-      const superado = totalGastos > limit
-      const cercano = !superado && pct >= 80
-      const barColor = superado ? "#ef4444" : cercano ? "#f59e0b" : "#10b981"
-      return (
-        <WidgetCard key="presupuesto_global">
-          <div className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Target className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.widgetPresupuestoGlobalLabel")}</p>
-              </div>
-              <WidgetEyeButton labelShow={t("dashboard.showAmounts")} labelHide={t("dashboard.hideAmounts")} />
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">{t("dashboard.sectionGastos")}</p>
-                <HidableAmount value={totalGastos} className={`text-3xl font-light ${superado ? "text-red-400" : "text-zinc-100"}`} />
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-zinc-500 mb-1">{t("dashboard.widgetPresupuestoGlobalLimit")}</p>
-                <HidableAmount value={limit} className="text-base font-medium text-zinc-400" />
-              </div>
-            </div>
-            <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${pct}%`, backgroundColor: barColor }}
-                role="progressbar"
-                aria-valuenow={pct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              />
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className={`font-semibold px-2 py-0.5 rounded-lg ${superado ? "bg-red-500/15 text-red-400" : cercano ? "bg-yellow-500/15 text-yellow-400" : "bg-emerald-500/15 text-emerald-400"}`}>
-                {pct}%
-              </span>
-              {superado
-                ? <HidableAmount value={totalGastos - limit} prefix={t("dashboard.widgetPresupuestoGlobalExceeded")} className="text-red-400 font-medium" />
-                : <HidableAmount value={restant} prefix={t("dashboard.widgetPresupuestoGlobalLeft")} className="text-zinc-500" />
-              }
-            </div>
-          </div>
-        </WidgetCard>
-      )
-    })(),
+    presupuesto_global: (
+      <PresupuestoGlobalWidget key="presupuesto_global" objetivos={objetivos} totalGastos={totalGastos} onOpenSettings={onOpenSettings} />
+    ),
 
     racha_ahorro: (
-      <div key="racha_ahorro" className="bg-zinc-900 border border-zinc-800/70 rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <svg width="14" height="14" viewBox="0 0 14 18" aria-hidden="true">
-            <g className="flame-outer">
-              <ellipse cx="7" cy="13" rx="5.5" ry="5" fill={rachaDias >= 7 ? "#10b981" : rachaDias >= 3 ? "#f59e0b" : "#71717a"} />
-              <path d="M7 2 C4 6 2 9 2 12 C2 15.3 4.2 17 7 17 C9.8 17 12 15.3 12 12 C12 9 10 6 7 2Z" fill={rachaDias >= 7 ? "#10b981" : rachaDias >= 3 ? "#f59e0b" : "#71717a"} />
-            </g>
-            <g className="flame-mid">
-              <path d="M7 6 C5.5 8.5 4.5 10 4.5 12 C4.5 14 5.5 15.5 7 15.5 C8.5 15.5 9.5 14 9.5 12 C9.5 10 8.5 8.5 7 6Z" fill={rachaDias >= 7 ? "#34d399" : rachaDias >= 3 ? "#fbbf24" : "#52525b"} />
-            </g>
-            <g className="flame-inner">
-              <path d="M7 9 C6.2 10.5 6 11.2 6 12.2 C6 13.4 6.4 14.2 7 14.2 C7.6 14.2 8 13.4 8 12.2 C8 11.2 7.8 10.5 7 9Z" fill={rachaDias >= 7 ? "#a7f3d0" : rachaDias >= 3 ? "#fde68a" : "#3f3f46"} />
-            </g>
-          </svg>
-          <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("dashboard.sectionRacha")}</p>
-        </div>
-        {rachaDias === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
-            <Flame className="w-8 h-8 text-zinc-700" aria-hidden="true" />
-            <p className="text-sm text-zinc-600">{t("dashboard.rachaNoActive")}</p>
-            <p className="text-xs text-zinc-700">{t("dashboard.rachaNoActiveHint")}</p>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4">
-            <div className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 ${rachaDias >= 7 ? "bg-emerald-500/15 border border-emerald-500/30" : rachaDias >= 3 ? "bg-yellow-500/15 border border-yellow-500/30" : "bg-zinc-800 border border-zinc-700"}`}>
-              <p className={`text-3xl font-bold tabular-nums leading-none ${rachaDias >= 7 ? "text-emerald-400" : rachaDias >= 3 ? "text-yellow-400" : "text-zinc-400"}`}>
-                {rachaDias}
-              </p>
-              <p className="text-[10px] text-zinc-500 mt-0.5">{t("dashboard.rachaDias")}</p>
-            </div>
-            <div className="flex-1 min-w-0 space-y-1">
-              <p className="text-sm font-medium text-zinc-200">
-                {rachaDias >= 7 ? t("dashboard.rachaIncreible") : rachaDias >= 3 ? t("dashboard.rachaBuen") : t("dashboard.rachaEmpezando")}
-              </p>
-              <p className="text-xs text-zinc-500">{t("dashboard.rachaConsecut")}</p>
-            </div>
-          </div>
-        )}
-      </div>
+      <RachaAhorroWidget key="racha_ahorro" rachaDias={rachaDias} rachaTopCat={rachaTopCat} />
     ),
   }
 

@@ -45,7 +45,7 @@ async function decryptInChunks(
   return results
 }
 
-export function useDashboardData(activeWidgets: string[]) {
+export function useDashboardData(activeWidgets: string[], userId: string) {
   const [movimientos, setMovimientos] = useState<{ recientes: Movimiento[]; paraSaldo: Movimiento[] }>({
     recientes: [],
     paraSaldo: [],
@@ -64,6 +64,7 @@ export function useDashboardData(activeWidgets: string[]) {
       const { data: dataReciente } = await supabase
         .from("movimientos")
         .select("*")
+        .eq("user_id", userId)
         .gte("created_at", fechaCorte.toISOString())
         .order("created_at", { ascending: false })
 
@@ -108,6 +109,7 @@ export function useDashboardData(activeWidgets: string[]) {
       const { data: dataParaSaldo } = await supabase
         .from("movimientos")
         .select("id, cantidad, tipo, cuenta_id, cuenta_destino_id, created_at")
+        .eq("user_id", userId)
         .order("created_at", { ascending: false })
 
       if (dataParaSaldo) {

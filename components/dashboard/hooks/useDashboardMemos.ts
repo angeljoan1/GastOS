@@ -77,6 +77,20 @@ export function useDashboardMemos({
     const last6Months = last12Months.slice(6)
     const topCategorias = pieData.slice(0, 5)
     const maxTopVal = topCategorias[0]?.value ?? 1
+
+    const ingresoTotals = monthIngresos.reduce((acc, m) => {
+      const catById = categorias.find(c => c.id === m.categoria)
+      const catByLabel = categorias.find(c => c.label.toLowerCase() === m.categoria?.toLowerCase())
+      const key = catById?.id ?? catByLabel?.id ?? m.categoria
+      acc[key] = (acc[key] || 0) + m.cantidad
+      return acc
+    }, {} as Record<string, number>)
+
+    const topIngresos = Object.entries(ingresoTotals)
+      .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+    const maxTopIngVal = topIngresos[0]?.value ?? 1
     const diasEnMes = new Date(sy, sm + 1, 0).getDate()
     const esMesActual = sm === hoy.getMonth() && sy === hoy.getFullYear()
     const diaActual = esMesActual ? hoy.getDate() : diasEnMes
@@ -179,7 +193,7 @@ export function useDashboardMemos({
       monthMovs, monthGastos, monthIngresos,
       totalGastos, totalIngresos, balanceNeto,
       saldos, patrimonioTotal,
-      categoryTotals, pieData, topCategorias, maxTopVal,
+      categoryTotals, pieData, topCategorias, maxTopVal, topIngresos, maxTopIngVal,
       last12Months, last6Months,
       diasEnMes, esMesActual, diaActual, diasRestantes,
       gastoDiario, gastoProyectado, ahorroProyectado, pctMes,

@@ -39,6 +39,7 @@ import Barras6MesesWidget from "@/components/dashboard/widgets/Barras6MesesWidge
 import LineaGastosWidget from "@/components/dashboard/widgets/LineaGastosWidget"
 import AreaBalanceWidget from "@/components/dashboard/widgets/AreaBalanceWidget"
 import TopCategoriasWidget from "@/components/dashboard/widgets/TopCategoriasWidget"
+import TopIngresosWidget from "@/components/dashboard/widgets/TopIngresosWidget"
 import ObjetivoAhorroWidget from "@/components/dashboard/widgets/ObjetivoAhorroWidget"
 import ComparativaMesWidget from "@/components/dashboard/widgets/ComparativaMesWidget"
 import DiaMasCaroWidget from "@/components/dashboard/widgets/DiaMasCaroWidget"
@@ -50,7 +51,7 @@ import RachaAhorroWidget from "@/components/dashboard/widgets/RachaAhorroWidget"
 
 type WidgetId =
   | "resumen_mes" | "saldo_cuentas" | "donut_categorias" | "barras_6meses"
-  | "linea_gastos" | "area_balance" | "top_categorias" | "proyeccion_mes"
+  | "linea_gastos" | "area_balance" | "top_categorias" | "top_ingresos" | "proyeccion_mes"
   | "media_diaria" | "mapa_calor" | "ratio_ahorro" | "presupuestos_categoria"
   | "objetivo_ahorro" | "comparativa_mes" | "dia_mas_caro"
   | "gasto_dia_semana" | "distribucion_ingreso" | "racha_ahorro"
@@ -72,6 +73,7 @@ function getWidgetCatalog(t: ReturnType<typeof useTranslations>): WidgetMeta[] {
     { id: "linea_gastos", label: t("dashboard.widgetLineaLabel"), descripcion: t("dashboard.widgetLineaDesc"), Icon: TrendingDown },
     { id: "area_balance", label: t("dashboard.widgetAreaLabel"), descripcion: t("dashboard.widgetAreaDesc"), Icon: ArrowLeftRight },
     { id: "top_categorias", label: t("dashboard.widgetTopLabel"), descripcion: t("dashboard.widgetTopDesc"), Icon: Package },
+    { id: "top_ingresos", label: t("dashboard.widgetTopIngresosLabel"), descripcion: t("dashboard.widgetTopIngresosDesc"), Icon: TrendingUp },
     { id: "objetivo_ahorro", label: t("dashboard.widgetObjetivoLabel"), descripcion: t("dashboard.widgetObjetivoDesc"), Icon: PiggyBank },
     { id: "comparativa_mes", label: t("dashboard.widgetComparativaLabel"), descripcion: t("dashboard.widgetComparativaDesc"), Icon: BarChart2 },
     { id: "dia_mas_caro", label: t("dashboard.widgetDiaMasCaroLabel"), descripcion: t("dashboard.widgetDiaMasCaroDesc"), Icon: CalendarDays },
@@ -150,7 +152,7 @@ export default function DashboardTab({
     monthMovs, monthGastos, monthIngresos,
     totalGastos, totalIngresos, balanceNeto,
     saldos, patrimonioTotal,
-    categoryTotals, pieData, topCategorias, maxTopVal,
+    categoryTotals, pieData, topCategorias, maxTopVal, topIngresos, maxTopIngVal,
     last12Months, last6Months,
     diasEnMes, esMesActual, diaActual, diasRestantes,
     gastoDiario, gastoProyectado, ahorroProyectado, pctMes,
@@ -276,6 +278,10 @@ export default function DashboardTab({
 
     top_categorias: (
       <TopCategoriasWidget key="top_categorias" topCategorias={topCategorias} maxTopVal={maxTopVal} categorias={categorias} onSelectCat={setSelectedCat} />
+    ),
+
+    top_ingresos: (
+      <TopIngresosWidget key="top_ingresos" topIngresos={topIngresos} maxTopIngVal={maxTopIngVal} categorias={categorias} />
     ),
     objetivo_ahorro: (
       <ObjetivoAhorroWidget key="objetivo_ahorro" objetivoAhorro={objetivoAhorro} pctObjetivo={pctObjetivo} balanceNeto={balanceNeto} onOpenSettings={onOpenSettings} />

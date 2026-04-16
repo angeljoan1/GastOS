@@ -40,7 +40,10 @@ export function useDashboardMemos({
 
     const saldos: SaldoCuenta[] = cuentas.map(c => ({
       cuenta: c,
-      saldo_actual: calcularSaldoCuenta(c, paraSaldo),
+      // Use the pre-computed running balance when available (avoids loading all history)
+      saldo_actual: c.saldo_actual !== undefined
+        ? c.saldo_actual
+        : calcularSaldoCuenta(c, paraSaldo),
     }))
     const patrimonioTotal = saldos.reduce((a, s) => a + s.saldo_actual, 0)
 

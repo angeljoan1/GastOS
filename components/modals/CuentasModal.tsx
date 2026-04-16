@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase"
 import { getIcon, CUENTA_COLORS, CUENTA_ICON_OPTIONS } from "@/lib/icons"
 import type { Cuenta } from "@/types"
 import { encryptData } from "@/lib/crypto"
+import { saveSaldoActual } from "@/services/cuentas"
 import { useState, useEffect, useRef } from "react"
 import { useAppData } from "@/contexts/AppDataContext"
 
@@ -70,6 +71,7 @@ export default function CuentasModal({
 
     const nombreCifrado = await encryptData(nombreRaw)
     const saldoCifrado = await encryptData(saldoRaw)
+    const saldoActualCifrado = await encryptData(saldoRaw)
 
     const { data, error } = await supabase
       .from("cuentas")
@@ -79,6 +81,7 @@ export default function CuentasModal({
         icono,
         color,
         saldo_inicial: saldoCifrado,
+        saldo_actual: saldoActualCifrado,
       })
       .select()
       .single()
@@ -90,6 +93,7 @@ export default function CuentasModal({
         ...data,
         nombre: nombreRaw,
         saldo_inicial: saldoRaw,
+        saldo_actual: saldoRaw,
       }
       onCuentasChange([...cuentas, cuentaEnClaro])
       setNombre("")

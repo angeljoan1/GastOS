@@ -24,7 +24,8 @@ import type { Session } from "@supabase/supabase-js"
 import type { Categoria, Cuenta, Presupuesto, Objetivo, Movimiento } from "@/types"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import ErrorBoundary from "@/components/ui/ErrorBoundary"
-import { clearKey, getMasterKey, decryptData, clearBiometricKey } from "@/lib/crypto"
+import { clearKey, getMasterKey, decryptData, encryptData, clearBiometricKey } from "@/lib/crypto"
+import { calcularSaldoCuenta } from "@/lib/calculations"
 import { AppDataProvider } from "@/contexts/AppDataContext"
 
 const APP_VERSION = 24
@@ -87,13 +88,48 @@ function MainApp({ session }: { session: Session }) {
       .then(async ({ data }) => {
         if (!data) return
         const decrypted = await Promise.all(
-          data.map(async c => ({
-            ...c,
-            nombre: await decryptData(c.nombre),
-            saldo_inicial: parseFloat(await decryptData(String(c.saldo_inicial))) || 0,
-          }))
+          data.map(async c => {
+            const saldoActualRaw = c.saldo_actual
+              ? parseFloat(await decryptData(String(c.saldo_actual)))
+              : undefined
+            return {
+              ...c,
+              nombre: await decryptData(c.nombre),
+              saldo_inicial: parseFloat(await decryptData(String(c.saldo_inicial))) || 0,
+              saldo_actual: isNaN(saldoActualRaw as number) ? undefined : saldoActualRaw,
+            }
+          })
         )
         setCuentas(decrypted)
+
+        // One-time migration: accounts that don't have saldo_actual yet
+        const sinSaldo = decrypted.filter(c => c.saldo_actual === undefined)
+        if (sinSaldo.length === 0) return
+
+        const { data: allMovs } = await supabase
+          .from("movimientos")
+          .select("id, cantidad, tipo, cuenta_id, cuenta_destino_id")
+          .eq("user_id", session.user.id)
+
+        if (!allMovs) return
+        const movsDecrypted = await Promise.all(
+          allMovs.map(async m => ({
+            ...m,
+            cantidad: parseFloat(await decryptData(String(m.cantidad))) || 0,
+          }))
+        )
+
+        const migrated = await Promise.all(
+          sinSaldo.map(async cuenta => {
+            const saldo = calcularSaldoCuenta(cuenta, movsDecrypted as Parameters<typeof calcularSaldoCuenta>[1])
+            const cifrado = await encryptData(saldo)
+            await supabase.from("cuentas").update({ saldo_actual: cifrado }).eq("id", cuenta.id)
+            return { ...cuenta, saldo_actual: saldo }
+          })
+        )
+        setCuentas(prev =>
+          prev.map(c => migrated.find(m => m.id === c.id) ?? c)
+        )
       })
 
     supabase

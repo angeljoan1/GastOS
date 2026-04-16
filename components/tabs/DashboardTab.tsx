@@ -143,7 +143,7 @@ export default function DashboardTab({
     })
   }
 
-  const { movimientos, hasEncryptedMovs, loading } = useDashboardData(activeWidgets, userId)
+  const { movimientos, hasEncryptedMovs, loading } = useDashboardData(activeWidgets, userId, cuentas)
 
   const sm = selectedDate.getMonth()
   const sy = selectedDate.getFullYear()

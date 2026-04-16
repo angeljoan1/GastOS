@@ -35,7 +35,7 @@ export interface Presupuesto {
 }
 
 // ─── Cuenta / Cartera ────────────────────────────────────────
-// nombre y saldo_inicial se cifran en BD [E2EE]
+// nombre, saldo_inicial y saldo_actual se cifran en BD [E2EE]
 // En memoria siempre están en claro (page.tsx los descifra al cargar)
 export interface Cuenta {
   id:            string
@@ -45,6 +45,7 @@ export interface Cuenta {
   icono:         string
   color:         string
   saldo_inicial: number     // [E2EE] cifrado en BD, en claro en memoria
+  saldo_actual?: number     // [E2EE] cifrado en BD, en claro en memoria; null = pendiente de migración
   created_at:    string
 }
 

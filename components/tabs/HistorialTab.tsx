@@ -23,6 +23,7 @@ import BottomSheet, { SheetTrigger, type SheetOption } from "@/components/ui/Bot
 import { encryptData, decryptData, DECRYPT_ERROR } from "@/lib/crypto"
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import { useAppData } from "@/contexts/AppDataContext"
+import { aplicarDeltaSaldo } from "@/services/cuentas"
 
 type TipoFilter = "todos" | "gasto" | "ingreso" | "transferencia"
 
@@ -36,7 +37,7 @@ const THEME_COLORS: Record<TipoFilter, string> = {
 
 export default function HistorialTab() {
   const t = useTranslations()
-  const { categorias, cuentas } = useAppData()
+  const { categorias, cuentas, setCuentas } = useAppData()
   const [movimientos, setMovimientos] = useState<Movimiento[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -195,17 +196,46 @@ export default function HistorialTab() {
     }
   }, [tipoFilter])
 
+  async function actualizarSaldoCuentas(deltas: { id: string; delta: number }[]) {
+    const items = deltas
+      .map(({ id, delta }) => {
+        const c = cuentas.find(x => x.id === id)
+        if (!c || c.saldo_actual === undefined) return null
+        return { cuentaId: id, delta, saldoActual: c.saldo_actual }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+    if (items.length === 0) return
+    const nuevos = await aplicarDeltaSaldo(items)
+    setCuentas(prev => prev.map(c => nuevos[c.id] !== undefined ? { ...c, saldo_actual: nuevos[c.id] } : c))
+  }
+
   async function handleDelete(id: string) {
     if (deletingId === id) return // Protección contra doble-tap
+    const mov = movimientos.find(m => m.id === id)
     setDeletingId(id)
     const { error } = await supabase.from("movimientos").delete().eq("id", id)
     setDeletingId(null)
     setConfirmarBorrado(null)
-    if (!error) setMovimientos(prev => prev.filter(m => m.id !== id))
+    if (!error) {
+      setMovimientos(prev => prev.filter(m => m.id !== id))
+      // Reverse the effect of the deleted movement on account balance
+      if (mov) {
+        if (mov.tipo === "transferencia") {
+          await actualizarSaldoCuentas([
+            ...(mov.cuenta_id ? [{ id: mov.cuenta_id, delta: mov.cantidad }] : []),
+            ...(mov.cuenta_destino_id ? [{ id: mov.cuenta_destino_id, delta: -mov.cantidad }] : []),
+          ])
+        } else if (mov.cuenta_id) {
+          const delta = (mov.tipo ?? "gasto") === "ingreso" ? -mov.cantidad : mov.cantidad
+          await actualizarSaldoCuentas([{ id: mov.cuenta_id, delta }])
+        }
+      }
+    }
   }
 
   async function handleUpdateMovimiento(updated: Movimiento) {
     setUpdateError(null)
+    const original = movimientos.find(m => m.id === updated.id)
     const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
 
     const cantidadEncriptada = await encryptData(updated.cantidad)
@@ -236,6 +266,13 @@ export default function HistorialTab() {
             : m
         )
       )
+      // Apply the net delta: undo old amount, apply new amount
+      if (original && updated.cuenta_id) {
+        const sign = (updated.tipo ?? "gasto") === "ingreso" ? 1 : -1
+        const oldSign = (original.tipo ?? "gasto") === "ingreso" ? 1 : -1
+        const delta = (updated.cantidad * sign) - (original.cantidad * oldSign)
+        if (delta !== 0) await actualizarSaldoCuentas([{ id: updated.cuenta_id, delta }])
+      }
     }
   }
 

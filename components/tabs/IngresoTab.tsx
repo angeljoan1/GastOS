@@ -21,6 +21,7 @@ import { invalidateSaldoCache } from "@/components/dashboard/hooks/useDashboardD
 import EncryptionBadge from "@/components/ui/Encryptionbadge"
 import NumericKeypad from "@/components/ui/NumericKeypad"
 import { useAppData } from "@/contexts/AppDataContext"
+import { aplicarDeltaSaldo } from "@/services/cuentas"
 
 function triggerHaptic() {
   if (typeof window !== "undefined" && window.navigator?.vibrate) {
@@ -36,7 +37,7 @@ export default function IngresoTab({
   onEditLast?: (mov: Movimiento) => void
 }) {
   const t = useTranslations()
-  const { categorias, cuentas, presupuestos } = useAppData()
+  const { categorias, cuentas, setCuentas, presupuestos } = useAppData()
   const [display, setDisplay] = useState("0")
   const [nota, setNota] = useState("")
   const [success, setSuccess] = useState(false)
@@ -218,6 +219,10 @@ function onCategoryClick(catId: string) {
       setError(t("ingreso.errorSave"))
     } else {
       invalidateSaldoCache()
+      if (cuentaId) {
+        const delta = tipoMovimiento === "ingreso" ? cantidadRaw : -cantidadRaw
+        await actualizarSaldoCuentas([{ id: cuentaId, delta }])
+      }
       const catLabel = categorias.find(c => c.id === cat)?.label ?? cat
       const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
       // Comprovar si s'ha superat el pressupost de la categoria
@@ -277,6 +282,10 @@ function onCategoryClick(catId: string) {
       setError(`Error: ${error.message}`)
     } else {
       invalidateSaldoCache()
+      await actualizarSaldoCuentas([
+        { id: cuentaId, delta: -cantidadRaw },
+        { id: cuentaDestinoId, delta: cantidadRaw },
+      ])
       const cuentaOrigenNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
       setLastSaved({ id: insertedTransfer?.[0]?.id ?? "", cantidad: cantidadRaw, catLabel: t("ingreso.typeTransferencia"), cuentaNombre: cuentaOrigenNombre, tipo: "transferencia" })
       setSuccess(true)
@@ -329,6 +338,10 @@ function onCategoryClick(catId: string) {
 
     setPendingSubs(prev => prev.filter(p => p.id !== sub.id))
     invalidateSaldoCache()
+    if (sub.cuenta_id) {
+      const delta = (sub.tipo ?? "gasto") === "ingreso" ? sub.cantidad : -sub.cantidad
+      await actualizarSaldoCuentas([{ id: sub.cuenta_id, delta }])
+    }
     setSuccess(true)
     setTimeout(() => setSuccess(false), 1800)
     setProcessingSub(null)
@@ -342,6 +355,19 @@ function onCategoryClick(catId: string) {
       .eq("id", id)
     if (!error) setPendingSubs(prev => prev.filter(p => p.id !== id))
     setProcessingSub(null)
+  }
+
+  async function actualizarSaldoCuentas(deltas: { id: string; delta: number }[]) {
+    const items = deltas
+      .map(({ id, delta }) => {
+        const c = cuentas.find(x => x.id === id)
+        if (!c || c.saldo_actual === undefined) return null
+        return { cuentaId: id, delta, saldoActual: c.saldo_actual }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+    if (items.length === 0) return
+    const nuevos = await aplicarDeltaSaldo(items)
+    setCuentas(prev => prev.map(c => nuevos[c.id] !== undefined ? { ...c, saldo_actual: nuevos[c.id] } : c))
   }
 
   const isDisabled = loading || display === "0" || display === "0."

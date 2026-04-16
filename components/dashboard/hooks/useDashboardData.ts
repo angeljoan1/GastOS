@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import { decryptData, DECRYPT_ERROR } from "@/lib/crypto"
-import type { Movimiento } from "@/types"
+import type { Movimiento, Cuenta } from "@/types"
 
 const SALDO_CACHE_KEY = "gastos_saldo_cache_v1"
 const SALDO_CACHE_TTL = 5 * 60 * 1000
@@ -45,7 +45,7 @@ async function decryptInChunks(
   return results
 }
 
-export function useDashboardData(activeWidgets: string[], userId: string) {
+export function useDashboardData(activeWidgets: string[], userId: string, cuentas?: Cuenta[]) {
   const [movimientos, setMovimientos] = useState<{ recientes: Movimiento[]; paraSaldo: Movimiento[] }>({
     recientes: [],
     paraSaldo: [],
@@ -97,6 +97,12 @@ export function useDashboardData(activeWidgets: string[], userId: string) {
   useEffect(() => {
     if (!activeWidgets.includes("saldo_cuentas")) return
     if (saldoFetchedRef.current) return
+
+    // Skip the heavy paraSaldo fetch if all accounts already have saldo_actual
+    const todasTienenSaldo = cuentas && cuentas.length > 0 &&
+      cuentas.every(c => c.saldo_actual !== undefined)
+    if (todasTienenSaldo) return
+
     saldoFetchedRef.current = true
 
     const fetchSaldo = async () => {
@@ -131,7 +137,7 @@ export function useDashboardData(activeWidgets: string[], userId: string) {
     }
 
     fetchSaldo()
-  }, [activeWidgets])
+  }, [activeWidgets, cuentas])
 
   return { movimientos, hasEncryptedMovs, loading }
 }

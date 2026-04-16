@@ -234,6 +234,11 @@ export default function ImportCSVModal({
 
     setImporting(false)
     if (!errorOcurrido) {
+      // Reset running balances so they are recalculated from scratch on next load
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from("cuentas").update({ saldo_actual: null }).eq("user_id", user.id)
+      }
       setStep("done")
     }
   }

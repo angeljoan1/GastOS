@@ -41,7 +41,7 @@ export default function IngresoTab({
   const [display, setDisplay] = useState("0")
   const [nota, setNota] = useState("")
   const [success, setSuccess] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)  // tracks background save to show spinner on transfer button
   const [error, setError] = useState<string | null>(null)
   const [tipoMovimiento, setTipoMovimiento] = useState<TipoActivo>("gasto")
   const [cuentaId, setCuentaId] = useState<string>("")
@@ -198,11 +198,25 @@ function onCategoryClick(catId: string) {
     if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
     const { getMasterKey } = await import("@/lib/crypto")
     if (!getMasterKey()) return setError(t("ingreso.errorSessionExpired"))
-    setLoading(true)
     setError(null)
 
+    // Capture form values before clearing
+    const notaCaptura = nota.trim()
+    const cuentaIdCaptura = cuentaId
+    const tipoCaptura = tipoMovimiento
+    const catLabel = categorias.find(c => c.id === cat)?.label ?? cat
+    const cuentaNombre = cuentas.find(c => c.id === cuentaIdCaptura)?.nombre ?? null
+
+    // Optimistic: clear form and show success immediately
+    setDisplay("0")
+    setNota("")
+    setLastSaved({ id: "", cantidad: cantidadRaw, catLabel, cuentaNombre, tipo: tipoCaptura })
+    setSuccess(true)
+    setTimeout(() => setSuccess(false), 2500)
+
+    // Encrypt and persist in background
     const cantidadEncriptada = await encryptData(cantidadRaw)
-    const notaEncriptada = nota ? await encryptData(nota.trim()) : null
+    const notaEncriptada = notaCaptura ? await encryptData(notaCaptura) : null
 
     const { data: insertedRows, error } = await supabase.from("movimientos").insert({
       cantidad: cantidadEncriptada,
@@ -210,45 +224,46 @@ function onCategoryClick(catId: string) {
       nota: notaEncriptada,
       is_recurring: isRecurring,
       ...(isRecurring && period ? { recur_period: period } : {}),
-      tipo: tipoMovimiento,
-      cuenta_id: cuentaId || null,
+      tipo: tipoCaptura,
+      cuenta_id: cuentaIdCaptura || null,
     }).select("id")
 
-    setLoading(false)
     if (error) {
+      // Revert: restore form and show error
+      setDisplay(cantidadRaw.toString())
+      setNota(notaCaptura)
+      setSuccess(false)
       setError(t("ingreso.errorSave"))
-    } else {
-      invalidateSaldoCache()
-      if (cuentaId) {
-        const delta = tipoMovimiento === "ingreso" ? cantidadRaw : -cantidadRaw
-        await actualizarSaldoCuentas([{ id: cuentaId, delta }])
-      }
-      const catLabel = categorias.find(c => c.id === cat)?.label ?? cat
-      const cuentaNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
-      // Comprovar si s'ha superat el pressupost de la categoria
-      const pressupost = presupuestos.find(p => p.categoria_id === cat)
-      if (pressupost && tipoMovimiento === "gasto") {
-        const { data: movsDelMes } = await supabase
-          .from("movimientos")
-          .select("cantidad")
-          .eq("categoria", cat)
-          .eq("tipo", "gasto")
-          .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-        if (movsDelMes) {
-          const { decryptData: decrypt } = await import("@/lib/crypto")
-          const totalMes = (await Promise.all(
-            movsDelMes.map(async m => parseFloat(await decrypt(m.cantidad)) || 0)
-          )).reduce((a, b) => a + b, 0)
-          if (totalMes > pressupost.cantidad) {
-            setError(t("ingreso.alertBudgetExceeded", { cat: catLabel, amount: pressupost.cantidad.toFixed(2) }))
-          }
+      return
+    }
+
+    invalidateSaldoCache()
+    if (cuentaIdCaptura) {
+      const delta = tipoCaptura === "ingreso" ? cantidadRaw : -cantidadRaw
+      await actualizarSaldoCuentas([{ id: cuentaIdCaptura, delta }])
+    }
+
+    // Update lastSaved with real ID
+    setLastSaved(prev => prev ? { ...prev, id: insertedRows?.[0]?.id ?? "" } : prev)
+
+    // Budget check (non-blocking, shows warning if exceeded)
+    const pressupost = presupuestos.find(p => p.categoria_id === cat)
+    if (pressupost && tipoCaptura === "gasto") {
+      const { data: movsDelMes } = await supabase
+        .from("movimientos")
+        .select("cantidad")
+        .eq("categoria", cat)
+        .eq("tipo", "gasto")
+        .gte("created_at", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+      if (movsDelMes) {
+        const { decryptData: decrypt } = await import("@/lib/crypto")
+        const totalMes = (await Promise.all(
+          movsDelMes.map(async m => parseFloat(await decrypt(m.cantidad)) || 0)
+        )).reduce((a, b) => a + b, 0)
+        if (totalMes > pressupost.cantidad) {
+          setError(t("ingreso.alertBudgetExceeded", { cat: catLabel, amount: pressupost.cantidad.toFixed(2) }))
         }
       }
-      setLastSaved({ id: insertedRows?.[0]?.id ?? "", cantidad: cantidadRaw, catLabel, cuentaNombre, tipo: tipoMovimiento })
-      setSuccess(true)
-      setDisplay("0")
-      setNota("")
-      setTimeout(() => setSuccess(false), 2500)
     }
   }
 
@@ -261,11 +276,25 @@ function onCategoryClick(catId: string) {
 
     const { getMasterKey } = await import("@/lib/crypto")
     if (!getMasterKey()) return setError(t("ingreso.errorSessionExpired"))
-    setLoading(true)
     setError(null)
 
+    const notaCaptura = nota.trim()
+    const origenId = cuentaId
+    const destinoId = cuentaDestinoId
+    const cuentaOrigenNombre = cuentas.find(c => c.id === origenId)?.nombre ?? null
+
+    // Optimistic: clear form and show success immediately
+    setSaving(true)
+    setDisplay("0")
+    setNota("")
+    setCuentaDestinoId("")
+    setIsRecurringTransfer(false)
+    setLastSaved({ id: "", cantidad: cantidadRaw, catLabel: t("ingreso.typeTransferencia"), cuentaNombre: cuentaOrigenNombre, tipo: "transferencia" })
+    setSuccess(true)
+    setTimeout(() => setSuccess(false), 2500)
+
     const cantidadEncriptada = await encryptData(cantidadRaw)
-    const notaEncriptada = nota ? await encryptData(nota.trim()) : null
+    const notaEncriptada = notaCaptura ? await encryptData(notaCaptura) : null
 
     const { data: insertedTransfer, error } = await supabase.from("movimientos").insert({
       cantidad: cantidadEncriptada,
@@ -273,28 +302,26 @@ function onCategoryClick(catId: string) {
       nota: notaEncriptada,
       is_recurring: isRecurringTransfer,
       tipo: "transferencia",
-      cuenta_id: cuentaId,
-      cuenta_destino_id: cuentaDestinoId,
+      cuenta_id: origenId,
+      cuenta_destino_id: destinoId,
     }).select("id")
 
-    setLoading(false)
+    setSaving(false)
     if (error) {
+      setDisplay(cantidadRaw.toString())
+      setNota(notaCaptura)
+      setCuentaDestinoId(destinoId)
+      setSuccess(false)
       setError(`Error: ${error.message}`)
-    } else {
-      invalidateSaldoCache()
-      await actualizarSaldoCuentas([
-        { id: cuentaId, delta: -cantidadRaw },
-        { id: cuentaDestinoId, delta: cantidadRaw },
-      ])
-      const cuentaOrigenNombre = cuentas.find(c => c.id === cuentaId)?.nombre ?? null
-      setLastSaved({ id: insertedTransfer?.[0]?.id ?? "", cantidad: cantidadRaw, catLabel: t("ingreso.typeTransferencia"), cuentaNombre: cuentaOrigenNombre, tipo: "transferencia" })
-      setSuccess(true)
-      setDisplay("0")
-      setNota("")
-      setCuentaDestinoId("")
-      setIsRecurringTransfer(false)
-      setTimeout(() => setSuccess(false), 2500)
+      return
     }
+
+    invalidateSaldoCache()
+    await actualizarSaldoCuentas([
+      { id: origenId, delta: -cantidadRaw },
+      { id: destinoId, delta: cantidadRaw },
+    ])
+    setLastSaved(prev => prev ? { ...prev, id: insertedTransfer?.[0]?.id ?? "" } : prev)
   }
 
   async function handleCobrarSub(sub: Movimiento) {
@@ -370,7 +397,7 @@ function onCategoryClick(catId: string) {
     setCuentas(prev => prev.map(c => nuevos[c.id] !== undefined ? { ...c, saldo_actual: nuevos[c.id] } : c))
   }
 
-  const isDisabled = loading || display === "0" || display === "0."
+  const isDisabled = saving || display === "0" || display === "0."
   const isTransfer = tipoMovimiento === "transferencia"
 
   const getCatLabel = (catId: string) =>
@@ -714,10 +741,10 @@ function onCategoryClick(catId: string) {
                   </div>
                   <button
                     onClick={handleGuardarTransferencia}
-                    disabled={isDisabled || !cuentaDestinoId || loading}
+                    disabled={isDisabled || !cuentaDestinoId || saving}
                     className="w-full py-4 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-zinc-950 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
                   >
-                    {loading
+                    {saving
                       ? <Loader2 className="w-4 h-4 animate-spin" />
                       : <ArrowLeftRight className="w-4 h-4" />
                     }
@@ -875,7 +902,7 @@ function onCategoryClick(catId: string) {
                               if (isDraggingCatRef.current) return
                               onCategoryClick(id)
                             }}
-                            disabled={isDisabled || loading}
+                            disabled={isDisabled || saving}
                           />
                         </div>
                       )

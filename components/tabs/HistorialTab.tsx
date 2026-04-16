@@ -212,23 +212,35 @@ export default function HistorialTab() {
   async function handleDelete(id: string) {
     if (deletingId === id) return // Protección contra doble-tap
     const mov = movimientos.find(m => m.id === id)
+    setConfirmarBorrado(null)
+
+    // Optimistic: remove immediately
+    setMovimientos(prev => prev.filter(m => m.id !== id))
     setDeletingId(id)
+
     const { error } = await supabase.from("movimientos").delete().eq("id", id)
     setDeletingId(null)
-    setConfirmarBorrado(null)
-    if (!error) {
-      setMovimientos(prev => prev.filter(m => m.id !== id))
-      // Reverse the effect of the deleted movement on account balance
-      if (mov) {
-        if (mov.tipo === "transferencia") {
-          await actualizarSaldoCuentas([
-            ...(mov.cuenta_id ? [{ id: mov.cuenta_id, delta: mov.cantidad }] : []),
-            ...(mov.cuenta_destino_id ? [{ id: mov.cuenta_destino_id, delta: -mov.cantidad }] : []),
-          ])
-        } else if (mov.cuenta_id) {
-          const delta = (mov.tipo ?? "gasto") === "ingreso" ? -mov.cantidad : mov.cantidad
-          await actualizarSaldoCuentas([{ id: mov.cuenta_id, delta }])
-        }
+
+    if (error) {
+      // Revert: restore the item in its original position
+      if (mov) setMovimientos(prev => {
+        const idx = prev.findIndex(m => new Date(m.created_at) < new Date(mov.created_at))
+        const next = [...prev]
+        next.splice(idx === -1 ? next.length : idx, 0, mov)
+        return next
+      })
+      return
+    }
+
+    if (mov) {
+      if (mov.tipo === "transferencia") {
+        await actualizarSaldoCuentas([
+          ...(mov.cuenta_id ? [{ id: mov.cuenta_id, delta: mov.cantidad }] : []),
+          ...(mov.cuenta_destino_id ? [{ id: mov.cuenta_destino_id, delta: -mov.cantidad }] : []),
+        ])
+      } else if (mov.cuenta_id) {
+        const delta = (mov.tipo ?? "gasto") === "ingreso" ? -mov.cantidad : mov.cantidad
+        await actualizarSaldoCuentas([{ id: mov.cuenta_id, delta }])
       }
     }
   }

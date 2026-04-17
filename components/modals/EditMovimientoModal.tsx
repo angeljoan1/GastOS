@@ -33,6 +33,7 @@ export default function EditMovimientoModal({
   const [cuentaId, setCuentaId] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [showCatSheet, setShowCatSheet] = useState(false)
+  const [showCuentaSheet, setShowCuentaSheet] = useState(false)
 
   useEffect(() => {
     if (movimiento) {
@@ -196,20 +197,42 @@ export default function EditMovimientoModal({
 
           {cuentas.length > 0 && (
             <div>
-              <label htmlFor="edit-cuenta" className="block text-sm font-medium text-zinc-300 mb-2">
+              <label className="block text-sm font-medium text-zinc-300 mb-2">
                 {t("ingreso.labelCuenta")}
               </label>
-              <select
-                id="edit-cuenta"
+              {(() => {
+                const selected = cuentas.find(c => c.id === cuentaId)
+                const SelIcon = selected ? getIcon(selected.icono) : null
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setShowCuentaSheet(true)}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-left transition-all hover:border-emerald-500/50 flex items-center gap-3"
+                  >
+                    {selected && SelIcon ? (
+                      <>
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: selected.color + "33" }}>
+                          <SelIcon className="w-3.5 h-3.5" style={{ color: selected.color }} />
+                        </div>
+                        <span className="text-zinc-100">{selected.nombre}</span>
+                      </>
+                    ) : (
+                      <span className="text-zinc-500">{t("ingreso.placeholderSelectCuenta")}</span>
+                    )}
+                  </button>
+                )
+              })()}
+              <BottomSheet
+                isOpen={showCuentaSheet}
+                onClose={() => setShowCuentaSheet(false)}
+                title={t("ingreso.labelCuenta")}
                 value={cuentaId}
-                onChange={e => setCuentaId(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/50 transition-all"
-              >
-                <option value="">{t("ingreso.placeholderSelectCuenta")}</option>
-                {cuentas.map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
-                ))}
-              </select>
+                onChange={v => { setCuentaId(v); setShowCuentaSheet(false) }}
+                options={[
+                  { value: "", label: t("ingreso.placeholderSelectCuenta") },
+                  ...cuentas.map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color })),
+                ]}
+              />
             </div>
           )}
 

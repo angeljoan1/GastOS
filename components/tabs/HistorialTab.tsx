@@ -278,12 +278,19 @@ export default function HistorialTab() {
             : m
         )
       )
-      // Apply the net delta: undo old amount, apply new amount
-      if (original && updated.cuenta_id) {
-        const sign = (updated.tipo ?? "gasto") === "ingreso" ? 1 : -1
+      // Rebalance accounts: handle same-account (net delta) and account-change cases
+      if (original) {
+        const newSign = (updated.tipo ?? "gasto") === "ingreso" ? 1 : -1
         const oldSign = (original.tipo ?? "gasto") === "ingreso" ? 1 : -1
-        const delta = (updated.cantidad * sign) - (original.cantidad * oldSign)
-        if (delta !== 0) await actualizarSaldoCuentas([{ id: updated.cuenta_id, delta }])
+        if (original.cuenta_id === (updated.cuenta_id || null) && updated.cuenta_id) {
+          const delta = (updated.cantidad * newSign) - (original.cantidad * oldSign)
+          if (delta !== 0) await actualizarSaldoCuentas([{ id: updated.cuenta_id, delta }])
+        } else {
+          const deltas: { id: string; delta: number }[] = []
+          if (original.cuenta_id) deltas.push({ id: original.cuenta_id, delta: -(original.cantidad * oldSign) })
+          if (updated.cuenta_id) deltas.push({ id: updated.cuenta_id, delta: updated.cantidad * newSign })
+          if (deltas.length) await actualizarSaldoCuentas(deltas)
+        }
       }
     }
   }

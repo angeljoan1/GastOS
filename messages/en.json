@@ -353,7 +353,12 @@
     "iconBilletes": "Bills",
     "iconEntidad": "Entity",
     "iconOtro": "Other",
-    "deleteHasMovements": "You cannot delete an account with linked movements."
+    "deleteHasMovements": "You cannot delete an account with linked movements.",
+    "saldoActual": "Current balance: {amount}€",
+    "editSaldo": "Edit balance",
+    "editSaldoPlaceholder": "New balance (€)",
+    "editSaldoAriaInput": "New balance for {name}",
+    "editSaldoAriaSave": "Save new balance for {name}"
   },
   "settings": {
     "title": "Settings",

@@ -353,7 +353,12 @@
     "iconBilletes": "Bitllets",
     "iconEntidad": "Entitat",
     "iconOtro": "Altre",
-    "deleteHasMovements": "No pots eliminar un compte amb moviments vinculats."
+    "deleteHasMovements": "No pots eliminar un compte amb moviments vinculats.",
+    "saldoActual": "Saldo actual: {amount}€",
+    "editSaldo": "Editar saldo",
+    "editSaldoPlaceholder": "Nou saldo (€)",
+    "editSaldoAriaInput": "Nou saldo per a {name}",
+    "editSaldoAriaSave": "Desar nou saldo de {name}"
   },
   "settings": {
     "title": "Configuració",

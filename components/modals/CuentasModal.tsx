@@ -6,7 +6,7 @@
 // BUG #2: decryptData sobre nombre ya en claro → CORREGIDO
 // BUG #20: saldo inicial siempre mostraba 0.00 → CORREGIDO
 
-import { X, Plus, Loader2, Trash2, Check } from "lucide-react"
+import { X, Plus, Loader2, Trash2, Check, Edit2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import { getIcon, CUENTA_COLORS, CUENTA_ICON_OPTIONS } from "@/lib/icons"
@@ -34,6 +34,9 @@ export default function CuentasModal({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [editingSaldoId, setEditingSaldoId] = useState<string | null>(null)
+  const [editingSaldoValue, setEditingSaldoValue] = useState("")
+  const [savingSaldoId, setSavingSaldoId] = useState<string | null>(null)
   const [cuentaOrder, setCuentaOrder] = useState<string[]>(() => {
     try {
       const s = localStorage.getItem(CUENTAS_ORDER_KEY)
@@ -125,6 +128,16 @@ export default function CuentasModal({
     setConfirmDeleteId(null)
   }
 
+  const handleEditSaldo = async (cuentaId: string) => {
+    const val = parseFloat(editingSaldoValue)
+    if (isNaN(val)) return
+    setSavingSaldoId(cuentaId)
+    await saveSaldoActual(cuentaId, val)
+    onCuentasChange(cuentas.map(c => c.id === cuentaId ? { ...c, saldo_actual: val } : c))
+    setSavingSaldoId(null)
+    setEditingSaldoId(null)
+  }
+
   if (!isOpen) return null
 
   const iconKeyMap: Record<string, string> = {
@@ -162,7 +175,10 @@ export default function CuentasModal({
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-zinc-200">{ghostCuentaData.nombre}</p>
               <p className="text-xs text-zinc-500">
-                {t("cuentas.saldoInicial", { amount: (ghostCuentaData.saldo_inicial ?? 0).toFixed(2) })}
+                {ghostCuentaData.saldo_actual !== undefined
+                  ? t("cuentas.saldoActual", { amount: ghostCuentaData.saldo_actual.toFixed(2) })
+                  : t("cuentas.saldoInicial", { amount: (ghostCuentaData.saldo_inicial ?? 0).toFixed(2) })
+                }
               </p>
             </div>
             <span className="text-zinc-600 text-xs mr-1">⠿</span>
@@ -306,12 +322,41 @@ export default function CuentasModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-zinc-200">{c.nombre}</p>
                     <p className="text-xs text-zinc-500">
-                      {t("cuentas.saldoInicial", { amount: (c.saldo_inicial ?? 0).toFixed(2) })}
+                      {c.saldo_actual !== undefined
+                        ? t("cuentas.saldoActual", { amount: c.saldo_actual.toFixed(2) })
+                        : t("cuentas.saldoInicial", { amount: (c.saldo_inicial ?? 0).toFixed(2) })
+                      }
                     </p>
                   </div>
                   <span className="text-zinc-600 text-xs pointer-events-none mr-1">⠿</span>
 
-                  {isConfirming ? (
+                  {editingSaldoId === c.id ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={editingSaldoValue}
+                        onChange={e => setEditingSaldoValue(e.target.value)}
+                        aria-label={t("cuentas.editSaldoAriaInput", { name: c.nombre })}
+                        className="w-24 bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-1 text-xs text-zinc-100 focus:outline-none focus:border-emerald-500/50"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleEditSaldo(c.id)}
+                        disabled={savingSaldoId === c.id}
+                        aria-label={t("cuentas.editSaldoAriaSave", { name: c.nombre })}
+                        className="text-xs bg-emerald-500 text-zinc-950 px-2.5 py-1 rounded-lg font-medium hover:bg-emerald-400 transition-all flex items-center gap-1"
+                      >
+                        {savingSaldoId === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                      </button>
+                      <button
+                        onClick={() => setEditingSaldoId(null)}
+                        className="text-xs text-zinc-500 hover:text-zinc-300 px-1.5"
+                      >
+                        {t("cuentas.deleteCancel")}
+                      </button>
+                    </div>
+                  ) : isConfirming ? (
                     <div className="flex gap-2">
                       <button
                         onClick={() => setConfirmDeleteId(null)}
@@ -332,13 +377,22 @@ export default function CuentasModal({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setConfirmDeleteId(c.id)}
-                      aria-label={t("cuentas.ariaDeleteAccount", { name: c.nombre })}
-                      className="w-8 h-8 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => { setEditingSaldoId(c.id); setEditingSaldoValue((c.saldo_actual ?? c.saldo_inicial ?? 0).toFixed(2)) }}
+                        aria-label={t("cuentas.editSaldo")}
+                        className="w-8 h-8 flex items-center justify-center text-zinc-600 hover:text-emerald-400 transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(c.id)}
+                        aria-label={t("cuentas.ariaDeleteAccount", { name: c.nombre })}
+                        className="w-8 h-8 flex items-center justify-center text-zinc-600 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               )

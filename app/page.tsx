@@ -27,6 +27,7 @@ import ErrorBoundary from "@/components/ui/ErrorBoundary"
 import { clearKey, getMasterKey, decryptData, encryptData, clearBiometricKey } from "@/lib/crypto"
 import { calcularSaldoCuenta } from "@/lib/calculations"
 import { AppDataProvider } from "@/contexts/AppDataContext"
+import { aplicarDeltaSaldo } from "@/services/cuentas"
 
 const APP_VERSION = 25
 
@@ -401,6 +402,7 @@ function MainApp({ session }: { session: Session }) {
         saveError={editUpdateError}
         onSave={async (updated) => {
           setEditUpdateError(null)
+          const original = editingMovFromIngreso
           const { encryptData } = await import("@/lib/crypto")
           const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
           const cantidadEncriptada = await encryptData(updated.cantidad)
@@ -420,6 +422,29 @@ function MainApp({ session }: { session: Session }) {
           if (error) {
             setEditUpdateError(error.message)
           } else {
+            if (original) {
+              const newSign = (updated.tipo ?? "gasto") === "ingreso" ? 1 : -1
+              const oldSign = (original.tipo ?? "gasto") === "ingreso" ? 1 : -1
+              const deltas: { cuentaId: string; delta: number; saldoActual: number }[] = []
+              const getCuenta = (id: string | null | undefined) => cuentas.find(c => c.id === id)
+              if (original.cuenta_id === (updated.cuenta_id || null) && updated.cuenta_id) {
+                const delta = (updated.cantidad * newSign) - (original.cantidad * oldSign)
+                const c = getCuenta(updated.cuenta_id)
+                if (delta !== 0 && c?.saldo_actual !== undefined)
+                  deltas.push({ cuentaId: updated.cuenta_id, delta, saldoActual: c.saldo_actual })
+              } else {
+                const oldC = getCuenta(original.cuenta_id)
+                const newC = getCuenta(updated.cuenta_id)
+                if (original.cuenta_id && oldC?.saldo_actual !== undefined)
+                  deltas.push({ cuentaId: original.cuenta_id, delta: -(original.cantidad * oldSign), saldoActual: oldC.saldo_actual })
+                if (updated.cuenta_id && newC?.saldo_actual !== undefined)
+                  deltas.push({ cuentaId: updated.cuenta_id, delta: updated.cantidad * newSign, saldoActual: newC.saldo_actual })
+              }
+              if (deltas.length) {
+                const nuevos = await aplicarDeltaSaldo(deltas)
+                setCuentas(prev => prev.map(c => nuevos[c.id] !== undefined ? { ...c, saldo_actual: nuevos[c.id] } : c))
+              }
+            }
             setEditingMovFromIngreso(null)
           }
         }}

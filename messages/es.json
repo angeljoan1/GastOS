@@ -353,7 +353,12 @@
     "iconBilletes": "Billetes",
     "iconEntidad": "Entidad",
     "iconOtro": "Otro",
-    "deleteHasMovements": "No puedes eliminar una cuenta con movimientos vinculados."
+    "deleteHasMovements": "No puedes eliminar una cuenta con movimientos vinculados.",
+    "saldoActual": "Saldo actual: {amount}€",
+    "editSaldo": "Editar saldo",
+    "editSaldoPlaceholder": "Nuevo saldo (€)",
+    "editSaldoAriaInput": "Nuevo saldo para {name}",
+    "editSaldoAriaSave": "Guardar nuevo saldo de {name}"
   },
   "settings": {
     "title": "Configuración",

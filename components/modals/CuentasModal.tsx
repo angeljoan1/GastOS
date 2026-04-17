@@ -301,6 +301,18 @@ export default function CuentasModal({
                 setGhostCuentaData(null)
               }
 
+              const handlePointerCancel = () => {
+                if (holdCuentaTimerRef.current) clearTimeout(holdCuentaTimerRef.current)
+                dragCuentaIdRef.current = null
+                dragOverCuentaIdRef.current = null
+                isDraggingCuentaRef.current = false
+                pointerCuentaStartRef.current = null
+                setDraggingCuentaId(null)
+                setDragOverCuentaId(null)
+                setGhostCuentaPos(null)
+                setGhostCuentaData(null)
+              }
+
               return (
                 <div
                   key={c.id}
@@ -308,8 +320,9 @@ export default function CuentasModal({
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
                   onPointerUp={handlePointerUp}
-                  className={`flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 select-none transition-all ${
-                    isDraggingThis ? "opacity-40 cursor-grabbing touch-none" : "cursor-grab"
+                  onPointerCancel={handlePointerCancel}
+                  className={`flex items-center gap-3 bg-zinc-800 border border-zinc-700/50 rounded-xl px-4 py-3 select-none touch-none transition-all ${
+                    isDraggingThis ? "opacity-40 cursor-grabbing" : "cursor-grab"
                   } ${isOver && !isDraggingThis ? "border-emerald-500/50 bg-emerald-500/10" : ""}`}
                 >
                   <div

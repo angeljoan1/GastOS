@@ -495,7 +495,10 @@ export default function DashboardTab({
             className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
             onClick={() => setShowWidgetPicker(false)}
           />
-          <div className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+          <div
+            className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300"
+            style={{ overflowY: dragId ? "hidden" : "auto", touchAction: dragId ? "none" : "auto" }}
+          >
             <div className="flex items-center justify-between mb-2">
               <h3 id="widget-picker-title" className="text-lg font-semibold text-zinc-100">
                 {t("dashboard.customizeTitle")}
@@ -601,6 +604,19 @@ export default function DashboardTab({
                   setGhostIcon(null)
                 }
 
+                const handlePointerCancel = () => {
+                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+                  dragIdRef.current = null
+                  dragOverIdRef.current = null
+                  isDraggingRef.current = false
+                  pointerStartRef.current = null
+                  setDragId(null)
+                  setDragOverId(null)
+                  setGhostPos(null)
+                  setGhostLabel("")
+                  setGhostIcon(null)
+                }
+
                 return (
                   <div
                     key={w.id}
@@ -608,6 +624,7 @@ export default function DashboardTab({
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerCancel}
                     className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none ${
                       isDraggingThis ? "opacity-40 cursor-grabbing touch-none" : "cursor-grab"
                     } ${isOver && !isDraggingThis ? "border-emerald-500/60 bg-emerald-500/15" : "border-emerald-500/40 bg-emerald-500/10"}`}

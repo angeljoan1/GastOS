@@ -13,7 +13,7 @@ export const CHART_COLORS = [
 ]
 
 export function heatColor(intensity: number): string {
-  if (intensity === 0) return "#18181b"
+  if (intensity === 0) return "transparent"
   if (intensity < 0.4) return `rgba(251,191,36,${0.15 + intensity * 0.5})`
   if (intensity < 0.75) return `rgba(249,115,22,${0.2 + intensity * 0.4})`
   return `rgba(239,68,68,${0.25 + intensity * 0.45})`

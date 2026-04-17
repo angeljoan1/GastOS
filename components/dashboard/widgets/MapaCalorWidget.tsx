@@ -61,9 +61,9 @@ export default function MapaCalorWidget({
               onBlur={() => setHoveredDay(null)}
               className={`aspect-square rounded-md flex items-center justify-center transition-all duration-200 relative cursor-default ${esHoy ? "ring-1 ring-emerald-500/70" : ""
                 } ${esFuturo ? "opacity-25" : ""}`}
-              style={{ backgroundColor: esFuturo ? "#18181b" : heatColor(intensity) }}
+              style={{ backgroundColor: heatColor(intensity) }}
             >
-              <span className={`text-[10px] font-medium select-none ${esHoy ? "text-emerald-300 font-bold" : gasto > 0 ? "text-white/80" : "text-zinc-600"
+              <span className={`text-[10px] font-medium select-none ${esHoy ? "text-emerald-300 font-bold" : gasto > 0 ? "text-zinc-900 dark:text-white/80" : "text-zinc-500"
                 }`}>
                 {dia}
               </span>

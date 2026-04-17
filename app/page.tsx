@@ -9,7 +9,7 @@ import FeedbackWidget from "@/components/FeedbackWidget"
 import ImportCSVModal from "@/components/modals/ImportCSVModal"
 import {
   LogOut, Loader2, WalletCards, History,
-  BarChart3, Settings, Menu, Download, Upload, Landmark, RefreshCw, MessageSquare, Sun, Moon,
+  BarChart3, Settings, Menu, Download, Upload, Landmark, RefreshCw, MessageSquare, Sun, Moon, Users,
 } from "lucide-react"
 import AuthScreen from "@/components/auth/AuthScreen"
 import PinPadScreen from "@/components/auth/PinPadScreen"
@@ -19,6 +19,7 @@ import IngresoTab from "@/components/tabs/IngresoTab"
 import HistorialTab from "@/components/tabs/HistorialTab"
 import DashboardTab from "@/components/tabs/DashboardTab"
 import EditMovimientoModal from "@/components/modals/EditMovimientoModal"
+import SharedWalletModal from "@/components/modals/SharedWalletModal"
 import { supabase } from "@/lib/supabase"
 import type { Session } from "@supabase/supabase-js"
 import type { Categoria, Cuenta, Presupuesto, Objetivo, Movimiento } from "@/types"
@@ -47,6 +48,7 @@ function MainApp({ session }: { session: Session }) {
   const [exportMsg, setExportMsg] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [showWallet, setShowWallet] = useState(false)
   const [editingMovFromIngreso, setEditingMovFromIngreso] = useState<Movimiento | null>(null)
   const [editUpdateError, setEditUpdateError] = useState<string | null>(null)
 
@@ -236,195 +238,208 @@ function MainApp({ session }: { session: Session }) {
 
   return (
     <AppDataProvider value={{ categorias, setCategorias, cuentas, setCuentas, presupuestos, setPresupuestos, objetivos, setObjetivos }}>
-    <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
-      <header className="flex items-center justify-between px-4 pt-safe-top py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
-        <div className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />
-          <span className="text-[17px] font-bold tracking-[-0.02em] text-zinc-100">GastOS</span>
-        </div>
+      <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
+        <header className="flex items-center justify-between px-4 pt-safe-top py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />
+            <span className="text-[17px] font-bold tracking-[-0.02em] text-zinc-100">GastOS</span>
+          </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setShowCuentas(true)}
-            aria-label={t("nav.ariaAccounts")}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
-          >
-            <Landmark className="w-5 h-5 text-zinc-400" />
-          </button>
-
-          <div className="relative" ref={menuRef}>
+          <div className="flex items-center gap-1">
             <button
-              onClick={() => setIsMenuOpen(o => !o)}
-              aria-label={t("nav.ariaMenu")}
-              aria-expanded={isMenuOpen}
-              aria-haspopup="menu"
-              className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
+              onClick={() => setShowCuentas(true)}
+              aria-label={t("nav.ariaAccounts")}
+              className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
             >
-              <Menu className="w-5 h-5 text-zinc-400" />
+              <Landmark className="w-5 h-5 text-zinc-400" />
             </button>
 
-            {isMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-11 w-52 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150"
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setIsMenuOpen(o => !o)}
+                aria-label={t("nav.ariaMenu")}
+                aria-expanded={isMenuOpen}
+                aria-haspopup="menu"
+                className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-zinc-800 transition-colors"
               >
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowSettings(true); setIsMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                <Menu className="w-5 h-5 text-zinc-400" />
+              </button>
+
+              {isMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-11 w-52 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150"
                 >
-                  <Settings className="w-4 h-4" /> {t("nav.menuSettings")}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={handleExportCSV}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
-                >
-                  <Download className="w-4 h-4" />
-                  {exportMsg ?? t("nav.menuExportCSV")}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowImport(true); setIsMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
-                >
-                  <Upload className="w-4 h-4" /> {t("nav.menuImportCSV")}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowFeedback(true); setIsMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
-                >
-                  <MessageSquare className="w-4 h-4" /> {t("nav.menuFeedback")}
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { toggleTheme(); setIsMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
-                >
-                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  {isDark ? "Modo claro" : "Modo oscuro"}
-                </button>
-                <div className="h-px bg-zinc-800 my-1 mx-2" />
-                <button
-                  role="menuitem"
-                  onClick={() => { clearKey(); clearBiometricKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors w-full"
-                >
-                  <LogOut className="w-4 h-4" /> {t("nav.menuSignOut")}
-                </button>
-              </div>
-            )}
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowSettings(true); setIsMenuOpen(false) }}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                  >
+                    <Settings className="w-4 h-4" /> {t("nav.menuSettings")}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                  >
+                    <Download className="w-4 h-4" />
+                    {exportMsg ?? t("nav.menuExportCSV")}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowImport(true); setIsMenuOpen(false) }}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                  >
+                    <Upload className="w-4 h-4" /> {t("nav.menuImportCSV")}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowFeedback(true); setIsMenuOpen(false) }}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                  >
+                    <MessageSquare className="w-4 h-4" /> {t("nav.menuFeedback")}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { toggleTheme(); setIsMenuOpen(false) }}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                  >
+                    {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                    {isDark ? "Modo claro" : "Modo oscuro"}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setShowWallet(true); setIsMenuOpen(false) }}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors w-full"
+                  >
+                    <Users className="w-4 h-4" /> {t("wallet.menuItem")}
+                  </button>
+
+                  <div className="h-px bg-zinc-800 my-1 mx-2" />
+                  <button
+                    role="menuitem"
+                    onClick={() => { clearKey(); clearBiometricKey(); supabase.auth.signOut(); setIsMenuOpen(false) }}
+                    className="flex items-center gap-3 px-3 py-3 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors w-full"
+                  >
+                    <LogOut className="w-4 h-4" /> {t("nav.menuSignOut")}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {loadError && (
-        <div className="px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/20 flex items-center gap-2">
-          <span className="text-xs text-yellow-400">{t("nav.loadError")}</span>
-          <button
-            onClick={() => window.location.reload()}
-            className="text-xs text-yellow-300 underline ml-auto"
-          >
-            {t("nav.loadErrorRetry")}
-          </button>
-        </div>
-      )}
-
-      <main className="flex-1 overflow-hidden flex flex-col min-h-0">
-        {tab === "ingreso" && (
-          <ErrorBoundary label="Registro">
-            <IngresoTab onEditLast={setEditingMovFromIngreso} />
-          </ErrorBoundary>
-        )}
-        {tab === "historial" && (
-          <ErrorBoundary label="Historial">
-            <HistorialTab key={historialKey} />
-          </ErrorBoundary>
-        )}
-        {tab === "dashboard" && (
-          <ErrorBoundary label="Dashboard">
-            <DashboardTab onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} userId={session.user.id} />
-          </ErrorBoundary>
-        )}
-      </main>
-
-      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-3 pb-safe-bottom">
-        <div className="flex items-center justify-around py-1.5 gap-1">
-          {([
-            { id: "ingreso", Icon: WalletCards, label: t("nav.register") },
-            { id: "historial", Icon: History, label: t("nav.historial") },
-            { id: "dashboard", Icon: BarChart3, label: t("nav.dashboard") },
-          ] as const).map(({ id, Icon, label }) => (
+        {loadError && (
+          <div className="px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/20 flex items-center gap-2">
+            <span className="text-xs text-yellow-400">{t("nav.loadError")}</span>
             <button
-              key={id}
-              onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
-              aria-label={label}
-              aria-current={tab === id ? "page" : undefined}
-              className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-200 ${
-                tab === id
+              onClick={() => window.location.reload()}
+              className="text-xs text-yellow-300 underline ml-auto"
+            >
+              {t("nav.loadErrorRetry")}
+            </button>
+          </div>
+        )}
+
+        <main className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {tab === "ingreso" && (
+            <ErrorBoundary label="Registro">
+              <IngresoTab onEditLast={setEditingMovFromIngreso} />
+            </ErrorBoundary>
+          )}
+          {tab === "historial" && (
+            <ErrorBoundary label="Historial">
+              <HistorialTab key={historialKey} />
+            </ErrorBoundary>
+          )}
+          {tab === "dashboard" && (
+            <ErrorBoundary label="Dashboard">
+              <DashboardTab onOpenSettings={tab => { setSettingsInitialTab(tab); setShowSettings(true) }} userId={session.user.id} />
+            </ErrorBoundary>
+          )}
+        </main>
+
+        <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-3 pb-safe-bottom">
+          <div className="flex items-center justify-around py-1.5 gap-1">
+            {([
+              { id: "ingreso", Icon: WalletCards, label: t("nav.register") },
+              { id: "historial", Icon: History, label: t("nav.historial") },
+              { id: "dashboard", Icon: BarChart3, label: t("nav.dashboard") },
+            ] as const).map(({ id, Icon, label }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
+                aria-label={label}
+                aria-current={tab === id ? "page" : undefined}
+                className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-200 ${tab === id
                   ? "bg-emerald-500/15 text-emerald-400"
                   : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <Icon className={`w-5 h-5 transition-transform duration-200 ${tab === id ? "scale-110" : ""}`} />
-              <span className="text-[10px] font-medium">{label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+                  }`}
+              >
+                <Icon className={`w-5 h-5 transition-transform duration-200 ${tab === id ? "scale-110" : ""}`} />
+                <span className="text-[10px] font-medium">{label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
 
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => { setShowSettings(false); setSettingsInitialTab(null) }}
-        initialTab={settingsInitialTab}
-        session={session}
-        userId={session.user.id}
-      />
-      <CuentasModal
-        isOpen={showCuentas}
-        onClose={() => setShowCuentas(false)}
-      />
-      <ImportCSVModal
-        isOpen={showImport}
-        onClose={() => setShowImport(false)}
-        onSuccess={() => {
-          setTab("historial")
-          setHistorialKey(k => k + 1)
-        }}
-      />
-      <FeedbackWidget userId={session.user.id} isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+        <SettingsModal
+          isOpen={showSettings}
+          onClose={() => { setShowSettings(false); setSettingsInitialTab(null) }}
+          initialTab={settingsInitialTab}
+          session={session}
+          userId={session.user.id}
+        />
+        <CuentasModal
+          isOpen={showCuentas}
+          onClose={() => setShowCuentas(false)}
+        />
+        <ImportCSVModal
+          isOpen={showImport}
+          onClose={() => setShowImport(false)}
+          onSuccess={() => {
+            setTab("historial")
+            setHistorialKey(k => k + 1)
+          }}
+        />
+        <FeedbackWidget userId={session.user.id} isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+        <SharedWalletModal
+          isOpen={showWallet}
+          onClose={() => setShowWallet(false)}
+          currentUserId={session.user.id}
+        />
+
         <EditMovimientoModal
-        isOpen={!!editingMovFromIngreso}
-        onClose={() => { setEditingMovFromIngreso(null); setEditUpdateError(null) }}
-        movimiento={editingMovFromIngreso}
-        saveError={editUpdateError}
-        onSave={async (updated) => {
-          setEditUpdateError(null)
-          const { encryptData } = await import("@/lib/crypto")
-          const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
-          const cantidadEncriptada = await encryptData(updated.cantidad)
-          const notaEncriptada = notaRaw ? await encryptData(notaRaw) : null
-          const { error } = await supabase
-            .from("movimientos")
-            .update({
-              cantidad: cantidadEncriptada as string,
-              categoria: updated.categoria,
-              nota: notaEncriptada,
-              tipo: updated.tipo ?? "gasto",
-              created_at: updated.created_at,
-              cuenta_id: updated.cuenta_id,
-              cuenta_destino_id: updated.cuenta_destino_id ?? null,
-            })
-            .eq("id", updated.id)
-          if (error) {
-            setEditUpdateError(error.message)
-          } else {
-            setEditingMovFromIngreso(null)
-          }
-        }}
-      />
-    </div>
+          isOpen={!!editingMovFromIngreso}
+          onClose={() => { setEditingMovFromIngreso(null); setEditUpdateError(null) }}
+          movimiento={editingMovFromIngreso}
+          saveError={editUpdateError}
+          onSave={async (updated) => {
+            setEditUpdateError(null)
+            const { encryptData } = await import("@/lib/crypto")
+            const notaRaw = updated.nota?.trim() === "" ? null : updated.nota?.trim()
+            const cantidadEncriptada = await encryptData(updated.cantidad)
+            const notaEncriptada = notaRaw ? await encryptData(notaRaw) : null
+            const { error } = await supabase
+              .from("movimientos")
+              .update({
+                cantidad: cantidadEncriptada as string,
+                categoria: updated.categoria,
+                nota: notaEncriptada,
+                tipo: updated.tipo ?? "gasto",
+                created_at: updated.created_at,
+                cuenta_id: updated.cuenta_id,
+                cuenta_destino_id: updated.cuenta_destino_id ?? null,
+              })
+              .eq("id", updated.id)
+            if (error) {
+              setEditUpdateError(error.message)
+            } else {
+              setEditingMovFromIngreso(null)
+            }
+          }}
+        />
+      </div>
     </AppDataProvider>
   )
 }

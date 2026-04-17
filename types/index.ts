@@ -71,6 +71,26 @@ export interface SaldoCuenta {
   saldo_actual: number
 }
 
+// ─── Carteras compartidas ────────────────────────────────────
+export interface SharedWallet {
+  id: string; nombre: string; join_code: string; created_by: string; created_at: string
+}
+export interface SharedWalletMember {
+  id: string; wallet_id: string; user_id: string
+  display_name: string; contribucion_mensual: number; joined_at: string
+}
+export interface SharedExpense {
+  id: string; wallet_id: string; paid_by: string
+  concepto: string; cantidad: number; fecha: string
+  linked_movimiento_id: string | null; created_at: string
+  splits?: string[]
+}
+export interface SharedSettlement {
+  id: string; wallet_id: string; settled_at: string
+  resumen: { from: string; to: string; cantidad: number }[]
+}
+
+
 // ─── Objetivo de ahorro ──────────────────────────────────────
 // cantidad se cifra en BD [E2EE]
 // En memoria siempre está en claro

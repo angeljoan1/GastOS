@@ -164,7 +164,20 @@
     "ariaCuenta": "Account {nombre}",
     "errorSessionExpired": "Session expired. Please enter your PIN again.",
     "alertBudgetExceeded": "You've exceeded the {cat} budget ({amount}€ this month).",
-    "ariaCategoria": "Category {label}"
+    "ariaCategoria": "Category {label}",
+    "compartidoToggleOff": "Mark as shared",
+    "compartidoToggleOn": "Shared expense",
+    "compartidoModoDividir": "Split between N",
+    "compartidoModoMiParte": "My share is X€",
+    "compartidoEntrePersonas": "How many people:",
+    "compartidoTotalAdelantado": "Total paid upfront",
+    "compartidoTuParteReal": "Your share",
+    "compartidoTuParteLabel": "Your share (€)",
+    "compartidoSeGuardara": "Will be saved as your expense",
+    "compartidoHintHistorial": "Reimbursements are tracked in History.",
+    "compartidoTuParte": "Your share:",
+    "compartidoErrorParteVacia": "Enter your real share (€).",
+    "compartidoErrorParteMayor": "Your share must be less than the total."
   },
   "historial": {
     "searchPlaceholder": "Search by note or category...",

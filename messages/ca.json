@@ -164,7 +164,20 @@
     "ariaCuenta": "Compte {nombre}",
     "errorSessionExpired": "Sessió expirada. Torna a introduir el teu PIN.",
     "alertBudgetExceeded": "Has superat el pressupost de {cat} ({amount}€ aquest mes).",
-    "ariaCategoria": "Categoria {label}"
+    "ariaCategoria": "Categoria {label}",
+    "compartidoToggleOff": "Marcar com a compartit",
+    "compartidoToggleOn": "Despesa compartida",
+    "compartidoModoDividir": "Dividir entre N",
+    "compartidoModoMiParte": "La meva part és X€",
+    "compartidoEntrePersonas": "Entre quantes persones:",
+    "compartidoTotalAdelantado": "Total avançat",
+    "compartidoTuParteReal": "La teva part real",
+    "compartidoTuParteLabel": "La teva part real (€)",
+    "compartidoSeGuardara": "Es guardarà com la teva despesa",
+    "compartidoHintHistorial": "Els reemborsaments es marquen des de l'historial.",
+    "compartidoTuParte": "La teva part:",
+    "compartidoErrorParteVacia": "Introdueix la teva part real (€).",
+    "compartidoErrorParteMayor": "La teva part ha de ser menor que el total."
   },
   "historial": {
     "searchPlaceholder": "Cerca per nota o categoria...",

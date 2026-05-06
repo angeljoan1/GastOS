@@ -2,16 +2,16 @@
 
 // components/tabs/IngresoTab.tsx
 // Cambios respecto a la versión anterior:
-//   - handleCobrarSub: insert único con created_at ya calculado (sin UPDATE posterior)
-//   - CategoryButton: disabled incluye loading para evitar doble envío
-//   - encryptData/decryptData ahora son async → se usa await
+//   - Selector de cuenta movido a la misma fila que la nota (inline)
+//   - Gasto compartido: toggle + dos modos (dividir entre N / mi parte es X€)
+//   - handleGuardar: persiste compartido_personas, compartido_total, reembolsos_recibidos
 
 import { useState, useEffect, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { supabase } from "@/lib/supabase"
 import {
   CalendarDays, X, Loader2, CheckCircle2,
-  TrendingDown, TrendingUp, ArrowLeftRight,
+  TrendingDown, TrendingUp, ArrowLeftRight, Users,
 } from "lucide-react"
 import { getIcon } from "@/lib/icons"
 import type { Categoria, Movimiento } from "@/types"
@@ -23,6 +23,7 @@ import NumericKeypad from "@/components/ui/NumericKeypad"
 import { useAppData } from "@/contexts/AppDataContext"
 import { aplicarDeltaSaldo } from "@/services/cuentas"
 
+
 function triggerHaptic() {
   if (typeof window !== "undefined" && window.navigator?.vibrate) {
     window.navigator.vibrate(50)
@@ -30,6 +31,7 @@ function triggerHaptic() {
 }
 
 type TipoActivo = "gasto" | "ingreso" | "transferencia"
+type ModoCompartido = "dividir" | "mi_parte"
 
 export default function IngresoTab({
   onEditLast,
@@ -41,7 +43,7 @@ export default function IngresoTab({
   const [display, setDisplay] = useState("0")
   const [nota, setNota] = useState("")
   const [success, setSuccess] = useState(false)
-  const [saving, setSaving] = useState(false)  // tracks background save to show spinner on transfer button
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tipoMovimiento, setTipoMovimiento] = useState<TipoActivo>("gasto")
   const [cuentaId, setCuentaId] = useState<string>("")
@@ -58,6 +60,21 @@ export default function IngresoTab({
   const [budgetWarning, setBudgetWarning] = useState<string | null>(null)
   const [lastSaved, setLastSaved] = useState<{ id: string; cantidad: number; catLabel: string; cuentaNombre: string | null; tipo: TipoActivo } | null>(null)
   const [catOrder, setCatOrder] = useState<string[]>([])
+  const [tecladoVisible, setTecladoVisible] = useState(false)
+  const [catSeleccionada, setCatSeleccionada] = useState<string | null>(null)
+  const tipoMovimientoButtonClass = tipoMovimiento === "ingreso"
+    ? "bg-emerald-500 hover:bg-emerald-400 text-zinc-950"
+    : tipoMovimiento === "transferencia"
+      ? "bg-blue-500 hover:bg-blue-400 text-zinc-950"
+      : "bg-red-500 hover:bg-red-400 text-zinc-950"
+
+  // ── Gasto compartido ─────────────────────────────────────────────────────────
+  const [esCompartido, setEsCompartido] = useState(false)
+  const [modoCompartido, setModoCompartido] = useState<ModoCompartido>("dividir")
+  const [compartidoPersonas, setCompartidoPersonas] = useState(2)
+  const [miParteManual, setMiParteManual] = useState("")
+
+  // Drag de categorías
   const dragCatIdRef = useRef<string | null>(null)
   const dragOverCatIdRef = useRef<string | null>(null)
   const isDraggingCatRef = useRef(false)
@@ -83,8 +100,6 @@ export default function IngresoTab({
   }, [categorias])
 
   useEffect(() => {
-    // Bug 8 FIX: user_id explícito para no depender solo de RLS.
-    // Bug 2 FIX: distinguimos DECRYPT_ERROR de dato vacío legítimo.
     ; (async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -120,7 +135,7 @@ export default function IngresoTab({
 
       const pending: Movimiento[] = []
       map.forEach(sub => {
-        if (sub.cantidad === -1) return // irrecuperable — no mostrar
+        if (sub.cantidad === -1) return
         const ultimo = new Date(sub.created_at)
         const meses = mesesDePeriod(sub.recur_period)
         const maxDay = new Date(ultimo.getFullYear(), ultimo.getMonth() + meses + 1, 0).getDate()
@@ -144,6 +159,24 @@ export default function IngresoTab({
       : tipoMovimiento === "transferencia"
         ? { text: "text-blue-400", bg: "bg-blue-500", hover: "hover:bg-blue-400", border: "border-blue-500/50", ring: "focus:ring-blue-500/20" }
         : { text: "text-red-400", bg: "bg-red-500", hover: "hover:bg-red-400", border: "border-red-500/50", ring: "focus:ring-red-500/20" }
+
+  // ── Cálculo de la parte real en tiempo real ────────────────────────────────
+  const displayNum = parseFloat(display) || 0
+
+  const cantidadFinalCompartido = (() => {
+    if (!esCompartido) return null
+    if (modoCompartido === "dividir") {
+      return compartidoPersonas > 1
+        ? Math.round((displayNum / compartidoPersonas) * 100) / 100
+        : displayNum
+    }
+    const manual = parseFloat(miParteManual)
+    return isNaN(manual) || manual <= 0 ? null : Math.round(manual * 100) / 100
+  })()
+
+  const miParteLabel = cantidadFinalCompartido !== null
+    ? cantidadFinalCompartido.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "—"
 
   async function saveCatOrder(orderedIds: string[]) {
     await Promise.all(
@@ -170,15 +203,24 @@ export default function IngresoTab({
     setDisplay(prev => prev.length <= 1 ? "0" : prev.slice(0, -1))
   }
 
-function onCategoryClick(catId: string) {
-  const cat = categorias.find(c => c.id === catId)
-  if (cat?.can_be_recurring) {
-    setPendingCat(catId)
-    setShowRecurModal(true)
-  } else {
-    handleGuardar(catId, false)
+  function onCategoryClick(catId: string) {
+    setTecladoVisible(false)
+    triggerHaptic()
+    if (catSeleccionada === catId) {
+      // Segundo tap en la misma: guardar directamente
+      const cat = categorias.find(c => c.id === catId)
+      if (cat?.can_be_recurring) {
+        setPendingCat(catId)
+        setShowRecurModal(true)
+      } else {
+        handleGuardar(catId, false)
+      }
+      setCatSeleccionada(null)
+    } else {
+      // Primer tap: solo seleccionar
+      setCatSeleccionada(catId)
+    }
   }
-}
 
   function mesesDePeriod(period?: string | null): number {
     switch (period) {
@@ -198,28 +240,50 @@ function onCategoryClick(catId: string) {
     triggerHaptic()
     setShowRecurModal(false)
     setShowPeriodStep(false)
+    setCatSeleccionada(null)
+
     const cantidadRaw = parseFloat(display)
     if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
+
     const { getMasterKey } = await import("@/lib/crypto")
     if (!getMasterKey()) return setError(t("ingreso.errorSessionExpired"))
+
+    // Si compartido en modo "mi_parte", validar que mi parte sea válida y menor que el total
+    if (esCompartido && modoCompartido === "mi_parte") {
+      const manual = parseFloat(miParteManual)
+      if (isNaN(manual) || manual <= 0) return setError(t("ingreso.compartidoErrorParteVacia"))
+      if (manual >= cantidadRaw) return setError(t("ingreso.compartidoErrorParteMayor"))
+    }
+
     setError(null)
 
-    // Capture form values before clearing
+    // Siempre se guarda el total adelantado. La parte propia es solo metadata.
+    const cantidadAGuardar = cantidadRaw
+    // personas para BD: en modo "mi_parte" calculamos aprox para que el badge sea informativo
+    const personasAGuardar = esCompartido
+      ? modoCompartido === "dividir"
+        ? compartidoPersonas
+        : Math.round(cantidadRaw / cantidadAGuardar)  // aprox
+      : null
+
     const notaCaptura = nota.trim()
     const cuentaIdCaptura = cuentaId
     const tipoCaptura = tipoMovimiento
     const catLabel = categorias.find(c => c.id === cat)?.label ?? cat
     const cuentaNombre = cuentas.find(c => c.id === cuentaIdCaptura)?.nombre ?? null
 
-    // Optimistic: clear form and show success immediately
+    // Optimistic: limpiar formulario y mostrar éxito de inmediato
     setDisplay("0")
     setNota("")
-    setLastSaved({ id: "", cantidad: cantidadRaw, catLabel, cuentaNombre, tipo: tipoCaptura })
+    setEsCompartido(false)
+    setModoCompartido("dividir")
+    setCompartidoPersonas(2)
+    setMiParteManual("")
+    setLastSaved({ id: "", cantidad: cantidadAGuardar, catLabel, cuentaNombre, tipo: tipoCaptura })
     setSuccess(true)
     setTimeout(() => setSuccess(false), 2500)
 
-    // Encrypt and persist in background
-    const cantidadEncriptada = await encryptData(cantidadRaw)
+    const cantidadEncriptada = await encryptData(cantidadAGuardar)
     const notaEncriptada = notaCaptura ? await encryptData(notaCaptura) : null
 
     const { data: insertedRows, error } = await supabase.from("movimientos").insert({
@@ -230,10 +294,15 @@ function onCategoryClick(catId: string) {
       ...(isRecurring && period ? { recur_period: period } : {}),
       tipo: tipoCaptura,
       cuenta_id: cuentaIdCaptura || null,
+      // ── Compartido ──────────────────────────────────────────────────────────
+      ...(esCompartido ? {
+        compartido_personas: personasAGuardar,
+        compartido_total: cantidadRaw,         // importe total que adelantaste
+        reembolsos_recibidos: 0,
+      } : {}),
     }).select("id")
 
     if (error) {
-      // Revert: restore form and show error
       setDisplay(cantidadRaw.toString())
       setNota(notaCaptura)
       setSuccess(false)
@@ -243,14 +312,13 @@ function onCategoryClick(catId: string) {
 
     invalidateSaldoCache()
     if (cuentaIdCaptura) {
-      const delta = tipoCaptura === "ingreso" ? cantidadRaw : -cantidadRaw
+      const delta = tipoCaptura === "ingreso" ? cantidadAGuardar : -cantidadAGuardar
       await actualizarSaldoCuentas([{ id: cuentaIdCaptura, delta }])
     }
 
-    // Update lastSaved with real ID
     setLastSaved(prev => prev ? { ...prev, id: insertedRows?.[0]?.id ?? "" } : prev)
 
-    // Budget check (non-blocking, shows warning if exceeded)
+    // Comprobación de presupuesto (no bloqueante)
     const pressupost = presupuestos.find(p => p.categoria_id === cat)
     if (pressupost && tipoCaptura === "gasto") {
       const { data: movsDelMes } = await supabase
@@ -273,6 +341,7 @@ function onCategoryClick(catId: string) {
   }
 
   async function handleGuardarTransferencia() {
+    setTecladoVisible(false)
     triggerHaptic()
     const cantidadRaw = parseFloat(display)
     if (!cantidadRaw || cantidadRaw <= 0) return setError(t("ingreso.errorAmountZero"))
@@ -288,7 +357,6 @@ function onCategoryClick(catId: string) {
     const destinoId = cuentaDestinoId
     const cuentaOrigenNombre = cuentas.find(c => c.id === origenId)?.nombre ?? null
 
-    // Optimistic: clear form and show success immediately
     setSaving(true)
     setDisplay("0")
     setNota("")
@@ -337,8 +405,6 @@ function onCategoryClick(catId: string) {
     const maxDay = new Date(orig.getFullYear(), orig.getMonth() + meses + 1, 0).getDate()
     const dia = Math.min(orig.getDate(), maxDay)
 
-    // Calculamos created_at en el cliente e insertamos en un solo paso
-    // (antes se hacía insert + update separados, lo que podía dejar fecha incorrecta si el update fallaba)
     const fechaObjetivo = new Date(
       orig.getFullYear(),
       orig.getMonth() + meses,
@@ -360,7 +426,7 @@ function onCategoryClick(catId: string) {
         tipo: sub.tipo ?? "gasto",
         cuenta_id: sub.cuenta_id,
         cuenta_destino_id: sub.cuenta_destino_id ?? null,
-        created_at: fechaObjetivo,   // ← directo en el insert, sin UPDATE posterior
+        created_at: fechaObjetivo,
       })
 
     if (error) {
@@ -415,572 +481,772 @@ function onCategoryClick(catId: string) {
   const getCatLabel = (catId: string) =>
     categorias.find(c => c.id === catId)?.label ?? catId
 
+  // Cuenta seleccionada para el selector inline
+  const cuentaSeleccionada = cuentas.find(c => c.id === cuentaId)
+
   return (
     <>
-    {ghostCatPos && ghostCatLabel && (
-      <div
-        className="fixed z-[200] pointer-events-none select-none"
-        style={{
-          left: ghostCatPos.x - 40,
-          top: ghostCatPos.y - 40,
-          opacity: 0.85,
-        }}
-      >
-        <div className="h-20 w-20 rounded-2xl bg-zinc-900 border border-emerald-500/50 flex flex-col items-center justify-center gap-2 shadow-2xl shadow-black/60">
-          <span className="text-[11px] font-medium text-zinc-300 text-center leading-tight px-1">{ghostCatLabel}</span>
-        </div>
-      </div>
-    )}
-    <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-      {success && lastSaved && (
-        <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-4 rounded-t-xl animate-in fade-in duration-300 px-8">
-          <CheckCircle2 className={`w-14 h-14 ${accent.text}`} strokeWidth={1.5} />
-          <p className={`font-semibold text-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
-          <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">{t("ingreso.savedAmount")}</span>
-              <span className={`font-semibold tabular-nums ${accent.text}`}>
-                {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">{t("ingreso.savedCategory")}</span>
-              <span className="text-zinc-200 font-medium">{lastSaved.catLabel}</span>
-            </div>
-            {lastSaved.cuentaNombre && (
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">{t("ingreso.savedAccount")}</span>
-                <span className="text-zinc-200">{lastSaved.cuentaNombre}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {showRecurModal && (
+      {ghostCatPos && ghostCatLabel && (
         <div
-          className="absolute inset-0 z-30 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="recur-modal-title"
+          className="fixed z-[200] pointer-events-none select-none"
+          style={{ left: ghostCatPos.x - 40, top: ghostCatPos.y - 40, opacity: 0.85 }}
         >
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
-            <CalendarDays className={`w-10 h-10 mx-auto mb-3 ${accent.text}`} aria-hidden="true" />
-
-            {!showPeriodStep ? (
-              <>
-                <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">
-                  {tipoMovimiento === "ingreso" ? t("ingreso.recurModalTitleIngreso") : t("ingreso.recurModalTitleGasto")}
-                </h3>
-                <p className="text-zinc-500 text-sm mb-6">
-                  {tipoMovimiento === "ingreso" ? t("ingreso.recurModalDescIngreso") : t("ingreso.recurModalDescGasto")}
-                </p>
-                <div className="flex flex-col gap-3">
-                  <button
-                    onClick={() => setShowPeriodStep(true)}
-                    className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
-                  >
-                    {tipoMovimiento === "ingreso" ? t("ingreso.recurYesIngreso") : t("ingreso.recurYesGasto")}
-                  </button>
-                  <button
-                    onClick={() => handleGuardar(pendingCat!, false)}
-                    className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
-                  >
-                    {tipoMovimiento === "ingreso" ? t("ingreso.recurNoIngreso") : t("ingreso.recurNoGasto")}
-                  </button>
-                  <button
-                    onClick={() => { setShowRecurModal(false); setShowPeriodStep(false) }}
-                    className="mt-1 text-xs text-zinc-600 hover:text-zinc-400"
-                  >
-                    {t("common.cancel")}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">{t("ingreso.recurPeriodTitle")}</h3>
-                <p className="text-zinc-500 text-sm mb-4">{t("ingreso.recurPeriodDesc")}</p>
-                <div className="flex flex-col gap-2 mb-4">
-                  {([
-                    { value: 'monthly', label: t("ingreso.recurMonthly"), sub: t("ingreso.recurMonthlyDesc") },
-                    { value: 'bimonthly', label: t("ingreso.recurBimonthly"), sub: t("ingreso.recurBimonthlyDesc") },
-                    { value: 'quarterly', label: t("ingreso.recurQuarterly"), sub: t("ingreso.recurQuarterlyDesc") },
-                    { value: 'semiannual', label: t("ingreso.recurSemiannual"), sub: t("ingreso.recurSemiannualDesc") },
-                    { value: 'annual', label: t("ingreso.recurAnnual"), sub: t("ingreso.recurAnnualDesc") },
-                  ] as const).map(({ value, label, sub }) => (
-                    <button
-                      key={value}
-                      onClick={() => setRecurPeriod(value)}
-                      className={`w-full py-2.5 px-4 rounded-xl text-sm text-left transition-all border flex justify-between items-center ${recurPeriod === value
-                        ? `${accent.bg} text-zinc-950 font-bold border-transparent`
-                        : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'
-                        }`}
-                    >
-                      <span>{label}</span>
-                      <span className={`text-xs ${recurPeriod === value ? 'text-zinc-950/60' : 'text-zinc-500'}`}>{sub}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowPeriodStep(false)}
-                    className="flex-1 py-2.5 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all"
-                  >
-                    {t("common.back")}
-                  </button>
-                  <button
-                    onClick={() => handleGuardar(pendingCat!, true, recurPeriod)}
-                    className={`flex-1 py-2.5 text-sm ${accent.bg} text-zinc-950 rounded-xl font-bold ${accent.hover} transition-all`}
-                  >
-                    {t("common.save")}
-                  </button>
-                </div>
-              </>
-            )}
+          <div className="h-20 w-20 rounded-2xl bg-zinc-900 border border-emerald-500/50 flex flex-col items-center justify-center gap-2 shadow-2xl shadow-black/60">
+            <span className="text-[11px] font-medium text-zinc-300 text-center leading-tight px-1">{ghostCatLabel}</span>
           </div>
         </div>
       )}
 
-      {pendingSubs.length > 0 && (
-        <div className="border-b border-zinc-800/60 p-4 bg-zinc-950">
-          <div className="flex items-center gap-2 mb-2">
-            <CalendarDays className="w-4 h-4 text-zinc-400" aria-hidden="true" />
-            <p className="font-semibold text-xs uppercase tracking-wider text-zinc-400">
-              {t("ingreso.pendingTitle")} — {new Date().toLocaleDateString("es-ES", { month: "long" })}
-            </p>
-          </div>
-          <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-            {pendingSubs.map(sub => {
-              const esIngreso = sub.tipo === "ingreso"
-              const esTransfer = sub.tipo === "transferencia"
-              const catLabel = getCatLabel(sub.categoria)
-              const badgeClass = esTransfer
-                ? "bg-blue-500/20 text-blue-400"
-                : esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-              const cardClass = esTransfer
-                ? "bg-blue-500/10 border-blue-500/20"
-                : esIngreso ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
-              const btnClass = esTransfer
-                ? "bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-zinc-950"
-                : esIngreso
-                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950"
-                : "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950"
-              const badgeLabel = esTransfer
-                ? t("ingreso.pendingLabelTransfer")
-                : esIngreso ? t("ingreso.pendingLabelIngreso") : t("ingreso.pendingLabelGasto")
-              return (
-                <div
-                  key={sub.id}
-                  className={`flex items-center justify-between rounded-xl p-3 border ${cardClass}`}
-                >
-                  <div className="min-w-0 flex-1 pr-3">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badgeClass}`}>
-                      {badgeLabel}
-                    </span>
-                    <p className="text-sm text-zinc-200 truncate font-medium mt-1">
-                      {catLabel}{sub.nota && sub.nota !== DECRYPT_ERROR ? ` · ${sub.nota}` : ""}
-                    </p>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      {sub.cantidad === -1
-                        ? t("common.encryptedShort")
-                        : `${sub.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`
-                      }
-                    </p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => handleCancelarSub(sub.id)}
-                      disabled={processingSub === sub.id}
-                      aria-label={`Cancelar recurrente ${catLabel}`}
-                      className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-all"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleCobrarSub(sub)}
-                      disabled={processingSub === sub.id}
-                      aria-label={`Cobrar recurrente ${catLabel}`}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${btnClass}`}
-                    >
-                      {processingSub === sub.id
-                        ? <Loader2 className="w-3 h-3 animate-spin" />
-                        : esIngreso ? t("ingreso.pendingCollect") : t("ingreso.pendingPay")
-                      }
-                    </button>
-                  </div>
+      <div className="flex flex-col h-full relative animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+        {/* Pantalla de éxito */}
+        {success && lastSaved && (
+          <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-4 rounded-t-xl animate-in fade-in duration-300 px-8">
+            <CheckCircle2 className={`w-14 h-14 ${accent.text}`} strokeWidth={1.5} />
+            <p className={`font-semibold text-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
+            <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">{t("ingreso.savedAmount")}</span>
+                <span className={`font-semibold tabular-nums ${accent.text}`}>
+                  {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-500">{t("ingreso.savedCategory")}</span>
+                <span className="text-zinc-200 font-medium">{lastSaved.catLabel}</span>
+              </div>
+              {lastSaved.cuentaNombre && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-500">{t("ingreso.savedAccount")}</span>
+                  <span className="text-zinc-200">{lastSaved.cuentaNombre}</span>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800" role="group" aria-label={t("ingreso.ariaTypeGroup")}>
-          {([
-            { id: "gasto", label: t("ingreso.typeGasto"), Icon: TrendingDown, activeClass: "bg-red-500/15 text-red-400 border border-red-500/30" },
-            { id: "ingreso", label: t("ingreso.typeIngreso"), Icon: TrendingUp, activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
-            { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30" },
-          ] as const).map(({ id, label, Icon, activeClass }) => (
-            <button
-              key={id}
-              onClick={() => { setTipoMovimiento(id); setError(null) }}
-              aria-pressed={tipoMovimiento === id}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${tipoMovimiento === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
-                }`}
-            >
-              <Icon className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{id === "transferencia" ? t("ingreso.typeTransferShort") : label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col items-end justify-end px-6 pt-2 pb-2 border-b border-zinc-800/60 bg-zinc-950">
-        {error && <p className="text-xs text-red-400 mb-1 self-start" role="alert">{error}</p>}
-        {budgetWarning && (
-          <div className="w-full mb-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2 text-xs text-yellow-400" role="status">
-            {budgetWarning}
+              )}
+            </div>
           </div>
         )}
-        <div className="flex items-baseline gap-2">
-          <span className={`text-2xl font-light transition-colors duration-200 ${accent.text}`} aria-hidden="true">€</span>
-          <span className="text-5xl font-light tracking-tight leading-none tabular-nums text-zinc-100">
-            {display}
-          </span>
-        </div>
-        <div className="flex items-center justify-between w-full mt-1">
-          <EncryptionBadge />
-          <p className={`text-xs font-medium uppercase tracking-widest ${accent.text} opacity-60`}>
-            {tipoMovimiento === "gasto" ? t("ingreso.typeGasto") : tipoMovimiento === "ingreso" ? t("ingreso.typeIngreso") : t("ingreso.typeTransferencia")}
-          </p>
-        </div>
-      </div>
 
-      {lastSaved && !success && (
-        <div className="px-4 pt-2 pb-0">
-          <button
-            onClick={() => {
-              if (!lastSaved?.id || !onEditLast) return
-              onEditLast({
-                id: lastSaved.id,
-                cantidad: lastSaved.cantidad,
-                categoria: "",
-                tipo: lastSaved.tipo,
-                created_at: new Date().toISOString(),
-                cuenta_id: cuentaId || null,
-                cuenta_destino_id: null,
-                nota: nota || null,
-                is_recurring: false,
-              } as Movimiento)
-            }}
-            className="w-full flex items-center justify-between bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
+        {/* Modal recurrente */}
+        {showRecurModal && (
+          <div
+            className="absolute inset-0 z-30 bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-6 text-center"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recur-modal-title"
           >
-            <span>{t("ingreso.lastSaved")}: <span className="text-zinc-300">{lastSaved.catLabel} · {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span></span>
-            <span className="text-zinc-600 text-[10px] uppercase tracking-wider ml-2">{t("ingreso.lastSavedEdit")}</span>
-          </button>
-        </div>
-      )}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-xs shadow-2xl animate-in zoom-in duration-300">
+              <CalendarDays className={`w-10 h-10 mx-auto mb-3 ${accent.text}`} aria-hidden="true" />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="px-4 py-4 flex flex-col gap-4">
-
-          <div>
-            <label htmlFor="nota-input" className="block text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">
-              {t("ingreso.labelNota")}
-            </label>
-            <input
-              id="nota-input"
-              type="text"
-              value={nota}
-              onChange={e => setNota(e.target.value)}
-              maxLength={80}
-              placeholder={
-                tipoMovimiento === "ingreso"
-                  ? t("ingreso.placeholderNotaIngreso")
-                  : tipoMovimiento === "transferencia"
-                    ? t("ingreso.placeholderNotaTransfer")
-                    : t("ingreso.placeholderNotaGasto")
-              }
-              className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
-            />
-          </div>
-
-          {isTransfer && (
-            <div className="space-y-3">
-              {cuentas.length < 2 ? (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
-                  <p className="text-sm text-blue-300 font-medium mb-1">{t("ingreso.needTwoAccounts")}</p>
-                  <p className="text-xs text-zinc-500">{t("ingreso.needTwoAccountsHint")}</p>
-                </div>
-              ) : (
+              {!showPeriodStep ? (
                 <>
-                  <div>
-                    <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaOrigen")}</p>
-                    {(() => {
-                      const c = cuentas.find(c => c.id === cuentaId)
-                      return (
-                        <SheetTrigger
-                          onClick={() => setShowCuentaSheet(true)}
-                          placeholder={t("ingreso.placeholderSelectCuenta")}
-                          label={c?.nombre}
-                          icono={c?.icono}
-                          color={c?.color}
-                        />
-                      )
-                    })()}
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaDestino")}</p>
-                    {(() => {
-                      const c = cuentas.find(c => c.id === cuentaDestinoId)
-                      return (
-                        <SheetTrigger
-                          onClick={() => setShowCuentaDestSheet(true)}
-                          placeholder={t("ingreso.placeholderSelectCuenta")}
-                          label={c?.nombre}
-                          icono={c?.icono}
-                          color={c?.color}
-                        />
-                      )
-                    })()}
-                  </div>
-                  <div className="flex items-center justify-between px-1 py-2">
-                    <div>
-                      <p className="text-xs font-medium text-zinc-300">{t("ingreso.recurringTransferLabel")}</p>
-                      <p className="text-xs text-zinc-600 mt-0.5">{t("ingreso.recurringTransferDesc")}</p>
-                    </div>
+                  <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">
+                    {tipoMovimiento === "ingreso" ? t("ingreso.recurModalTitleIngreso") : t("ingreso.recurModalTitleGasto")}
+                  </h3>
+                  <p className="text-zinc-500 text-sm mb-6">
+                    {tipoMovimiento === "ingreso" ? t("ingreso.recurModalDescIngreso") : t("ingreso.recurModalDescGasto")}
+                  </p>
+                  <div className="flex flex-col gap-3">
                     <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isRecurringTransfer}
-                      onClick={() => setIsRecurringTransfer(v => !v)}
-                      className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${isRecurringTransfer ? "bg-blue-500" : "bg-zinc-700"
-                        }`}
+                      onClick={() => setShowPeriodStep(true)}
+                      className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
                     >
-                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${isRecurringTransfer ? "left-5" : "left-1"
-                        }`} />
+                      {tipoMovimiento === "ingreso" ? t("ingreso.recurYesIngreso") : t("ingreso.recurYesGasto")}
+                    </button>
+                    <button
+                      onClick={() => handleGuardar(pendingCat!, false)}
+                      className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
+                    >
+                      {tipoMovimiento === "ingreso" ? t("ingreso.recurNoIngreso") : t("ingreso.recurNoGasto")}
+                    </button>
+                    <button
+                      onClick={() => { setShowRecurModal(false); setShowPeriodStep(false) }}
+                      className="mt-1 text-xs text-zinc-600 hover:text-zinc-400"
+                    >
+                      {t("common.cancel")}
                     </button>
                   </div>
-                  <button
-                    onClick={handleGuardarTransferencia}
-                    disabled={isDisabled || !cuentaDestinoId || saving}
-                    className="w-full py-4 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-zinc-950 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
-                  >
-                    {saving
-                      ? <Loader2 className="w-4 h-4 animate-spin" />
-                      : <ArrowLeftRight className="w-4 h-4" />
-                    }
-                    {t("ingreso.registerTransfer")}
-                  </button>
+                </>
+              ) : (
+                <>
+                  <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">{t("ingreso.recurPeriodTitle")}</h3>
+                  <p className="text-zinc-500 text-sm mb-4">{t("ingreso.recurPeriodDesc")}</p>
+                  <div className="flex flex-col gap-2 mb-4">
+                    {([
+                      { value: 'monthly', label: t("ingreso.recurMonthly"), sub: t("ingreso.recurMonthlyDesc") },
+                      { value: 'bimonthly', label: t("ingreso.recurBimonthly"), sub: t("ingreso.recurBimonthlyDesc") },
+                      { value: 'quarterly', label: t("ingreso.recurQuarterly"), sub: t("ingreso.recurQuarterlyDesc") },
+                      { value: 'semiannual', label: t("ingreso.recurSemiannual"), sub: t("ingreso.recurSemiannualDesc") },
+                      { value: 'annual', label: t("ingreso.recurAnnual"), sub: t("ingreso.recurAnnualDesc") },
+                    ] as const).map(({ value, label, sub }) => (
+                      <button
+                        key={value}
+                        onClick={() => setRecurPeriod(value)}
+                        className={`w-full py-2.5 px-4 rounded-xl text-sm text-left transition-all border flex justify-between items-center ${recurPeriod === value
+                          ? `${accent.bg} text-zinc-950 font-bold border-transparent`
+                          : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'
+                          }`}
+                      >
+                        <span>{label}</span>
+                        <span className={`text-xs ${recurPeriod === value ? 'text-zinc-950/60' : 'text-zinc-500'}`}>{sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowPeriodStep(false)}
+                      className="flex-1 py-2.5 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all"
+                    >
+                      {t("common.back")}
+                    </button>
+                    <button
+                      onClick={() => handleGuardar(pendingCat!, true, recurPeriod)}
+                      className={`flex-1 py-2.5 text-sm ${accent.bg} text-zinc-950 rounded-xl font-bold ${accent.hover} transition-all`}
+                    >
+                      {t("common.save")}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
-          )}
+          </div>
+        )}
 
-          {!isTransfer && (
-            <>
-              {cuentas.length > 0 && (
-                <div>
-                  <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuenta")}</p>
-                  <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t("ingreso.ariaSelectCuenta")}>
-                    {cuentas.map(c => {
-                      const CIcon = getIcon(c.icono)
-                      const selected = cuentaId === c.id
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => setCuentaId(c.id)}
-                          aria-pressed={selected}
-                          aria-label={t("ingreso.ariaCuenta", { nombre: c.nombre })}
-                          style={{
-                            borderColor: selected ? c.color : c.color + "40",
-                            backgroundColor: selected ? c.color + "33" : c.color + "12",
-                          }}
-                          className="flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-all"
-                        >
-                          <CIcon className="w-4 h-4" style={{ color: c.color }} aria-hidden="true" />
-                          <span style={{ color: selected ? c.color : c.color + "99" }}>{c.nombre}</span>
-                        </button>
-                      )
-                    })}
+        {/* Recurrentes pendientes */}
+        {pendingSubs.length > 0 && (
+          <div className="border-b border-zinc-800/60 p-4 bg-zinc-950">
+            <div className="flex items-center gap-2 mb-2">
+              <CalendarDays className="w-4 h-4 text-zinc-400" aria-hidden="true" />
+              <p className="font-semibold text-xs uppercase tracking-wider text-zinc-400">
+                {t("ingreso.pendingTitle")} — {new Date().toLocaleDateString("es-ES", { month: "long" })}
+              </p>
+            </div>
+            <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+              {pendingSubs.map(sub => {
+                const esIngreso = sub.tipo === "ingreso"
+                const esTransfer = sub.tipo === "transferencia"
+                const catLabel = getCatLabel(sub.categoria)
+                const badgeClass = esTransfer
+                  ? "bg-blue-500/20 text-blue-400"
+                  : esIngreso ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                const cardClass = esTransfer
+                  ? "bg-blue-500/10 border-blue-500/20"
+                  : esIngreso ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
+                const btnClass = esTransfer
+                  ? "bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-zinc-950"
+                  : esIngreso
+                    ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950"
+                    : "bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-zinc-950"
+                const badgeLabel = esTransfer
+                  ? t("ingreso.pendingLabelTransfer")
+                  : esIngreso ? t("ingreso.pendingLabelIngreso") : t("ingreso.pendingLabelGasto")
+                return (
+                  <div key={sub.id} className={`flex items-center justify-between rounded-xl p-3 border ${cardClass}`}>
+                    <div className="min-w-0 flex-1 pr-3">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badgeClass}`}>
+                        {badgeLabel}
+                      </span>
+                      <p className="text-sm text-zinc-200 truncate font-medium mt-1">
+                        {catLabel}{sub.nota && sub.nota !== DECRYPT_ERROR ? ` · ${sub.nota}` : ""}
+                      </p>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        {sub.cantidad === -1
+                          ? t("common.encryptedShort")
+                          : `${sub.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`
+                        }
+                      </p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleCancelarSub(sub.id)}
+                        disabled={processingSub === sub.id}
+                        aria-label={`Cancelar recurrente ${catLabel}`}
+                        className="w-8 h-8 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 hover:text-red-400 flex items-center justify-center transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleCobrarSub(sub)}
+                        disabled={processingSub === sub.id}
+                        aria-label={`Cobrar recurrente ${catLabel}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${btnClass}`}
+                      >
+                        {processingSub === sub.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : esIngreso ? t("ingreso.pendingCollect") : t("ingreso.pendingPay")
+                        }
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })}
+            </div>
+          </div>
+        )}
 
-              <div>
-                <div className="flex items-baseline justify-between mb-3 px-1">
-                  <p className="text-xs text-zinc-600 uppercase tracking-widest">{t("ingreso.labelCategoria")}</p>
-                  <p className="text-[10px] text-zinc-700">{t("ingreso.manageInSettings")}</p>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {(() => {
-                    const filtered = Array.from(
-                      new Map(
-                        categorias
-                          .filter(c =>
-                            tipoMovimiento === "ingreso"
-                              ? c.tipo === "ingreso" || c.tipo === "ambos"
-                              : c.tipo === "gasto" || c.tipo === "ambos"
-                          )
-                          .map(c => [c.id, c])
-                      ).values()
-                    )
-                    const ordered = catOrder.length > 0
-                      ? [...filtered].sort((a, b) => catOrder.indexOf(a.id) - catOrder.indexOf(b.id))
-                      : filtered
-                    return ordered.map(cat => {
-                      const isDraggingThis = draggingCatId === cat.id
-                      const isOver = dragOverCatId === cat.id && !isDraggingThis
+        {/* Selector de tipo */}
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800" role="group" aria-label={t("ingreso.ariaTypeGroup")}>
+            {([
+              { id: "gasto", label: t("ingreso.typeGasto"), Icon: TrendingDown, activeClass: "bg-red-500/15 text-red-400 border border-red-500/30" },
+              { id: "ingreso", label: t("ingreso.typeIngreso"), Icon: TrendingUp, activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
+              { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30" },
+            ] as const).map(({ id, label, Icon, activeClass }) => (
+              <button
+                key={id}
+                onClick={() => { setTipoMovimiento(id); setError(null); setEsCompartido(false) }}
+                aria-pressed={tipoMovimiento === id}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${tipoMovimiento === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
+                  }`}
+              >
+                <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sm:hidden">{id === "transferencia" ? t("ingreso.typeTransferShort") : label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-                      const HOLD_MS = 350
+        {/* Display del importe */}
+        <div
+          className="flex flex-col items-center justify-end px-6 pt-3 pb-3 border-b border-zinc-800/60 bg-zinc-950 cursor-pointer select-none"
+          onClick={() => setTecladoVisible(v => !v)}
+        >
+          {error && <p className="text-xs text-red-400 mb-1 self-start" role="alert">{error}</p>}
+          {budgetWarning && (
+            <div className="w-full mb-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2 text-xs text-yellow-400" role="status">
+              {budgetWarning}
+            </div>
+          )}
+          <div className="flex items-baseline gap-2">
+            <span
+              className="text-xl font-light transition-colors duration-200"
+              style={{ color: tipoMovimiento === "ingreso" ? "#10b981" : tipoMovimiento === "transferencia" ? "#3b82f6" : "#ef4444" }}
+              aria-hidden="true"
+            >€</span>
+            <span
+              className="text-6xl tracking-tight leading-none tabular-nums transition-all duration-300"
+              style={{
+                fontFamily: "var(--font-dm-sans), sans-serif",
+                fontWeight: 200,
+                WebkitTextStroke: `1px ${tipoMovimiento === "ingreso" ? "#10b981" : tipoMovimiento === "transferencia" ? "#3b82f6" : "#ef4444"}`,
+                color: "transparent",
+              }}
+            >
+              {display}
+            </span>
+          </div>
+          {esCompartido && cantidadFinalCompartido !== null && (
+            <p className="text-xs text-amber-400 mt-0.5 tabular-nums">
+              {t("ingreso.compartidoTuParte")} <span className="font-semibold">{miParteLabel}€</span>
+            </p>
+          )}
+          <div className="flex items-center justify-between w-full mt-1">
+            <EncryptionBadge />
+            <p
+              className="text-[10px] font-medium uppercase tracking-widest opacity-60"
+              style={{ color: tipoMovimiento === "ingreso" ? "#10b981" : tipoMovimiento === "transferencia" ? "#3b82f6" : "#ef4444" }}
+            >
+              {tecladoVisible ? "▼ " : "▲ "}{tipoMovimiento === "gasto" ? t("ingreso.typeGasto") : tipoMovimiento === "ingreso" ? t("ingreso.typeIngreso") : t("ingreso.typeTransferencia")}
+            </p>
+          </div>
+        </div>
 
-                      const handlePointerDown = (e: React.PointerEvent) => {
-                        isDraggingCatRef.current = false
-                        dragCatIdRef.current = cat.id
-                        pointerCatStartRef.current = { x: e.clientX, y: e.clientY }
-                        holdCatTimerRef.current = setTimeout(() => {
-                          if (!dragCatIdRef.current) return
-                          isDraggingCatRef.current = true
-                          setDraggingCatId(dragCatIdRef.current)
-                          setGhostCatLabel(cat.label)
-                          if (pointerCatStartRef.current) {
-                            setGhostCatPos({ x: pointerCatStartRef.current.x, y: pointerCatStartRef.current.y })
-                          }
-                          const el = document.querySelector(`[data-cat-id="${dragCatIdRef.current}"]`)
-                          if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
-                        }, HOLD_MS)
+        {/* Último guardado */}
+        {lastSaved && !success && (
+          <div className="px-4 pt-2 pb-0">
+            <button
+              onClick={() => {
+                if (!lastSaved?.id || !onEditLast) return
+                onEditLast({
+                  id: lastSaved.id,
+                  cantidad: lastSaved.cantidad,
+                  categoria: "",
+                  tipo: lastSaved.tipo,
+                  created_at: new Date().toISOString(),
+                  cuenta_id: cuentaId || null,
+                  cuenta_destino_id: null,
+                  nota: nota || null,
+                  is_recurring: false,
+                } as Movimiento)
+              }}
+              className="w-full flex items-center justify-between bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
+            >
+              <span>{t("ingreso.lastSaved")}: <span className="text-zinc-300">{lastSaved.catLabel} · {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span></span>
+              <span className="text-zinc-600 text-[10px] uppercase tracking-wider ml-2">{t("ingreso.lastSavedEdit")}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Contenido scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 py-4 flex flex-col gap-4">
+
+            {/* Transferencia */}
+            {isTransfer && (
+              <div className="space-y-3">
+                {cuentas.length < 2 ? (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
+                    <p className="text-sm text-blue-300 font-medium mb-1">{t("ingreso.needTwoAccounts")}</p>
+                    <p className="text-xs text-zinc-500">{t("ingreso.needTwoAccountsHint")}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelNota")}</p>
+                      <input
+                        type="text"
+                        value={nota}
+                        onChange={e => setNota(e.target.value)}
+                        maxLength={80}
+                        placeholder={t("ingreso.placeholderNotaTransfer")}
+                        className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaOrigen")}</p>
+                      {(() => {
+                        const c = cuentas.find(c => c.id === cuentaId)
+                        return (
+                          <SheetTrigger
+                            onClick={() => setShowCuentaSheet(true)}
+                            placeholder={t("ingreso.placeholderSelectCuenta")}
+                            label={c?.nombre}
+                            icono={c?.icono}
+                            color={c?.color}
+                          />
+                        )
+                      })()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaDestino")}</p>
+                      {(() => {
+                        const c = cuentas.find(c => c.id === cuentaDestinoId)
+                        return (
+                          <SheetTrigger
+                            onClick={() => setShowCuentaDestSheet(true)}
+                            placeholder={t("ingreso.placeholderSelectCuenta")}
+                            label={c?.nombre}
+                            icono={c?.icono}
+                            color={c?.color}
+                          />
+                        )
+                      })()}
+                    </div>
+                    <div className="flex items-center justify-between px-1 py-2">
+                      <div>
+                        <p className="text-xs font-medium text-zinc-300">{t("ingreso.recurringTransferLabel")}</p>
+                        <p className="text-xs text-zinc-600 mt-0.5">{t("ingreso.recurringTransferDesc")}</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isRecurringTransfer}
+                        onClick={() => setIsRecurringTransfer(v => !v)}
+                        className={`relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0 ${isRecurringTransfer ? "bg-blue-500" : "bg-zinc-700"}`}
+                      >
+                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${isRecurringTransfer ? "left-5" : "left-1"}`} />
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleGuardarTransferencia}
+                      disabled={isDisabled || !cuentaDestinoId || saving}
+                      className="w-full py-4 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-zinc-950 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                    >
+                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
+                      {t("ingreso.registerTransfer")}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+
+
+            {/* Gasto / Ingreso */}
+            {!isTransfer && (
+              <>
+                {/* ── Fila: Nota + Cuenta inline ─────────────────────────── */}
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 min-w-0">
+                    <label htmlFor="nota-input" className="block text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">
+                      {t("ingreso.labelNota")}
+                    </label>
+                    <input
+                      id="nota-input"
+                      type="text"
+                      value={nota}
+                      onChange={e => setNota(e.target.value)}
+                      maxLength={80}
+                      placeholder={
+                        tipoMovimiento === "ingreso"
+                          ? t("ingreso.placeholderNotaIngreso")
+                          : t("ingreso.placeholderNotaGasto")
                       }
+                      className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
+                    />
+                  </div>
 
-                      const handlePointerMove = (e: React.PointerEvent) => {
-                        if (!dragCatIdRef.current || !pointerCatStartRef.current) return
-                        const dx = e.clientX - pointerCatStartRef.current.x
-                        const dy = e.clientY - pointerCatStartRef.current.y
-                        if (!isDraggingCatRef.current) {
-                          if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
-                            if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
-                            dragCatIdRef.current = null
-                            pointerCatStartRef.current = null
+                  {/* Cuenta inline — solo si hay cuentas */}
+                  {cuentas.length > 0 && cuentaSeleccionada && (
+                    <div className="flex-shrink-0">
+                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
+                        {t("ingreso.labelCuenta")}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setShowCuentaSheet(true)}
+                          aria-label={`Cuenta: ${cuentaSeleccionada.nombre}`}
+                          className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800/80 rounded-xl px-3 py-2.5 text-sm hover:border-zinc-600 transition-all max-w-[120px]"
+                          style={{ borderColor: cuentaSeleccionada.color + "60" }}
+                        >
+                          {(() => {
+                            const CIcon = getIcon(cuentaSeleccionada.icono)
+                            return (
+                              <>
+                                <CIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: cuentaSeleccionada.color }} aria-hidden="true" />
+                                <span className="truncate text-xs font-medium" style={{ color: cuentaSeleccionada.color }}>
+                                  {cuentaSeleccionada.nombre}
+                                </span>
+                              </>
+                            )
+                          })()}
+                        </button>
+
+                        {/* Icono compartido — solo visible en modo gasto */}
+                        {tipoMovimiento === "gasto" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEsCompartido(v => !v)
+                              setModoCompartido("dividir")
+                              setCompartidoPersonas(2)
+                              setMiParteManual("")
+                            }}
+                            aria-label={esCompartido ? t("ingreso.compartidoToggleOn") : t("ingreso.compartidoToggleOff")}
+                            title={esCompartido ? t("ingreso.compartidoToggleOn") : t("ingreso.compartidoToggleOff")}
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center border transition-all flex-shrink-0 ${esCompartido
+                              ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                              : "border-zinc-800/80 bg-zinc-900 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300"
+                              }`}
+                          >
+                            <Users className="w-4 h-4" aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+
+
+                {esCompartido && (
+                  <div className="mt-3 bg-amber-500/8 border border-amber-500/20 rounded-2xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+
+                    {/* Toggle de modo */}
+                    <div className="flex rounded-lg bg-zinc-900/80 p-0.5 border border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setModoCompartido("dividir")}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${modoCompartido === "dividir"
+                            ? "bg-amber-500/20 text-zinc-100 dark:text-amber-300"
+                            : "text-zinc-500 hover:text-zinc-400"
+                          }`}
+                      >
+                        {t("ingreso.compartidoModoDividir")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModoCompartido("mi_parte")}
+                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${modoCompartido === "mi_parte"
+                            ? "bg-amber-500/20 text-amber-950 dark:text-amber-300"
+                            : "text-zinc-500 hover:text-zinc-400"
+                          }`}
+                      >
+                        {t("ingreso.compartidoModoMiParte")}
+                      </button>
+                    </div>
+
+                    {/* Modo: dividir entre N */}
+                    {modoCompartido === "dividir" && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <p className="text-xs text-zinc-400 flex-shrink-0">{t("ingreso.compartidoEntrePersonas")}</p>
+                          <div className="flex items-center gap-2 ml-auto">
+                            <button
+                              onClick={() => setCompartidoPersonas(p => Math.max(2, p - 1))}
+                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-lg font-light hover:bg-zinc-700 active:scale-90 transition-all"
+                            >−</button>
+                            <span className="text-xl font-semibold text-zinc-100 w-6 text-center tabular-nums">{compartidoPersonas}</span>
+                            <button
+                              onClick={() => setCompartidoPersonas(p => Math.min(20, p + 1))}
+                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-lg font-light hover:bg-zinc-700 active:scale-90 transition-all"
+                            >+</button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between bg-zinc-900/60 rounded-xl px-3 py-2.5">
+                          <span className="text-xs text-zinc-500">{t("ingreso.compartidoTotalAdelantado")}</span>
+                          <span className="text-sm font-medium text-zinc-300 tabular-nums">{displayNum.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span>
+                        </div>
+                        <div className="flex items-center justify-between bg-amber-500/10 rounded-xl px-3 py-2.5 border border-amber-500/20">
+                          <span className="text-xs" style={{ color: "var(--compartido-text)" }}>
+                            {t("ingreso.compartidoTuParteReal")}
+                          </span>
+                          <span className="text-base font-bold text-amber-800 tabular-nums">{miParteLabel}€</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Modo: mi parte es X€ */}
+                    {modoCompartido === "mi_parte" && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between bg-zinc-900/60 rounded-xl px-3 py-2.5">
+                          <span className="text-xs text-zinc-500">{t("ingreso.compartidoTotalAdelantado")}</span>
+                          <span className="text-sm font-medium text-zinc-300 tabular-nums">{displayNum.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span>
+                        </div>
+                        <div>
+                          <label htmlFor="mi-parte-input" className="block text-xs text-zinc-500 mb-1.5 px-1">
+                            {t("ingreso.compartidoTuParteLabel")}
+                          </label>
+                          <input
+                            id="mi-parte-input"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            value={miParteManual}
+                            onChange={e => setMiParteManual(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full bg-zinc-900 border border-amber-500/30 rounded-xl px-4 py-2.5 text-sm text-amber-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/60 transition-all tabular-nums"
+                          />
+                        </div>
+                        {cantidadFinalCompartido !== null && (
+                          <div className="flex items-center justify-between bg-amber-500/10 rounded-xl px-3 py-2.5 border border-amber-500/20">
+                            <span className="text-xs" style={{ color: "var(--compartido-text)" }}>
+                              {t("ingreso.compartidoSeGuardara")}
+                            </span>
+                            <span className="text-base font-bold" style={{ color: "var(--compartido-text-strong)" }}>
+                              {miParteLabel}€
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="text-[10px] text-zinc-600 text-center">
+                      {t("ingreso.compartidoHintHistorial")}
+                    </p>
+                  </div>
+                )}
+
+                {/* ── Grid de categorías ─────────────────────────────────── */}
+                <div>
+                  <div className="flex items-baseline justify-between mb-3 px-1">
+                    <p className="text-xs text-zinc-600 uppercase tracking-widest">{t("ingreso.labelCategoria")}</p>
+                    <p className="text-[10px] text-zinc-700">{t("ingreso.manageInSettings")}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(() => {
+                      const filtered = Array.from(
+                        new Map(
+                          categorias
+                            .filter(c =>
+                              tipoMovimiento === "ingreso"
+                                ? c.tipo === "ingreso" || c.tipo === "ambos"
+                                : c.tipo === "gasto" || c.tipo === "ambos"
+                            )
+                            .map(c => [c.id, c])
+                        ).values()
+                      )
+                      const ordered = catOrder.length > 0
+                        ? [...filtered].sort((a, b) => catOrder.indexOf(a.id) - catOrder.indexOf(b.id))
+                        : filtered
+
+                      return ordered.map(cat => {
+                        const isDraggingThis = draggingCatId === cat.id
+                        const isOver = dragOverCatId === cat.id && !isDraggingThis
+                        const HOLD_MS = 350
+
+                        const handlePointerDown = (e: React.PointerEvent) => {
+                          isDraggingCatRef.current = false
+                          dragCatIdRef.current = cat.id
+                          pointerCatStartRef.current = { x: e.clientX, y: e.clientY }
+                          holdCatTimerRef.current = setTimeout(() => {
+                            if (!dragCatIdRef.current) return
+                            isDraggingCatRef.current = true
+                            setDraggingCatId(dragCatIdRef.current)
+                            setGhostCatLabel(cat.label)
+                            if (pointerCatStartRef.current) setGhostCatPos({ x: pointerCatStartRef.current.x, y: pointerCatStartRef.current.y })
+                            const el = document.querySelector(`[data-cat-id="${dragCatIdRef.current}"]`)
+                            if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
+                          }, HOLD_MS)
+                        }
+
+                        const handlePointerMove = (e: React.PointerEvent) => {
+                          if (!dragCatIdRef.current || !pointerCatStartRef.current) return
+                          const dx = e.clientX - pointerCatStartRef.current.x
+                          const dy = e.clientY - pointerCatStartRef.current.y
+                          if (!isDraggingCatRef.current) {
+                            if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                              if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
+                              dragCatIdRef.current = null
+                              pointerCatStartRef.current = null
+                            }
+                            return
                           }
-                          return
-                        }
-                        setGhostCatPos({ x: e.clientX, y: e.clientY })
-                        e.currentTarget.releasePointerCapture(e.pointerId)
-                        const el = document.elementFromPoint(e.clientX, e.clientY)
-                        const target = el?.closest("[data-cat-id]")
-                        const overId = target?.getAttribute("data-cat-id") ?? null
-                        if (overId && overId !== dragCatIdRef.current) {
-                          dragOverCatIdRef.current = overId
-                          setDragOverCatId(overId)
-                        }
-                        e.currentTarget.setPointerCapture(e.pointerId)
-                      }
-
-                      const handlePointerUp = (e: React.PointerEvent) => {
-                        if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
-                        if (isDraggingCatRef.current) {
+                          setGhostCatPos({ x: e.clientX, y: e.clientY })
                           e.currentTarget.releasePointerCapture(e.pointerId)
                           const el = document.elementFromPoint(e.clientX, e.clientY)
                           const target = el?.closest("[data-cat-id]")
-                          const finalOverId = target?.getAttribute("data-cat-id") ?? dragOverCatIdRef.current
-                          const from = dragCatIdRef.current
-                          if (from && finalOverId && from !== finalOverId) {
-                            setCatOrder(prev => {
-                              const base = prev.length > 0 ? prev : ordered.map(c => c.id)
-                              const next = [...base]
-                              const fromIdx = next.indexOf(from)
-                              const toIdx = next.indexOf(finalOverId)
-                              if (fromIdx === -1 || toIdx === -1) return prev
-                              next.splice(fromIdx, 1)
-                              next.splice(toIdx, 0, from)
-                              saveCatOrder(next)
-                              return next
-                            })
-                          }
+                          const overId = target?.getAttribute("data-cat-id") ?? null
+                          if (overId && overId !== dragCatIdRef.current) { dragOverCatIdRef.current = overId; setDragOverCatId(overId) }
+                          e.currentTarget.setPointerCapture(e.pointerId)
                         }
-                        dragCatIdRef.current = null
-                        dragOverCatIdRef.current = null
-                        isDraggingCatRef.current = false
-                        pointerCatStartRef.current = null
-                        setDraggingCatId(null)
-                        setDragOverCatId(null)
-                        setGhostCatPos(null)
-                        setGhostCatLabel("")
-                      }
 
-                      return (
-                        <div
-                          key={cat.id}
-                          data-cat-id={cat.id}
-                          onPointerDown={handlePointerDown}
-                          onPointerMove={handlePointerMove}
-                          onPointerUp={handlePointerUp}
-                          className={`touch-none select-none transition-all duration-150 rounded-2xl ${
-                            isDraggingThis ? "opacity-40 scale-95" : ""
-                          } ${isOver ? "ring-2 ring-emerald-500/60" : ""}`}
-                        >
-                          <CategoryButton
-                            cat={cat}
-                            onPress={(id) => {
-                              if (isDraggingCatRef.current) return
-                              onCategoryClick(id)
-                            }}
-                            disabled={isDisabled || saving}
-                          />
-                        </div>
-                      )
-                    })
-                  })()}
+                        const handlePointerUp = (e: React.PointerEvent) => {
+                          if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
+                          if (isDraggingCatRef.current) {
+                            e.currentTarget.releasePointerCapture(e.pointerId)
+                            const el = document.elementFromPoint(e.clientX, e.clientY)
+                            const target = el?.closest("[data-cat-id]")
+                            const finalOverId = target?.getAttribute("data-cat-id") ?? dragOverCatIdRef.current
+                            const from = dragCatIdRef.current
+                            if (from && finalOverId && from !== finalOverId) {
+                              setCatOrder(prev => {
+                                const base = prev.length > 0 ? prev : ordered.map(c => c.id)
+                                const next = [...base]
+                                const fromIdx = next.indexOf(from)
+                                const toIdx = next.indexOf(finalOverId)
+                                if (fromIdx === -1 || toIdx === -1) return prev
+                                next.splice(fromIdx, 1)
+                                next.splice(toIdx, 0, from)
+                                saveCatOrder(next)
+                                return next
+                              })
+                            }
+                          }
+                          dragCatIdRef.current = null
+                          dragOverCatIdRef.current = null
+                          isDraggingCatRef.current = false
+                          pointerCatStartRef.current = null
+                          setDraggingCatId(null)
+                          setDragOverCatId(null)
+                          setGhostCatPos(null)
+                          setGhostCatLabel("")
+                        }
+
+                        return (
+                          <div
+                            key={cat.id}
+                            data-cat-id={cat.id}
+                            onPointerDown={handlePointerDown}
+                            onPointerMove={handlePointerMove}
+                            onPointerUp={handlePointerUp}
+                            className={`touch-none select-none transition-all duration-150 rounded-2xl ${isDraggingThis ? "opacity-40 scale-95" : ""} ${isOver ? "ring-2 ring-emerald-500/60" : ""}`}
+                          >
+                            <CategoryButton
+                              cat={cat}
+                              onPress={(id) => {
+                                if (isDraggingCatRef.current) return
+                                onCategoryClick(id)
+                              }}
+                              disabled={isDisabled || saving}
+                              isSelected={catSeleccionada === cat.id}
+                              tipoMovimiento={tipoMovimiento as "gasto" | "ingreso" | "transferencia"}
+                            />
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+
+                {catSeleccionada && (
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-200">
+                    <button
+                      onClick={() => onCategoryClick(catSeleccionada)}
+                      disabled={isDisabled || saving}
+                      className={`w-full py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-40 ${tipoMovimientoButtonClass}`}
+                    >
+                      {saving
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <span>Guardar · {categorias.find(c => c.id === catSeleccionada)?.label}</span>
+                      }
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
 
-      <NumericKeypad onDigit={handleDigit} onBackspace={handleBackspace} />
+        <div
+          className={`transition-all duration-300 overflow-hidden ${tecladoVisible ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+            }`}
+        >
+          <NumericKeypad onDigit={handleDigit} onBackspace={handleBackspace} />
+        </div>
 
-      <BottomSheet
-        isOpen={showCuentaSheet}
-        onClose={() => setShowCuentaSheet(false)}
-        title={t("ingreso.sheetTitleCuentaOrigen")}
-        value={cuentaId}
-        onChange={setCuentaId}
-        options={cuentas.map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}
-      />
-      <BottomSheet
-        isOpen={showCuentaDestSheet}
-        onClose={() => setShowCuentaDestSheet(false)}
-        title={t("ingreso.sheetTitleCuentaDestino")}
-        value={cuentaDestinoId}
-        onChange={setCuentaDestinoId}
-        options={cuentas.filter(c => c.id !== cuentaId).map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}
-      />
-    </div>
+        {/* BottomSheets */}
+        <BottomSheet
+          isOpen={showCuentaSheet}
+          onClose={() => setShowCuentaSheet(false)}
+          title={isTransfer ? t("ingreso.sheetTitleCuentaOrigen") : t("ingreso.labelCuenta")}
+          value={cuentaId}
+          onChange={setCuentaId}
+          options={cuentas.map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}
+        />
+        <BottomSheet
+          isOpen={showCuentaDestSheet}
+          onClose={() => setShowCuentaDestSheet(false)}
+          title={t("ingreso.sheetTitleCuentaDestino")}
+          value={cuentaDestinoId}
+          onChange={setCuentaDestinoId}
+          options={cuentas.filter(c => c.id !== cuentaId).map(c => ({ value: c.id, label: c.nombre, icono: c.icono, color: c.color }))}
+        />
+      </div >
     </>
   )
 }
 
 function CategoryButton({
-  cat, onPress, disabled,
+  cat, onPress, disabled, isSelected, tipoMovimiento,
 }: {
   cat: Categoria
   onPress: (id: string) => void
   disabled: boolean
+  isSelected: boolean
+  tipoMovimiento: "gasto" | "ingreso" | "transferencia"
 }) {
   const t = useTranslations()
   const CatIcon = getIcon(cat.icono)
+  const accentSelected = (() => {
+    switch (tipoMovimiento) {
+      case "ingreso":
+        return { bg: "bg-emerald-500/10 border-emerald-500/40", icon: "text-emerald-400", text: "text-emerald-300" }
+      case "transferencia":
+        return { bg: "bg-blue-500/10 border-blue-500/40", icon: "text-blue-400", text: "text-blue-300" }
+      default:
+        return { bg: "bg-red-500/10 border-red-500/40", icon: "text-red-400", text: "text-red-300" }
+    }
+  })()
+
   return (
     <button
       onClick={() => onPress(cat.id)}
       disabled={disabled}
       aria-label={t("ingreso.ariaCategoria", { label: cat.label })}
-      className="h-20 w-full rounded-2xl bg-zinc-900 border border-zinc-800/80 hover:border-zinc-500 hover:bg-zinc-800/80 disabled:opacity-40 transition-all duration-200 flex flex-col items-center justify-center gap-2 select-none p-2"
+      aria-pressed={isSelected}
+      className={`h-20 w-full rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center gap-2 select-none p-2 ${isSelected
+        ? `${accentSelected.bg} scale-[0.97]`
+        : "bg-zinc-900 border-zinc-800/80 hover:border-zinc-500 hover:bg-zinc-800/80"
+        } disabled:opacity-40`}
     >
-      <CatIcon className="w-5 h-5 text-zinc-400" aria-hidden="true" />
-      <span className="text-[11px] font-medium text-zinc-300 text-center leading-tight">{cat.label}</span>
+      <CatIcon
+        className={`w-5 h-5 transition-colors ${isSelected ? accentSelected.icon : "text-zinc-400"}`}
+        aria-hidden="true"
+      />
+      <span className={`text-[11px] font-medium text-center leading-tight transition-colors ${isSelected ? accentSelected.text : "text-zinc-300"}`}>
+        {cat.label}
+      </span>
     </button>
   )
+
 }

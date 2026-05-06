@@ -97,11 +97,11 @@ export default function HistorialTab() {
       const decryptedData = await Promise.all(
         data.map(async (m) => {
           const cantidadStr = await decryptData(m.cantidad)
-          const notaStr     = m.nota ? await decryptData(m.nota) : null
+          const notaStr = m.nota ? await decryptData(m.nota) : null
           return {
             ...m,
             cantidad: cantidadStr === DECRYPT_ERROR ? -1 : (parseFloat(cantidadStr) || 0),
-            nota:     notaStr     === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
+            nota: notaStr === DECRYPT_ERROR ? DECRYPT_ERROR : notaStr,
           }
         })
       )
@@ -267,8 +267,8 @@ export default function HistorialTab() {
       .eq("id", updated.id)
       .select()
 
-      if (error) {
-        setUpdateError(t("historial.errorSave", { message: error.message }))
+    if (error) {
+      setUpdateError(t("historial.errorSave", { message: error.message }))
     } else if (data?.length) {
       setUpdateError(null)
       setMovimientos(prev =>
@@ -387,10 +387,10 @@ export default function HistorialTab() {
           <div className="w-[48%]">
             {(() => {
               const tipoOpts = [
-                { id: "todos",         label: t("historial.filterAll"),           color: undefined,  icono: undefined          },
-                { id: "gasto",         label: t("historial.filterExpenses"),      color: "#ef4444",  icono: "TrendingDown"     },
-                { id: "ingreso",       label: t("historial.filterIncome"),        color: "#10b981",  icono: "TrendingUp"       },
-                { id: "transferencia", label: t("historial.filterTransfersShort"),color: "#3b82f6",  icono: "ArrowLeftRight"   },
+                { id: "todos", label: t("historial.filterAll"), color: undefined, icono: undefined },
+                { id: "gasto", label: t("historial.filterExpenses"), color: "#ef4444", icono: "TrendingDown" },
+                { id: "ingreso", label: t("historial.filterIncome"), color: "#10b981", icono: "TrendingUp" },
+                { id: "transferencia", label: t("historial.filterTransfersShort"), color: "#3b82f6", icono: "ArrowLeftRight" },
               ]
               const sel = tipoOpts.find(opt => opt.id === tipoFilter)
               return (
@@ -474,9 +474,9 @@ export default function HistorialTab() {
                       ...(jiggleId === m.id
                         ? { animation: "swipe-hint 2s linear forwards" }
                         : {
-                            transform: `translateX(${swipeClampedDx}px)`,
-                            transition: swipeState?.id === m.id ? "none" : "transform 0.2s ease",
-                          }
+                          transform: `translateX(${swipeClampedDx}px)`,
+                          transition: swipeState?.id === m.id ? "none" : "transform 0.2s ease",
+                        }
                       ),
                     }}
                     onTouchStart={e => {
@@ -509,64 +509,151 @@ export default function HistorialTab() {
                       swipeLocked.current = null
                     }}
                   >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${esTransfer ? "bg-blue-500/10" : esIngreso ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
-                    {esTransfer
-                      ? <ArrowLeftRight className="w-4 h-4 text-blue-400" aria-hidden="true" />
-                      : <CatIcon className={`w-4 h-4 ${esIngreso ? "text-emerald-400" : "text-red-400"}`} aria-hidden="true" />
-                    }
-                  </div>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${esTransfer ? "bg-blue-500/10" : esIngreso ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
+                      {esTransfer
+                        ? <ArrowLeftRight className="w-4 h-4 text-blue-400" aria-hidden="true" />
+                        : <CatIcon className={`w-4 h-4 ${esIngreso ? "text-emerald-400" : "text-red-400"}`} aria-hidden="true" />
+                      }
+                    </div>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-200 truncate">
-                      {esTransfer ? t("historial.labelTransfer") : (cat?.label ?? m.categoria)}
-                    </p>
-                    <span className={`w-fit text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${esTransfer
-                      ? "bg-blue-500/15 text-blue-400"
-                      : esIngreso
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-red-500/15 text-red-400"
-                      }`}>
-                      {esTransfer ? t("historial.badgeTransfer") : esIngreso ? t("historial.badgeIngreso") : t("historial.badgeGasto")}
-                    </span>
-                    {esTransfer && cuenta && cuentaDest && (
-                      <p className="text-xs text-zinc-500 mt-0.5 truncate">
-                        {cuenta.nombre} → {cuentaDest.nombre}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-zinc-200 truncate">
+                        {esTransfer ? t("historial.labelTransfer") : (cat?.label ?? m.categoria)}
+                      </p>
+                      <span className={`w-fit text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${esTransfer
+                        ? "bg-blue-500/15 text-blue-400"
+                        : esIngreso
+                          ? "bg-emerald-500/15 text-emerald-400"
+                          : "bg-red-500/15 text-red-400"
+                        }`}>
+                        {esTransfer ? t("historial.badgeTransfer") : esIngreso ? t("historial.badgeIngreso") : t("historial.badgeGasto")}
+                      </span>
+                      {esTransfer && cuenta && cuentaDest && (
+                        <p className="text-xs text-zinc-500 mt-0.5 truncate">
+                          {cuenta.nombre} → {cuentaDest.nombre}
+                        </p>
+                      )}
+                      {!esTransfer && cuenta && (
+                        <p className="text-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
+                      )}
+                      {/* ── Badge gasto compartido con contador +/- ── */}
+                      {m.compartido_personas && m.compartido_personas > 1 && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                            👥 compartido
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const recibidos = m.reembolsos_recibidos ?? 0
+                                if (recibidos <= 0) return
+                                const nuevoContador = recibidos - 1
+
+                                await supabase.from("movimientos")
+                                  .update({ reembolsos_recibidos: nuevoContador })
+                                  .eq("id", m.id)
+                                setMovimientos(prev =>
+                                  prev.map(x => x.id === m.id ? { ...x, reembolsos_recibidos: nuevoContador } : x)
+                                )
+
+                                if (m.compartido_personas && m.compartido_total) {
+                                  const parteAmigo = Math.round((m.compartido_total / m.compartido_personas) * 100) / 100
+                                  const cuentaDelMov = cuentas.find(c => c.id === m.cuenta_id)
+                                  if (cuentaDelMov?.saldo_actual !== undefined) {
+                                    const nuevosSaldos = await aplicarDeltaSaldo([{
+                                      cuentaId: cuentaDelMov.id,
+                                      delta: -parteAmigo,
+                                      saldoActual: cuentaDelMov.saldo_actual,
+                                    }])
+                                    setCuentas(prev => prev.map(c =>
+                                      nuevosSaldos[c.id] !== undefined ? { ...c, saldo_actual: nuevosSaldos[c.id] } : c
+                                    ))
+                                  }
+                                }
+                              }}
+                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all text-xs active:scale-90"
+                              aria-label="Restar reembolso"
+                            >−</button>
+                            <span className={`text-[10px] font-semibold tabular-nums min-w-[28px] text-center ${(m.reembolsos_recibidos ?? 0) >= (m.compartido_personas - 1)
+                              ? "text-emerald-400"
+                              : "text-amber-400"
+                              }`}>
+                              {m.reembolsos_recibidos ?? 0}/{m.compartido_personas - 1}
+                              {(m.reembolsos_recibidos ?? 0) >= (m.compartido_personas - 1) ? " ✓" : ""}
+                            </span>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const recibidos = m.reembolsos_recibidos ?? 0
+                                const esperados = m.compartido_personas! - 1
+                                if (recibidos >= esperados) return
+                                const nuevoContador = recibidos + 1
+
+                                await supabase.from("movimientos")
+                                  .update({ reembolsos_recibidos: nuevoContador })
+                                  .eq("id", m.id)
+                                setMovimientos(prev =>
+                                  prev.map(x => x.id === m.id ? { ...x, reembolsos_recibidos: nuevoContador } : x)
+                                )
+
+                                if (m.compartido_personas && m.compartido_total) {
+                                  const parteAmigo = Math.round((m.compartido_total / m.compartido_personas) * 100) / 100
+                                  const cuentaDelMov = cuentas.find(c => c.id === m.cuenta_id)
+                                  if (cuentaDelMov?.saldo_actual !== undefined) {
+                                    const nuevosSaldos = await aplicarDeltaSaldo([{
+                                      cuentaId: cuentaDelMov.id,
+                                      delta: parteAmigo,
+                                      saldoActual: cuentaDelMov.saldo_actual,
+                                    }])
+                                    setCuentas(prev => prev.map(c =>
+                                      nuevosSaldos[c.id] !== undefined ? { ...c, saldo_actual: nuevosSaldos[c.id] } : c
+                                    ))
+                                  }
+                                }
+                              }}
+                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all text-xs active:scale-90"
+                              aria-label="Sumar reembolso"
+                            >+</button>
+                          </div>
+                          {m.compartido_total && (
+                            <span className="text-[10px] text-zinc-600 tabular-nums">
+                              ({m.compartido_total.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€ total)
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {m.nota === DECRYPT_ERROR ? (
+                        <p className="text-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
+                      ) : m.nota ? (
+                        <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
+                      ) : null}
+                      <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
+                    </div>
+
+                    {m.cantidad === -1 ? (
+                      <span
+                        className="text-sm font-semibold flex-shrink-0 text-zinc-600"
+                        aria-label={t("common.encryptedValue")}
+                        title={t("common.encryptedValue")}
+                      >
+                        {t("common.encryptedShort")}
+                      </span>
+                    ) : (
+                      <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${amountColor}`}
+                        aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
+                      >
+                        {amountPrefix}
+                        {(m.cantidad as number).toLocaleString("es-ES", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}€
                       </p>
                     )}
-                    {!esTransfer && cuenta && (
-                      <p className="text-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
+
+                    {isDeleting && (
+                      <Loader2 className="w-4 h-4 animate-spin text-zinc-600 flex-shrink-0" />
                     )}
-                    {m.nota === DECRYPT_ERROR ? (
-                      <p className="text-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
-                    ) : m.nota ? (
-                      <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
-                    ) : null}
-                    <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
-                  </div>
-
-                  {m.cantidad === -1 ? (
-                    <span
-                      className="text-sm font-semibold flex-shrink-0 text-zinc-600"
-                      aria-label={t("common.encryptedValue")}
-                      title={t("common.encryptedValue")}
-                    >
-                      {t("common.encryptedShort")}
-                    </span>
-                  ) : (
-                    <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${amountColor}`}
-                      aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
-                    >
-                      {amountPrefix}
-                      {(m.cantidad as number).toLocaleString("es-ES", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}€
-                    </p>
-                  )}
-
-                  {isDeleting && (
-                    <Loader2 className="w-4 h-4 animate-spin text-zinc-600 flex-shrink-0" />
-                  )}
                   </div>
                 </div>
               )
@@ -628,7 +715,7 @@ export default function HistorialTab() {
                     : movABorrar?.tipo === "transferencia"
                       ? t("historial.deleteConfirmTransfer")
                       : t("historial.deleteConfirmGasto"),
-                      amount: movABorrar && movABorrar.cantidad !== -1 ? movABorrar.cantidad.toFixed(2) : "?",
+                  amount: movABorrar && movABorrar.cantidad !== -1 ? movABorrar.cantidad.toFixed(2) : "?",
                 })}
                 className="flex-1 py-2 text-sm bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all"
               >
@@ -654,10 +741,10 @@ export default function HistorialTab() {
         value={tipoFilter}
         onChange={v => setTipoFilter(v as TipoFilter)}
         options={[
-          { value: "todos",         label: t("historial.filterAll")       },
-          { value: "gasto",         label: t("historial.filterExpenses"),  icono: "TrendingDown",  tipo: "gasto"          },
-          { value: "ingreso",       label: t("historial.filterIncome"),    icono: "TrendingUp",    tipo: "ingreso"        },
-          { value: "transferencia", label: t("historial.filterTransfers"), icono: "ArrowLeftRight",tipo: "transferencia"  },
+          { value: "todos", label: t("historial.filterAll") },
+          { value: "gasto", label: t("historial.filterExpenses"), icono: "TrendingDown", tipo: "gasto" },
+          { value: "ingreso", label: t("historial.filterIncome"), icono: "TrendingUp", tipo: "ingreso" },
+          { value: "transferencia", label: t("historial.filterTransfers"), icono: "ArrowLeftRight", tipo: "transferencia" },
         ]}
       />
 

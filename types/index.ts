@@ -53,16 +53,24 @@ export interface Cuenta {
 // cantidad y nota se cifran en BD [E2EE]
 // En memoria siempre están en claro
 export interface Movimiento {
-  id:                 string
-  created_at:         string
-  cantidad:           number        // [E2EE] cifrado en BD, en claro en memoria
-  categoria:          string
-  nota?:              string | null // [E2EE] cifrado en BD, en claro en memoria
-  is_recurring?:      boolean
-  recur_period?:      'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual' | null
-  tipo?:              TipoMovimiento
-  cuenta_id?:         string | null
-  cuenta_destino_id?: string | null
+  id:                    string
+  created_at:            string
+  cantidad:              number        // [E2EE] cifrado en BD, en claro en memoria
+  categoria:             string
+  nota?:                 string | null // [E2EE] cifrado en BD, en claro en memoria
+  is_recurring?:         boolean
+  recur_period?:         'monthly' | 'bimonthly' | 'quarterly' | 'semiannual' | 'annual' | null
+  tipo?:                 TipoMovimiento
+  cuenta_id?:            string | null
+  cuenta_destino_id?:    string | null
+  // ─── Gasto compartido ──────────────────────────────────────
+  // compartido_personas: total de personas entre las que se divide (incluido tú).
+  // compartido_total: importe bruto que pagaste tú (lo que mostraba el display).
+  // reembolsos_recibidos: cuántas personas ya te han devuelto su parte.
+  // La cantidad guardada en el movimiento es SIEMPRE tu parte real (compartido_total / compartido_personas).
+  compartido_personas?:  number | null
+  compartido_total?:     number | null
+  reembolsos_recibidos?: number | null
 }
 
 // ─── Saldo calculado (UI only, no persiste en DB) ────────────
@@ -77,7 +85,7 @@ export interface SaldoCuenta {
 export interface Objetivo {
   id:         string
   user_id:    string
-  tipo:       string        // 'ahorro_mensual' por ahora
+  tipo:       string        // 'ahorro_mensual' | 'gasto_total'
   cantidad:   number        // [E2EE] cifrado en BD, en claro en memoria
   created_at: string
   updated_at: string

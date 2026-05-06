@@ -16,12 +16,19 @@
 
 /* Dark mode: slightly lighter than pure black — "gris muy oscuro" */
 html.dark {
-  --color-zinc-950: oklch(0.158 0.006 285.823);
+  --color-zinc-950: oklch(0.34 0.006 285.823);
+  --color-zinc-900: oklch(0.38 0.006 285.823);
+  --color-zinc-800: oklch(0.44 0.006 285.823);
+  --color-zinc-700: oklch(0.52 0.006 285.823);
+  --compartido-text: oklch(0.85 0.15 80);
+  --compartido-text-strong: oklch(0.90 0.18 80);
+  --compartido-bg: oklch(0.28 0.06 60);
+  --compartido-border: oklch(0.45 0.10 60);
 }
 
 /* Light mode: warm off-white/bone scale (invert + add warmth so it's not stark white) */
 html:not(.dark) {
-  --color-zinc-50:  oklch(0.138 0.004 80);
+  --color-zinc-50: oklch(0.138 0.004 80);
   --color-zinc-100: oklch(0.203 0.007 80);
   --color-zinc-200: oklch(0.268 0.007 80);
   --color-zinc-300: oklch(0.362 0.013 80);
@@ -31,10 +38,14 @@ html:not(.dark) {
   --color-zinc-800: oklch(0.906 0.007 80);
   --color-zinc-900: oklch(0.944 0.008 80);
   --color-zinc-950: oklch(0.966 0.008 80);
+  --compartido-text: oklch(0.45 0.12 60);
+  --compartido-text-strong: oklch(0.35 0.14 60);
+  --compartido-bg: oklch(0.95 0.04 80);
+  --compartido-border: oklch(0.80 0.08 60);
 }
 
 :root {
-  --background: #0a0a0a;
+  --background: #27272a;
   --foreground: #ededed;
 }
 
@@ -48,28 +59,55 @@ html:not(.dark) {
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-zinc-950: var(--color-zinc-950);
+  --color-zinc-900: var(--color-zinc-900);
+  --color-zinc-800: var(--color-zinc-800);
+  --color-zinc-700: var(--color-zinc-700);
 }
 
-html, body {
+html,
+body {
   background: var(--color-zinc-950);
-  color:      var(--foreground);
+  color: var(--foreground);
 }
 
 /* Smooth background transition on theme switch */
-html { transition: background-color 250ms ease; }
-body { transition: background-color 250ms ease, color 250ms ease; }
+html {
+  transition: background-color 250ms ease;
+}
+
+body {
+  transition: background-color 250ms ease, color 250ms ease;
+}
 
 /* Premium selection highlight */
-::selection { background: oklch(0.696 0.17 162.48 / 0.25); }
+::selection {
+  background: oklch(0.696 0.17 162.48 / 0.25);
+}
 
 /* Refined scrollbar */
-::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-zinc-700); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-600); }
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-zinc-700);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-zinc-600);
+}
 
 /* Input focus: consistent across all inputs */
-input:focus, textarea:focus, select:focus {
+input:focus,
+textarea:focus,
+select:focus {
   outline: none;
   border-color: oklch(0.696 0.17 162.48 / 0.5);
   box-shadow: 0 0 0 3px oklch(0.696 0.17 162.48 / 0.08);
@@ -79,101 +117,174 @@ input:focus, textarea:focus, select:focus {
 .btn-shadow {
   box-shadow: 0 4px 14px oklch(0.696 0.17 162.48 / 0.25), 0 1px 3px oklch(0 0 0 / 0.2);
 }
+
 .btn-shadow:hover {
   box-shadow: 0 6px 20px oklch(0.696 0.17 162.48 / 0.35), 0 1px 3px oklch(0 0 0 / 0.2);
 }
+
 .btn-shadow:active {
   box-shadow: 0 2px 8px oklch(0.696 0.17 162.48 / 0.2);
   transform: translateY(1px);
 }
 
 @media (display-mode: standalone) {
-    html, body {
-      overscroll-behavior: none;
-    }
+
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+@layer utilities {
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top);
   }
 
-  @layer utilities {
-   .pt-safe-top {
-     padding-top: env(safe-area-inset-top);
-   }
-   .pb-safe-bottom {
-     padding-bottom: env(safe-area-inset-bottom);
-   }
- }
-  
-  @keyframes marquee {
-    0%    { transform: translateX(0); }
-    30%   { transform: translateX(0); }
-    70%   { transform: translateX(calc(-100% + 70px)); }
-    100%  { transform: translateX(calc(-100% + 70px)); }
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
   }
 
-  @keyframes swipe-hint {
-    0%   { transform: translateX(0px); }
-    15%  { transform: translateX(-16px); }
-    30%  { transform: translateX(-32px); }
-    70%  { transform: translateX(32px); }
-    85%  { transform: translateX(16px); }
-    100% { transform: translateX(0px); }
+  30% {
+    transform: translateX(0);
   }
 
-  .swipe-hint {
-    animation: swipe-hint 0.6s ease-in-out;
+  70% {
+    transform: translateX(calc(-100% + 70px));
   }
 
-  @media print {
-    header,
-    nav,
-    button,
-    [data-feedback-widget],
-    .print-hide {
-      display: none !important;
-    }
+  100% {
+    transform: translateX(calc(-100% + 70px));
+  }
+}
 
-    html, body {
-      background: #ffffff !important;
-      color: #000000 !important;
-    }
-
-    main {
-      overflow: visible !important;
-      height: auto !important;
-    }
-
-    .print-widget {
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
+@keyframes swipe-hint {
+  0% {
+    transform: translateX(0px);
   }
 
-  /* ── Animaciones widget racha_ahorro ──────────────────────────────────────── */
+  15% {
+    transform: translateX(-16px);
+  }
+
+  30% {
+    transform: translateX(-32px);
+  }
+
+  70% {
+    transform: translateX(32px);
+  }
+
+  85% {
+    transform: translateX(16px);
+  }
+
+  100% {
+    transform: translateX(0px);
+  }
+}
+
+.swipe-hint {
+  animation: swipe-hint 0.6s ease-in-out;
+}
+
+@media print {
+
+  header,
+  nav,
+  button,
+  [data-feedback-widget],
+  .print-hide {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .print-widget {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* ── Animaciones widget racha_ahorro ──────────────────────────────────────── */
 @keyframes flicker1 {
-  0%,100% { transform: scaleX(1) scaleY(1); }
-  25%     { transform: scaleX(0.88) scaleY(1.08); }
-  75%     { transform: scaleX(1.08) scaleY(0.94); }
+
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+  }
+
+  25% {
+    transform: scaleX(0.88) scaleY(1.08);
+  }
+
+  75% {
+    transform: scaleX(1.08) scaleY(0.94);
+  }
 }
+
 @keyframes flicker2 {
-  0%,100% { transform: scaleX(1) scaleY(1); }
-  33%     { transform: scaleX(0.92) scaleY(1.1); }
-  66%     { transform: scaleX(1.06) scaleY(0.9); }
+
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+  }
+
+  33% {
+    transform: scaleX(0.92) scaleY(1.1);
+  }
+
+  66% {
+    transform: scaleX(1.06) scaleY(0.9);
+  }
 }
+
 @keyframes rise {
-  0%,100% { transform: translateY(0); }
-  50%     { transform: translateY(-3px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
 }
+
 .flame-outer {
   animation: flicker1 1.4s ease-in-out infinite, rise 1.8s ease-in-out infinite;
   transform-origin: bottom center;
 }
+
 .flame-mid {
   animation: flicker2 1.1s ease-in-out infinite;
   transform-origin: bottom center;
 }
+
 .flame-inner {
   animation: flicker1 0.9s ease-in-out infinite reverse;
   transform-origin: bottom center;
 }
+
 @media (prefers-reduced-motion: reduce) {
-  .flame-outer, .flame-mid, .flame-inner { animation: none; }
+
+  .flame-outer,
+  .flame-mid,
+  .flame-inner {
+    animation: none;
+  }
 }

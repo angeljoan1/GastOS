@@ -29,7 +29,7 @@ import { calcularSaldoCuenta } from "@/lib/calculations"
 import { AppDataProvider } from "@/contexts/AppDataContext"
 import { aplicarDeltaSaldo } from "@/services/cuentas"
 
-const APP_VERSION = 25
+const APP_VERSION = 26
 
 // ─── MainApp ─────────────────────────────────────────────────────────────────
 function MainApp({ session }: { session: Session }) {

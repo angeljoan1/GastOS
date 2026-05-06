@@ -164,7 +164,20 @@
     "ariaCuenta": "Cuenta {nombre}",
     "errorSessionExpired": "Sesión expirada. Vuelve a introducir tu PIN.",
     "alertBudgetExceeded": "Has superado el presupuesto de {cat} ({amount}€ este mes).",
-    "ariaCategoria": "Categoría {label}"
+    "ariaCategoria": "Categoría {label}",
+    "compartidoToggleOff": "Marcar como compartido",
+    "compartidoToggleOn": "Gasto compartido",
+    "compartidoModoDividir": "Dividir entre N",
+    "compartidoModoMiParte": "Mi parte es X€",
+    "compartidoEntrePersonas": "Entre cuántas personas:",
+    "compartidoTotalAdelantado": "Total adelantado",
+    "compartidoTuParteReal": "Tu parte real",
+    "compartidoTuParteLabel": "Tu parte real (€)",
+    "compartidoSeGuardara": "Se guardará como tu gasto",
+    "compartidoHintHistorial": "Los reembolsos se marcan desde el historial.",
+    "compartidoTuParte": "Tu parte:",
+    "compartidoErrorParteVacia": "Introduce tu parte real (€).",
+    "compartidoErrorParteMayor": "Tu parte debe ser menor que el total."
   },
   "historial": {
     "searchPlaceholder": "Buscar por nota o categoría...",

@@ -151,11 +151,11 @@ select:focus {
     letter-spacing: -0.03em;
   }
 
-  .text-app-xs   { font-size: calc(0.75rem  * var(--app-font-scale)); }
-  .text-app-sm   { font-size: calc(0.875rem * var(--app-font-scale)); }
-  .text-app-base { font-size: calc(1rem     * var(--app-font-scale)); }
-  .text-app-lg   { font-size: calc(1.125rem * var(--app-font-scale)); }
-  .text-app-xl   { font-size: calc(1.25rem  * var(--app-font-scale)); }
+  .text-app-xs   { font-size: calc(0.75rem  * var(--app-font-scale, 1)); }
+  .text-app-sm   { font-size: calc(0.875rem * var(--app-font-scale, 1)); }
+  .text-app-base { font-size: calc(1rem     * var(--app-font-scale, 1)); }
+  .text-app-lg   { font-size: calc(1.125rem * var(--app-font-scale, 1)); }
+  .text-app-xl   { font-size: calc(1.25rem  * var(--app-font-scale, 1)); }
 }
 
 @keyframes marquee {

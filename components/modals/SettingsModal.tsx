@@ -71,9 +71,17 @@ export default function SettingsModal({
   const [fontSize, setFontSize] = useState<FontSize>(() => {
     if (typeof window === "undefined") return "medium"
     const stored = localStorage.getItem(FONT_SIZE_KEY)
-    return (stored === "small" || stored === "large") ? stored : "medium"
+    return (stored === "small" || stored === "large" || stored === "medium") ? stored as FontSize : "medium"
   })
   const t = useTranslations()
+
+  useEffect(() => {
+    const stored = localStorage.getItem(FONT_SIZE_KEY)
+    const size: FontSize = (stored === "small" || stored === "large" || stored === "medium") ? stored as FontSize : "medium"
+    const html = document.documentElement
+    html.classList.remove("font-small", "font-medium", "font-large")
+    html.classList.add(`font-${size}`)
+  }, [])
 
   useEffect(() => {
     if (isOpen) {

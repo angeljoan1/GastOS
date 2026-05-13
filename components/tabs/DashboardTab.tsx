@@ -223,8 +223,8 @@ export default function DashboardTab({
 
   const encryptedBanner = hasEncryptedMovs ? (
     <div className="mx-4 mb-2 flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-2.5">
-      <span className="text-sm">🔒</span>
-      <p className="text-xs text-yellow-400/90">{t("common.encryptedBanner")}</p>
+      <span className="text-app-sm">🔒</span>
+      <p className="text-app-xs text-yellow-400/90">{t("common.encryptedBanner")}</p>
     </div>
   ) : null
 
@@ -329,7 +329,7 @@ export default function DashboardTab({
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <p className="text-sm font-bold text-zinc-200 capitalize flex-1 text-center tracking-wide">
+        <p className="text-app-sm font-bold text-zinc-200 capitalize flex-1 text-center tracking-wide">
           {monthLabel}
         </p>
 
@@ -358,8 +358,8 @@ export default function DashboardTab({
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
             <Package className="w-6 h-6 text-emerald-400" aria-hidden="true" />
           </div>
-          <p className="text-base font-semibold text-zinc-200">{t("dashboard.emptyStateTitle")}</p>
-          <p className="text-sm text-zinc-500">{t("dashboard.emptyStateHint")}</p>
+          <p className="text-app-base font-semibold text-zinc-200">{t("dashboard.emptyStateTitle")}</p>
+          <p className="text-app-sm text-zinc-500">{t("dashboard.emptyStateHint")}</p>
         </div>
       )}
 
@@ -372,7 +372,7 @@ export default function DashboardTab({
         className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400 transition-all"
       >
         <Plus className="w-4 h-4" aria-hidden="true" />
-        <span className="text-sm font-semibold">{t("dashboard.customizeDashboard")}</span>
+        <span className="text-app-sm font-semibold">{t("dashboard.customizeDashboard")}</span>
       </button>
 
       {/* Drill-down categoria */}
@@ -420,10 +420,10 @@ export default function DashboardTab({
                     <CatIcon className="w-4 h-4" style={{ color }} aria-hidden="true" />
                   </div>
                   <div>
-                    <h3 id="cat-drill-title" className="text-base font-semibold text-zinc-100">
+                    <h3 id="cat-drill-title" className="text-app-base font-semibold text-zinc-100">
                       {cat?.label ?? selectedCat}
                     </h3>
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-app-xs text-zinc-500">
                       {t("dashboard.drillTotalMes")}: <span className="font-medium" style={{ color }}>{catTotal.toFixed(2)}€</span>
                     </p>
                   </div>
@@ -436,7 +436,7 @@ export default function DashboardTab({
                   <X className="w-4 h-4 text-zinc-400" />
                 </button>
               </div>
-              <p className="text-xs text-zinc-600 mb-3">{t("dashboard.last6Months")}</p>
+              <p className="text-app-xs text-zinc-600 mb-3">{t("dashboard.last6Months")}</p>
               <div className="w-full h-[180px]">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <LineChart data={drillData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -475,9 +475,9 @@ export default function DashboardTab({
                 <GhostIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-zinc-100">{ghostLabel}</p>
+                <p className="text-app-sm font-medium text-zinc-100">{ghostLabel}</p>
               </div>
-              <span className="text-zinc-600 text-xs">⠿</span>
+              <span className="text-zinc-600 text-app-xs">⠿</span>
             </div>
           </div>
         )
@@ -497,7 +497,7 @@ export default function DashboardTab({
           />
           <div className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex items-center justify-between mb-2">
-              <h3 id="widget-picker-title" className="text-lg font-black text-zinc-100">
+              <h3 id="widget-picker-title" className="text-app-lg font-black text-zinc-100">
                 {t("dashboard.customizeTitle")}
               </h3>
               <button
@@ -508,7 +508,7 @@ export default function DashboardTab({
                 <X className="w-5 h-5 text-zinc-400" />
               </button>
             </div>
-            <p className="text-xs text-zinc-600 mb-5">
+            <p className="text-app-xs text-zinc-600 mb-5">
               {t("dashboard.customizeHint")}
             </p>
             <div className="space-y-2">
@@ -616,11 +616,11 @@ export default function DashboardTab({
                       <WIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0 pointer-events-none">
-                      <p className="text-sm font-medium text-zinc-100">{w.label}</p>
-                      <p className="text-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
+                      <p className="text-app-sm font-medium text-zinc-100">{w.label}</p>
+                      <p className="text-app-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-zinc-600 text-xs select-none pointer-events-none">⠿</span>
+                      <span className="text-zinc-600 text-app-xs select-none pointer-events-none">⠿</span>
                       <button
                         onClick={e => { e.stopPropagation(); toggleWidget(w.id) }}
                         className="w-6 h-6 rounded-full flex items-center justify-center bg-emerald-500 border-2 border-emerald-500"
@@ -645,8 +645,8 @@ export default function DashboardTab({
                       <WIcon className="w-5 h-5 text-zinc-500" aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-400">{w.label}</p>
-                      <p className="text-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
+                      <p className="text-app-sm font-medium text-zinc-400">{w.label}</p>
+                      <p className="text-app-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
                     </div>
                     <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-zinc-600" />
                   </button>

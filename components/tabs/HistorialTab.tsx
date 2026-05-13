@@ -362,7 +362,7 @@ export default function HistorialTab() {
               onChange={e => setSearchTerm(e.target.value)}
               placeholder={t("historial.searchPlaceholder")}
               aria-label={t("historial.ariaSearch")}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-app-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50 transition-all"
             />
           </div>
           <EncryptionBadge />
@@ -418,14 +418,14 @@ export default function HistorialTab() {
           return (
             <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-6">
               <Package className="w-10 h-10 text-zinc-700" aria-hidden="true" />
-              <p className="text-sm text-zinc-500 font-medium">
+              <p className="text-app-sm text-zinc-500 font-medium">
                 {hasActiveFilters
                   ? (searchTerm.trim() ? t("historial.noResults") : t("historial.noResultsFilter"))
                   : t("historial.noMovements")
                 }
               </p>
               {!hasActiveFilters && (
-                <p className="text-xs text-zinc-700">{t("historial.noMovementsHint")}</p>
+                <p className="text-app-xs text-zinc-700">{t("historial.noMovementsHint")}</p>
               )}
             </div>
           )
@@ -517,7 +517,7 @@ export default function HistorialTab() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-200 truncate">
+                      <p className="text-app-sm font-medium text-zinc-200 truncate">
                         {esTransfer ? t("historial.labelTransfer") : (cat?.label ?? m.categoria)}
                       </p>
                       <span className={`w-fit text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded mt-0.5 ${esTransfer
@@ -529,12 +529,12 @@ export default function HistorialTab() {
                         {esTransfer ? t("historial.badgeTransfer") : esIngreso ? t("historial.badgeIngreso") : t("historial.badgeGasto")}
                       </span>
                       {esTransfer && cuenta && cuentaDest && (
-                        <p className="text-xs text-zinc-500 mt-0.5 truncate">
+                        <p className="text-app-xs text-zinc-500 mt-0.5 truncate">
                           {cuenta.nombre} → {cuentaDest.nombre}
                         </p>
                       )}
                       {!esTransfer && cuenta && (
-                        <p className="text-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
+                        <p className="text-app-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
                       )}
                       {/* ── Badge gasto compartido (solo etiqueta) ── */}
                       {m.compartido_personas && m.compartido_personas > 1 && (
@@ -543,25 +543,25 @@ export default function HistorialTab() {
                         </span>
                       )}
                       {m.nota === DECRYPT_ERROR ? (
-                        <p className="text-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
+                        <p className="text-app-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
                       ) : m.nota ? (
-                        <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
+                        <p className="text-app-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
                       ) : null}
-                      <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
+                      <p className="text-app-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
                     </div>
 
                     {/* ── Columna derecha: importe + dial reembolsos ── */}
                     <div className="flex flex-col items-center gap-1 flex-shrink-0">
                       {m.cantidad === -1 ? (
                         <span
-                          className="text-sm font-semibold text-zinc-600"
+                          className="text-app-sm font-semibold text-zinc-600"
                           aria-label={t("common.encryptedValue")}
                           title={t("common.encryptedValue")}
                         >
                           {t("common.encryptedShort")}
                         </span>
                       ) : (
-                        <p className={`text-sm font-semibold tabular-nums ${amountColor}`}
+                        <p className={`text-app-sm font-semibold tabular-nums ${amountColor}`}
                           aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
                         >
                           {amountPrefix}
@@ -603,7 +603,7 @@ export default function HistorialTab() {
                                   }
                                 }
                               }}
-                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all text-xs active:scale-90"
+                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all text-app-xs active:scale-90"
                               aria-label="Restar reembolso"
                             >−</button>
                             <span className={`text-[10px] font-semibold tabular-nums min-w-[28px] text-center ${(m.reembolsos_recibidos ?? 0) >= (m.compartido_personas - 1)
@@ -641,7 +641,7 @@ export default function HistorialTab() {
                                   }
                                 }
                               }}
-                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all text-xs active:scale-90"
+                              className="w-5 h-5 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all text-app-xs active:scale-90"
                               aria-label="Sumar reembolso"
                             >+</button>
                           </div>
@@ -670,7 +670,7 @@ export default function HistorialTab() {
                   fetchMovimientos(next, selectedCategory, tipoFilter)
                 }}
                 disabled={loading}
-                className="w-full py-4 mt-2 text-sm font-medium text-zinc-400 bg-zinc-900/50 hover:bg-zinc-900 rounded-xl transition-all flex justify-center items-center gap-2"
+                className="w-full py-4 mt-2 text-app-sm font-medium text-zinc-400 bg-zinc-900/50 hover:bg-zinc-900 rounded-xl transition-all flex justify-center items-center gap-2"
               >
                 {loading
                   ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -700,13 +700,13 @@ export default function HistorialTab() {
                     : t("historial.deleteConfirmGasto")
               })}
             </h3>
-            <p className="text-zinc-500 text-sm mb-6">{t("historial.deleteConfirmBody")}</p>
+            <p className="text-zinc-500 text-app-sm mb-6">{t("historial.deleteConfirmBody")}</p>
             <div className="flex gap-3">
               <button
                 ref={cancelDeleteRef}
                 onClick={() => setConfirmarBorrado(null)}
                 aria-label={t("historial.ariaCancelDelete")}
-                className="flex-1 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-all"
+                className="flex-1 py-2 text-app-sm text-zinc-400 hover:text-zinc-200 transition-all"
               >
                 {t("common.cancel")}
               </button>
@@ -720,7 +720,7 @@ export default function HistorialTab() {
                       : t("historial.deleteConfirmGasto"),
                   amount: movABorrar && movABorrar.cantidad !== -1 ? movABorrar.cantidad.toFixed(2) : "?",
                 })}
-                className="flex-1 py-2 text-sm bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all"
+                className="flex-1 py-2 text-app-sm bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all"
               >
                 {t("common.delete")}
               </button>

@@ -506,20 +506,20 @@ export default function IngresoTab({
         {success && lastSaved && (
           <div className="absolute inset-0 z-40 bg-zinc-950/95 flex flex-col items-center justify-center gap-4 rounded-t-xl animate-in fade-in duration-300 px-8">
             <CheckCircle2 className={`w-14 h-14 ${accent.text}`} strokeWidth={1.5} />
-            <p className={`font-semibold text-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
+            <p className={`font-semibold text-app-lg ${accent.text}`}>{t("ingreso.savedOk")}</p>
             <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-app-sm">
                 <span className="text-zinc-500">{t("ingreso.savedAmount")}</span>
                 <span className={`font-semibold tabular-nums ${accent.text}`}>
                   {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-app-sm">
                 <span className="text-zinc-500">{t("ingreso.savedCategory")}</span>
                 <span className="text-zinc-200 font-medium">{lastSaved.catLabel}</span>
               </div>
               {lastSaved.cuentaNombre && (
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-app-sm">
                   <span className="text-zinc-500">{t("ingreso.savedAccount")}</span>
                   <span className="text-zinc-200">{lastSaved.cuentaNombre}</span>
                 </div>
@@ -544,25 +544,25 @@ export default function IngresoTab({
                   <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">
                     {tipoMovimiento === "ingreso" ? t("ingreso.recurModalTitleIngreso") : t("ingreso.recurModalTitleGasto")}
                   </h3>
-                  <p className="text-zinc-500 text-sm mb-6">
+                  <p className="text-zinc-500 text-app-sm mb-6">
                     {tipoMovimiento === "ingreso" ? t("ingreso.recurModalDescIngreso") : t("ingreso.recurModalDescGasto")}
                   </p>
                   <div className="flex flex-col gap-3">
                     <button
                       onClick={() => setShowPeriodStep(true)}
-                      className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
+                      className="w-full py-3 text-app-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
                     >
                       {tipoMovimiento === "ingreso" ? t("ingreso.recurYesIngreso") : t("ingreso.recurYesGasto")}
                     </button>
                     <button
                       onClick={() => handleGuardar(pendingCat!, false)}
-                      className="w-full py-3 text-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
+                      className="w-full py-3 text-app-sm bg-zinc-700 text-zinc-100 rounded-xl font-bold hover:bg-zinc-600 transition-all"
                     >
                       {tipoMovimiento === "ingreso" ? t("ingreso.recurNoIngreso") : t("ingreso.recurNoGasto")}
                     </button>
                     <button
                       onClick={() => { setShowRecurModal(false); setShowPeriodStep(false) }}
-                      className="mt-1 text-xs text-zinc-600 hover:text-zinc-400"
+                      className="mt-1 text-app-xs text-zinc-600 hover:text-zinc-400"
                     >
                       {t("common.cancel")}
                     </button>
@@ -571,7 +571,7 @@ export default function IngresoTab({
               ) : (
                 <>
                   <h3 id="recur-modal-title" className="text-zinc-100 font-semibold mb-2">{t("ingreso.recurPeriodTitle")}</h3>
-                  <p className="text-zinc-500 text-sm mb-4">{t("ingreso.recurPeriodDesc")}</p>
+                  <p className="text-zinc-500 text-app-sm mb-4">{t("ingreso.recurPeriodDesc")}</p>
                   <div className="flex flex-col gap-2 mb-4">
                     {([
                       { value: 'monthly', label: t("ingreso.recurMonthly"), sub: t("ingreso.recurMonthlyDesc") },
@@ -583,26 +583,26 @@ export default function IngresoTab({
                       <button
                         key={value}
                         onClick={() => setRecurPeriod(value)}
-                        className={`w-full py-2.5 px-4 rounded-xl text-sm text-left transition-all border flex justify-between items-center ${recurPeriod === value
+                        className={`w-full py-2.5 px-4 rounded-xl text-app-sm text-left transition-all border flex justify-between items-center ${recurPeriod === value
                           ? `${accent.bg} text-zinc-950 font-bold border-transparent`
                           : 'text-zinc-300 border-zinc-700 hover:bg-zinc-800'
                           }`}
                       >
                         <span>{label}</span>
-                        <span className={`text-xs ${recurPeriod === value ? 'text-zinc-950/60' : 'text-zinc-500'}`}>{sub}</span>
+                        <span className={`text-app-xs ${recurPeriod === value ? 'text-zinc-950/60' : 'text-zinc-500'}`}>{sub}</span>
                       </button>
                     ))}
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowPeriodStep(false)}
-                      className="flex-1 py-2.5 text-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all"
+                      className="flex-1 py-2.5 text-app-sm text-zinc-400 border border-zinc-700 rounded-xl hover:bg-zinc-800 transition-all"
                     >
                       {t("common.back")}
                     </button>
                     <button
                       onClick={() => handleGuardar(pendingCat!, true, recurPeriod)}
-                      className={`flex-1 py-2.5 text-sm ${accent.bg} text-zinc-950 rounded-xl font-bold ${accent.hover} transition-all`}
+                      className={`flex-1 py-2.5 text-app-sm ${accent.bg} text-zinc-950 rounded-xl font-bold ${accent.hover} transition-all`}
                     >
                       {t("common.save")}
                     </button>
@@ -618,7 +618,7 @@ export default function IngresoTab({
           <div className="border-b border-zinc-800/60 p-4 bg-zinc-950">
             <div className="flex items-center gap-2 mb-2">
               <CalendarDays className="w-4 h-4 text-zinc-400" aria-hidden="true" />
-              <p className="font-semibold text-xs uppercase tracking-wider text-zinc-400">
+              <p className="font-semibold text-app-xs uppercase tracking-wider text-zinc-400">
                 {t("ingreso.pendingTitle")} — {new Date().toLocaleDateString("es-ES", { month: "long" })}
               </p>
             </div>
@@ -647,10 +647,10 @@ export default function IngresoTab({
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${badgeClass}`}>
                         {badgeLabel}
                       </span>
-                      <p className="text-sm text-zinc-200 truncate font-medium mt-1">
+                      <p className="text-app-sm text-zinc-200 truncate font-medium mt-1">
                         {catLabel}{sub.nota && sub.nota !== DECRYPT_ERROR ? ` · ${sub.nota}` : ""}
                       </p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
+                      <p className="text-app-xs text-zinc-500 mt-0.5">
                         {sub.cantidad === -1
                           ? t("common.encryptedShort")
                           : `${sub.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`
@@ -670,7 +670,7 @@ export default function IngresoTab({
                         onClick={() => handleCobrarSub(sub)}
                         disabled={processingSub === sub.id}
                         aria-label={`Cobrar recurrente ${catLabel}`}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${btnClass}`}
+                        className={`px-3 py-1.5 rounded-lg text-app-xs font-bold transition-all flex items-center gap-1 ${btnClass}`}
                       >
                         {processingSub === sub.id
                           ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -697,7 +697,7 @@ export default function IngresoTab({
                 key={id}
                 onClick={() => { setTipoMovimiento(id); setError(null); setEsCompartido(false) }}
                 aria-pressed={tipoMovimiento === id}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs rounded-lg transition-all duration-200 ${tipoMovimiento === id ? `${activeClass} font-bold` : "text-zinc-600 hover:text-zinc-400 font-medium"
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-app-xs rounded-lg transition-all duration-200 ${tipoMovimiento === id ? `${activeClass} font-bold` : "text-zinc-600 hover:text-zinc-400 font-medium"
                   }`}
               >
                 <Icon className="w-3.5 h-3.5" aria-hidden="true" />
@@ -713,15 +713,15 @@ export default function IngresoTab({
           className="flex flex-col items-center justify-end px-6 pt-3 pb-3 border-b border-zinc-800/60 bg-zinc-950 cursor-pointer select-none"
           onClick={() => setTecladoVisible(v => !v)}
         >
-          {error && <p className="text-xs text-red-400 mb-1 self-start" role="alert">{error}</p>}
+          {error && <p className="text-app-xs text-red-400 mb-1 self-start" role="alert">{error}</p>}
           {budgetWarning && (
-            <div className="w-full mb-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2 text-xs text-yellow-400" role="status">
+            <div className="w-full mb-1 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2 text-app-xs text-yellow-400" role="status">
               {budgetWarning}
             </div>
           )}
           <div className="flex items-baseline gap-2">
             <span
-              className="text-xl font-light transition-colors duration-200"
+              className="text-app-xl font-light transition-colors duration-200"
               style={{ color: tipoMovimiento === "ingreso" ? "#10b981" : tipoMovimiento === "transferencia" ? "#3b82f6" : "#ef4444" }}
               aria-hidden="true"
             >€</span>
@@ -737,7 +737,7 @@ export default function IngresoTab({
             </span>
           </div>
           {esCompartido && cantidadFinalCompartido !== null && (
-            <p className="text-xs text-amber-400 mt-0.5 tabular-nums">
+            <p className="text-app-xs text-amber-400 mt-0.5 tabular-nums">
               {t("ingreso.compartidoTuParte")} <span className="font-semibold">{miParteLabel}€</span>
             </p>
           )}
@@ -770,7 +770,7 @@ export default function IngresoTab({
                   is_recurring: false,
                 } as Movimiento)
               }}
-              className="w-full flex items-center justify-between bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
+              className="w-full flex items-center justify-between bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-3 py-2 text-app-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 transition-all"
             >
               <span>{t("ingreso.lastSaved")}: <span className="text-zinc-300">{lastSaved.catLabel} · {lastSaved.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span></span>
               <span className="text-zinc-600 text-[10px] uppercase tracking-wider ml-2">{t("ingreso.lastSavedEdit")}</span>
@@ -787,8 +787,8 @@ export default function IngresoTab({
               <div className="space-y-3">
                 {cuentas.length < 2 ? (
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-center">
-                    <p className="text-sm text-blue-300 font-medium mb-1">{t("ingreso.needTwoAccounts")}</p>
-                    <p className="text-xs text-zinc-500">{t("ingreso.needTwoAccountsHint")}</p>
+                    <p className="text-app-sm text-blue-300 font-medium mb-1">{t("ingreso.needTwoAccounts")}</p>
+                    <p className="text-app-xs text-zinc-500">{t("ingreso.needTwoAccountsHint")}</p>
                   </div>
                 ) : (
                   <>
@@ -800,7 +800,7 @@ export default function IngresoTab({
                         onChange={e => setNota(e.target.value)}
                         maxLength={80}
                         placeholder={t("ingreso.placeholderNotaTransfer")}
-                        className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
+                        className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-app-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
                       />
                     </div>
                     <div>
@@ -835,8 +835,8 @@ export default function IngresoTab({
                     </div>
                     <div className="flex items-center justify-between px-1 py-2">
                       <div>
-                        <p className="text-xs font-medium text-zinc-300">{t("ingreso.recurringTransferLabel")}</p>
-                        <p className="text-xs text-zinc-600 mt-0.5">{t("ingreso.recurringTransferDesc")}</p>
+                        <p className="text-app-xs font-medium text-zinc-300">{t("ingreso.recurringTransferLabel")}</p>
+                        <p className="text-app-xs text-zinc-600 mt-0.5">{t("ingreso.recurringTransferDesc")}</p>
                       </div>
                       <button
                         type="button"
@@ -851,7 +851,7 @@ export default function IngresoTab({
                     <button
                       onClick={handleGuardarTransferencia}
                       disabled={isDisabled || !cuentaDestinoId || saving}
-                      className="w-full py-4 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-zinc-950 font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-zinc-950 font-bold rounded-xl text-app-sm transition-all flex items-center justify-center gap-2"
                     >
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
                       {t("ingreso.registerTransfer")}
@@ -883,7 +883,7 @@ export default function IngresoTab({
                           ? t("ingreso.placeholderNotaIngreso")
                           : t("ingreso.placeholderNotaGasto")
                       }
-                      className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2 text-sm text-zinc-100 placeholder-zinc-700 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
+                      className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2 text-app-sm text-zinc-100 placeholder-zinc-700 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
                     />
                   </div>
 
@@ -897,7 +897,7 @@ export default function IngresoTab({
                         <button
                           onClick={() => setShowCuentaSheet(true)}
                           aria-label={`Cuenta: ${cuentaSeleccionada.nombre}`}
-                          className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800/80 rounded-xl px-3 py-2.5 text-sm hover:border-zinc-600 transition-all max-w-[120px]"
+                          className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800/80 rounded-xl px-3 py-2.5 text-app-sm hover:border-zinc-600 transition-all max-w-[120px]"
                           style={{ borderColor: cuentaSeleccionada.color + "60" }}
                         >
                           {(() => {
@@ -905,7 +905,7 @@ export default function IngresoTab({
                             return (
                               <>
                                 <CIcon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: cuentaSeleccionada.color }} aria-hidden="true" />
-                                <span className="truncate text-xs font-medium" style={{ color: cuentaSeleccionada.color }}>
+                                <span className="truncate text-app-xs font-medium" style={{ color: cuentaSeleccionada.color }}>
                                   {cuentaSeleccionada.nombre}
                                 </span>
                               </>
@@ -948,7 +948,7 @@ export default function IngresoTab({
                       <button
                         type="button"
                         onClick={() => setModoCompartido("dividir")}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${modoCompartido === "dividir"
+                        className={`flex-1 py-1.5 text-app-xs font-semibold rounded-md transition-all ${modoCompartido === "dividir"
                             ? "bg-amber-500/20 text-zinc-100 dark:text-amber-300"
                             : "text-zinc-500 hover:text-zinc-400"
                           }`}
@@ -958,7 +958,7 @@ export default function IngresoTab({
                       <button
                         type="button"
                         onClick={() => setModoCompartido("mi_parte")}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${modoCompartido === "mi_parte"
+                        className={`flex-1 py-1.5 text-app-xs font-semibold rounded-md transition-all ${modoCompartido === "mi_parte"
                             ? "bg-amber-500/20 text-amber-950 dark:text-amber-300"
                             : "text-zinc-500 hover:text-zinc-400"
                           }`}
@@ -971,28 +971,28 @@ export default function IngresoTab({
                     {modoCompartido === "dividir" && (
                       <div className="space-y-3">
                         <div className="flex items-center gap-3">
-                          <p className="text-xs text-zinc-400 flex-shrink-0">{t("ingreso.compartidoEntrePersonas")}</p>
+                          <p className="text-app-xs text-zinc-400 flex-shrink-0">{t("ingreso.compartidoEntrePersonas")}</p>
                           <div className="flex items-center gap-2 ml-auto">
                             <button
                               onClick={() => setCompartidoPersonas(p => Math.max(2, p - 1))}
-                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-lg font-light hover:bg-zinc-700 active:scale-90 transition-all"
+                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-app-lg font-light hover:bg-zinc-700 active:scale-90 transition-all"
                             >−</button>
-                            <span className="text-xl font-semibold text-zinc-100 w-6 text-center tabular-nums">{compartidoPersonas}</span>
+                            <span className="text-app-xl font-semibold text-zinc-100 w-6 text-center tabular-nums">{compartidoPersonas}</span>
                             <button
                               onClick={() => setCompartidoPersonas(p => Math.min(20, p + 1))}
-                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-lg font-light hover:bg-zinc-700 active:scale-90 transition-all"
+                              className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 flex items-center justify-center text-app-lg font-light hover:bg-zinc-700 active:scale-90 transition-all"
                             >+</button>
                           </div>
                         </div>
                         <div className="flex items-center justify-between bg-zinc-900/60 rounded-xl px-3 py-2.5">
-                          <span className="text-xs text-zinc-500">{t("ingreso.compartidoTotalAdelantado")}</span>
-                          <span className="text-sm font-medium text-zinc-300 tabular-nums">{displayNum.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span>
+                          <span className="text-app-xs text-zinc-500">{t("ingreso.compartidoTotalAdelantado")}</span>
+                          <span className="text-app-sm font-medium text-zinc-300 tabular-nums">{displayNum.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span>
                         </div>
                         <div className="flex items-center justify-between bg-amber-500/10 rounded-xl px-3 py-2.5 border border-amber-500/20">
-                          <span className="text-xs" style={{ color: "var(--compartido-text)" }}>
+                          <span className="text-app-xs" style={{ color: "var(--compartido-text)" }}>
                             {t("ingreso.compartidoTuParteReal")}
                           </span>
-                          <span className="text-base font-bold text-amber-800 tabular-nums">{miParteLabel}€</span>
+                          <span className="text-app-base font-bold text-amber-800 tabular-nums">{miParteLabel}€</span>
                         </div>
                       </div>
                     )}
@@ -1001,11 +1001,11 @@ export default function IngresoTab({
                     {modoCompartido === "mi_parte" && (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between bg-zinc-900/60 rounded-xl px-3 py-2.5">
-                          <span className="text-xs text-zinc-500">{t("ingreso.compartidoTotalAdelantado")}</span>
-                          <span className="text-sm font-medium text-zinc-300 tabular-nums">{displayNum.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span>
+                          <span className="text-app-xs text-zinc-500">{t("ingreso.compartidoTotalAdelantado")}</span>
+                          <span className="text-app-sm font-medium text-zinc-300 tabular-nums">{displayNum.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€</span>
                         </div>
                         <div>
-                          <label htmlFor="mi-parte-input" className="block text-xs text-zinc-500 mb-1.5 px-1">
+                          <label htmlFor="mi-parte-input" className="block text-app-xs text-zinc-500 mb-1.5 px-1">
                             {t("ingreso.compartidoTuParteLabel")}
                           </label>
                           <input
@@ -1016,15 +1016,15 @@ export default function IngresoTab({
                             value={miParteManual}
                             onChange={e => setMiParteManual(e.target.value)}
                             placeholder="0.00"
-                            className="w-full bg-zinc-900 border border-amber-500/30 rounded-xl px-4 py-2.5 text-sm text-amber-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/60 transition-all tabular-nums"
+                            className="w-full bg-zinc-900 border border-amber-500/30 rounded-xl px-4 py-2.5 text-app-sm text-amber-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/60 transition-all tabular-nums"
                           />
                         </div>
                         {cantidadFinalCompartido !== null && (
                           <div className="flex items-center justify-between bg-amber-500/10 rounded-xl px-3 py-2.5 border border-amber-500/20">
-                            <span className="text-xs" style={{ color: "var(--compartido-text)" }}>
+                            <span className="text-app-xs" style={{ color: "var(--compartido-text)" }}>
                               {t("ingreso.compartidoSeGuardara")}
                             </span>
-                            <span className="text-base font-bold" style={{ color: "var(--compartido-text-strong)" }}>
+                            <span className="text-app-base font-bold" style={{ color: "var(--compartido-text-strong)" }}>
                               {miParteLabel}€
                             </span>
                           </div>
@@ -1165,7 +1165,7 @@ export default function IngresoTab({
                     <button
                       onClick={() => onCategoryClick(catSeleccionada)}
                       disabled={isDisabled || saving}
-                      className={`w-full py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-40 ${tipoMovimientoButtonClass}`}
+                      className={`w-full py-4 rounded-2xl font-bold text-app-sm transition-all flex items-center justify-center gap-2 disabled:opacity-40 ${tipoMovimientoButtonClass}`}
                     >
                       {saving
                         ? <Loader2 className="w-4 h-4 animate-spin" />

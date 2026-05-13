@@ -878,12 +878,12 @@ export default function IngresoTab({
                       value={nota}
                       onChange={e => setNota(e.target.value)}
                       maxLength={80}
-                      placeholder={
+                     placeholder={
                         tipoMovimiento === "ingreso"
                           ? t("ingreso.placeholderNotaIngreso")
                           : t("ingreso.placeholderNotaGasto")
                       }
-                      className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
+                      className={`w-full bg-zinc-900 border border-zinc-800/80 rounded-xl px-4 py-2 text-sm text-zinc-100 placeholder-zinc-700 focus:outline-none transition-all focus:ring-1 ${accent.border} ${accent.ring}`}
                     />
                   </div>
 

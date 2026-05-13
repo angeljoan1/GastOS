@@ -237,7 +237,10 @@ function MainApp({ session }: { session: Session }) {
 
   return (
     <AppDataProvider value={{ categorias, setCategorias, cuentas, setCuentas, presupuestos, setPresupuestos, objetivos, setObjetivos }}>
-    <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden">
+    <div
+      className="flex flex-col h-dvh bg-zinc-950 text-zinc-100 w-full max-w-md mx-auto relative overflow-hidden"
+      style={{ zoom: `calc(1 * var(--app-font-scale, 1))` } as React.CSSProperties}
+    >
       <header className="flex items-center justify-between px-4 pt-safe-top py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
         <div className="flex items-center gap-2.5">
           <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />

@@ -55,7 +55,7 @@ export default function RootLayout({
     >
       <head>
         {/* Runs before first paint: remove .dark if user picked light mode */}
-        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('gastos-theme')==='light')document.documentElement.classList.remove('dark')}catch(e){}` }} />
+        <script dangerouslySetInnerHTML={{ __html: `try{if(localStorage.getItem('gastos-theme')==='light')document.documentElement.classList.remove('dark')}catch(e){}try{var fs=localStorage.getItem('gastos-font-size');if(fs==='small'||fs==='large')document.documentElement.classList.add('font-'+fs);else document.documentElement.classList.add('font-medium')}catch(e){document.documentElement.classList.add('font-medium')}` }} />
       </head>
       <body className="min-h-full flex flex-col">
         <IntlProvider>{children}</IntlProvider>

@@ -438,7 +438,12 @@
     "bioReactivateHint": "Si cambias tu PIN via recuperación de correo, deberás reactivar la biometría.",
     "bioErrorActivate": "No se pudo activar. Inténtalo de nuevo.",
     "swipeHintLabel": "Animación de deslizamiento",
-    "swipeHintDesc": "Muestra una animación al abrir el historial para recordar que puedes deslizar"
+    "swipeHintDesc": "Muestra una animación al abrir el historial para recordar que puedes deslizar",
+    "fontSizeLabel": "Tamaño de texto",
+    "fontSizeDesc": "Ajusta el tamaño del texto de la app",
+    "fontSizeSmall": "S",
+    "fontSizeMedium": "M",
+    "fontSizeLarge": "L"
   },
   "import_csv": {
     "title": "Importar CSV",

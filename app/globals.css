@@ -150,6 +150,12 @@ select:focus {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.03em;
   }
+
+  .text-app-xs   { font-size: calc(0.75rem  * var(--app-font-scale)); }
+  .text-app-sm   { font-size: calc(0.875rem * var(--app-font-scale)); }
+  .text-app-base { font-size: calc(1rem     * var(--app-font-scale)); }
+  .text-app-lg   { font-size: calc(1.125rem * var(--app-font-scale)); }
+  .text-app-xl   { font-size: calc(1.25rem  * var(--app-font-scale)); }
 }
 
 @keyframes marquee {
@@ -229,47 +235,20 @@ select:focus {
 
 /* ── Animaciones widget racha_ahorro ──────────────────────────────────────── */
 @keyframes flicker1 {
-
-  0%,
-  100% {
-    transform: scaleX(1) scaleY(1);
-  }
-
-  25% {
-    transform: scaleX(0.88) scaleY(1.08);
-  }
-
-  75% {
-    transform: scaleX(1.08) scaleY(0.94);
-  }
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  25%       { transform: scaleX(0.88) scaleY(1.08); }
+  75%       { transform: scaleX(1.08) scaleY(0.94); }
 }
 
 @keyframes flicker2 {
-
-  0%,
-  100% {
-    transform: scaleX(1) scaleY(1);
-  }
-
-  33% {
-    transform: scaleX(0.92) scaleY(1.1);
-  }
-
-  66% {
-    transform: scaleX(1.06) scaleY(0.9);
-  }
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  33%      { transform: scaleX(0.92) scaleY(1.1); }
+  66%      { transform: scaleX(1.06) scaleY(0.9); }
 }
 
 @keyframes rise {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-3px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
 }
 
 .flame-outer {
@@ -288,47 +267,53 @@ select:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .flame-outer,
   .flame-mid,
   .flame-inner {
     animation: none;
   }
-
-  /* ── Tipografía global premium ───────────────────────────────────────────── */
-  .text-display {
-    font-family: var(--font-geist-sans), sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.04em;
-  }
-
-  .text-label-section {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-zinc-600, #52525b);
-  }
-
-  /* Gradiente de texto para importes positivos/negativos */
-  .amount-positive {
-    background: linear-gradient(135deg, #10b981, #34d399);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .amount-negative {
-    background: linear-gradient(135deg, #ef4444, #f87171);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Card con profundidad */
-  .card-elevated {
-    background: var(--color-zinc-900);
-    border: 1px solid var(--color-zinc-800);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-  }
 }
+
+/* ── Tipografía global premium ───────────────────────────────────────────── */
+.text-display {
+  font-family: var(--font-geist-sans), sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.text-label-section {
+  font-size: calc(0.65rem * var(--app-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-zinc-600, #52525b);
+}
+
+.amount-positive {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.amount-negative {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card-elevated {
+  background: var(--color-zinc-900);
+  border: 1px solid var(--color-zinc-800);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+/* ── Escala de texto ─────────────────────────────────────────────────────── */
+:root {
+  --app-font-scale: 1;
+}
+
+html.font-small  { --app-font-scale: 0.875; }
+html.font-medium { --app-font-scale: 1; }
+html.font-large  { --app-font-scale: 1.2; }

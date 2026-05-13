@@ -23,6 +23,10 @@ import { getIcon, CATEGORIA_ICON_OPTIONS } from "@/lib/icons"
 import { encryptData, isBiometricAvailable, hasBiometricKey, saveBiometricKey, clearBiometricKey } from "@/lib/crypto"
 import { useAppData } from "@/contexts/AppDataContext"
 
+const FONT_SIZE_KEY = "gastos-font-size"
+const FONT_SIZES = ["small", "medium", "large"] as const
+type FontSize = typeof FONT_SIZES[number]
+
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]
 
 export default function SettingsModal({
@@ -64,6 +68,11 @@ export default function SettingsModal({
   const [swipeHintEnabled, setSwipeHintEnabled] = useState<boolean>(
     typeof window !== "undefined" ? localStorage.getItem("gastos_swipe_hint") !== "off" : true
   )
+  const [fontSize, setFontSize] = useState<FontSize>(() => {
+    if (typeof window === "undefined") return "medium"
+    const stored = localStorage.getItem(FONT_SIZE_KEY)
+    return (stored === "small" || stored === "large") ? stored : "medium"
+  })
   const t = useTranslations()
 
   useEffect(() => {
@@ -291,6 +300,14 @@ export default function SettingsModal({
     setPendingLocale(locale)
   }
 
+  const handleChangeFontSize = (size: FontSize) => {
+    setFontSize(size)
+    localStorage.setItem(FONT_SIZE_KEY, size)
+    const html = document.documentElement
+    html.classList.remove("font-small", "font-medium", "font-large")
+    html.classList.add(`font-${size}`)
+  }
+
   // 2. Esta es la función que ejecuta el cambio real si el usuario dice "Sí"
   const confirmLocaleChange = () => {
     if (!pendingLocale) return
@@ -345,6 +362,34 @@ export default function SettingsModal({
                     }`}
                 >
                   {loc.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Selector de tamaño de fuente ── */}
+          <div className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-zinc-800 bg-zinc-800/40">
+            <span className="text-zinc-600 flex-shrink-0 text-sm font-black select-none w-4 text-center" aria-hidden="true">A</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-zinc-300">{t("settings.fontSizeLabel")}</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{t("settings.fontSizeDesc")}</p>
+            </div>
+            <div className="flex gap-1">
+              {([
+                { value: "small",  label: t("settings.fontSizeSmall")  },
+                { value: "medium", label: t("settings.fontSizeMedium") },
+                { value: "large",  label: t("settings.fontSizeLarge")  },
+              ] as const).map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => handleChangeFontSize(value)}
+                  aria-pressed={fontSize === value}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${fontSize === value
+                    ? "bg-emerald-500 text-zinc-950"
+                    : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200"
+                    }`}
+                >
+                  {label}
                 </button>
               ))}
             </div>

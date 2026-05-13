@@ -238,14 +238,14 @@ function MainApp({ session }: { session: Session }) {
   return (
     <AppDataProvider value={{ categorias, setCategorias, cuentas, setCuentas, presupuestos, setPresupuestos, objetivos, setObjetivos }}>
     <div
-      className="flex flex-col bg-zinc-950 text-zinc-100 max-w-md mx-auto relative overflow-hidden"
+      className="flex flex-col bg-zinc-950 text-zinc-100 mx-auto relative overflow-hidden"
       style={{
         zoom: `var(--app-font-scale, 1)`,
         width: `calc(min(100vw, 28rem) / var(--app-font-scale, 1))`,
         height: `calc(100dvh / var(--app-font-scale, 1))`,
       } as React.CSSProperties}
     >
-      <header className="flex items-center justify-between px-4 pt-safe-top py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
+      <header className="flex items-center justify-between px-4 pt-safe-zoom py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
         <div className="flex items-center gap-2.5">
           <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />
           <span className="text-[19px] font-black tracking-[-0.03em] text-zinc-100">GastOS</span>
@@ -357,7 +357,7 @@ function MainApp({ session }: { session: Session }) {
         )}
       </main>
 
-      <nav className="border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-bottom">
+      <nav className="border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-zoom">
         <div className="flex items-center justify-around py-2 gap-2">
           {([
             { id: "ingreso",   Icon: WalletCards, label: t("nav.register")  },

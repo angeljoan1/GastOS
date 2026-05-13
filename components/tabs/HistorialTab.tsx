@@ -539,7 +539,7 @@ export default function HistorialTab() {
                       {/* ── Badge gasto compartido (solo etiqueta) ── */}
                       {m.compartido_personas && m.compartido_personas > 1 && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 mt-0.5 w-fit">
-                          👥 compartido
+                          👥 {t("ingreso.compartidoToggleOn")}
                         </span>
                       )}
                       {m.nota === DECRYPT_ERROR ? (

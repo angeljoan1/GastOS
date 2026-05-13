@@ -146,6 +146,15 @@ select:focus {
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  /* Safe area utilities that compensate for CSS zoom so the visual inset stays correct */
+  .pt-safe-zoom {
+    padding-top: calc(env(safe-area-inset-top) / var(--app-font-scale, 1));
+  }
+
+  .pb-safe-zoom {
+    padding-bottom: calc(env(safe-area-inset-bottom) / var(--app-font-scale, 1));
+  }
+
   /* Fuente uniforme para todos los números de la app */
   .num {
     font-family: var(--font-geist-sans), sans-serif;

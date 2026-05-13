@@ -470,6 +470,7 @@ export default function HistorialTab() {
                   <div
                     className={`flex items-center gap-3 bg-zinc-900 border ${borderColor} rounded-2xl px-4 py-3 hover:bg-zinc-800/50 cursor-pointer`}
                     style={{
+                      touchAction: 'pan-y',
                       opacity: isDeleting ? 0.5 : 1,
                       ...(jiggleId === m.id
                         ? { animation: "swipe-hint 2s linear forwards" }

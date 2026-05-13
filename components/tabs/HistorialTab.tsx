@@ -536,12 +536,45 @@ export default function HistorialTab() {
                       {!esTransfer && cuenta && (
                         <p className="text-xs text-zinc-600 mt-0.5 truncate">{cuenta.nombre}</p>
                       )}
-                      {/* ── Badge gasto compartido con contador +/- ── */}
+                      {/* ── Badge gasto compartido (solo etiqueta) ── */}
                       {m.compartido_personas && m.compartido_personas > 1 && (
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
-                            👥 compartido
-                          </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 mt-0.5 w-fit">
+                          👥 compartido
+                        </span>
+                      )}
+                      {m.nota === DECRYPT_ERROR ? (
+                        <p className="text-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
+                      ) : m.nota ? (
+                        <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
+                      ) : null}
+                      <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
+                    </div>
+
+                    {/* ── Columna derecha: importe + dial reembolsos ── */}
+                    <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                      {m.cantidad === -1 ? (
+                        <span
+                          className="text-sm font-semibold text-zinc-600"
+                          aria-label={t("common.encryptedValue")}
+                          title={t("common.encryptedValue")}
+                        >
+                          {t("common.encryptedShort")}
+                        </span>
+                      ) : (
+                        <p className={`text-sm font-semibold tabular-nums ${amountColor}`}
+                          aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
+                        >
+                          {amountPrefix}
+                          {(m.cantidad as number).toLocaleString("es-ES", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}€
+                        </p>
+                      )}
+
+                      {/* Dial reembolsos + total: solo si es compartido */}
+                      {m.compartido_personas && m.compartido_personas > 1 && (
+                        <div className="flex flex-col items-end gap-0.5">
                           <div className="flex items-center gap-1">
                             <button
                               onClick={async (e) => {
@@ -549,14 +582,12 @@ export default function HistorialTab() {
                                 const recibidos = m.reembolsos_recibidos ?? 0
                                 if (recibidos <= 0) return
                                 const nuevoContador = recibidos - 1
-
                                 await supabase.from("movimientos")
                                   .update({ reembolsos_recibidos: nuevoContador })
                                   .eq("id", m.id)
                                 setMovimientos(prev =>
                                   prev.map(x => x.id === m.id ? { ...x, reembolsos_recibidos: nuevoContador } : x)
                                 )
-
                                 if (m.compartido_personas && m.compartido_total) {
                                   const parteAmigo = Math.round((m.compartido_total / m.compartido_personas) * 100) / 100
                                   const cuentaDelMov = cuentas.find(c => c.id === m.cuenta_id)
@@ -589,14 +620,12 @@ export default function HistorialTab() {
                                 const esperados = m.compartido_personas! - 1
                                 if (recibidos >= esperados) return
                                 const nuevoContador = recibidos + 1
-
                                 await supabase.from("movimientos")
                                   .update({ reembolsos_recibidos: nuevoContador })
                                   .eq("id", m.id)
                                 setMovimientos(prev =>
                                   prev.map(x => x.id === m.id ? { ...x, reembolsos_recibidos: nuevoContador } : x)
                                 )
-
                                 if (m.compartido_personas && m.compartido_total) {
                                   const parteAmigo = Math.round((m.compartido_total / m.compartido_personas) * 100) / 100
                                   const cuentaDelMov = cuentas.find(c => c.id === m.cuenta_id)
@@ -623,42 +652,16 @@ export default function HistorialTab() {
                           )}
                         </div>
                       )}
-                      {m.nota === DECRYPT_ERROR ? (
-                        <p className="text-xs text-zinc-600 mt-0.5">{t("common.encryptedShort")}</p>
-                      ) : m.nota ? (
-                        <p className="text-xs text-zinc-500 mt-0.5 truncate">{m.nota}</p>
-                      ) : null}
-                      <p className="text-xs text-zinc-700 mt-0.5">{formatDate(m.created_at)}</p>
+
+                      {isDeleting && (
+                        <Loader2 className="w-4 h-4 animate-spin text-zinc-600" />
+                      )}
+
                     </div>
-
-                    {m.cantidad === -1 ? (
-                      <span
-                        className="text-sm font-semibold flex-shrink-0 text-zinc-600"
-                        aria-label={t("common.encryptedValue")}
-                        title={t("common.encryptedValue")}
-                      >
-                        {t("common.encryptedShort")}
-                      </span>
-                    ) : (
-                      <p className={`text-sm font-semibold tabular-nums flex-shrink-0 ${amountColor}`}
-                        aria-label={`${amountPrefix}${m.cantidad.toLocaleString("es-ES", { minimumFractionDigits: 2 })} euros`}
-                      >
-                        {amountPrefix}
-                        {(m.cantidad as number).toLocaleString("es-ES", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}€
-                      </p>
-                    )}
-
-                    {isDeleting && (
-                      <Loader2 className="w-4 h-4 animate-spin text-zinc-600 flex-shrink-0" />
-                    )}
                   </div>
                 </div>
               )
             })}
-
             {hasMore && !searchTerm && (
               <button
                 onClick={() => {

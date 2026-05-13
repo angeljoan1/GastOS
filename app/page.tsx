@@ -241,7 +241,7 @@ function MainApp({ session }: { session: Session }) {
       <header className="flex items-center justify-between px-4 pt-safe-top py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
         <div className="flex items-center gap-2.5">
           <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />
-          <span className="text-[17px] font-bold tracking-[-0.02em] text-zinc-100">GastOS</span>
+          <span className="text-[19px] font-black tracking-[-0.03em] text-zinc-100">GastOS</span>
         </div>
 
         <div className="flex items-center gap-1">
@@ -350,28 +350,35 @@ function MainApp({ session }: { session: Session }) {
         )}
       </main>
 
-      <nav className="border-t border-zinc-800/60 bg-zinc-950/95 backdrop-blur-sm px-3 pb-safe-bottom">
-        <div className="flex items-center justify-around py-1.5 gap-1">
+      <nav className="border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-bottom">
+        <div className="flex items-center justify-around py-2 gap-2">
           {([
-            { id: "ingreso", Icon: WalletCards, label: t("nav.register") },
-            { id: "historial", Icon: History, label: t("nav.historial") },
-            { id: "dashboard", Icon: BarChart3, label: t("nav.dashboard") },
-          ] as const).map(({ id, Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
-              aria-label={label}
-              aria-current={tab === id ? "page" : undefined}
-              className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all duration-200 ${
-                tab === id
-                  ? "bg-emerald-500/15 text-emerald-400"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <Icon className={`w-5 h-5 transition-transform duration-200 ${tab === id ? "scale-110" : ""}`} />
-              <span className="text-[10px] font-medium">{label}</span>
-            </button>
-          ))}
+            { id: "ingreso",   Icon: WalletCards, label: t("nav.register")  },
+            { id: "historial", Icon: History,     label: t("nav.historial") },
+            { id: "dashboard", Icon: BarChart3,   label: t("nav.dashboard") },
+          ] as const).map(({ id, Icon, label }) => {
+            const isActive = tab === id
+            return (
+              <button
+                key={id}
+                onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
+                aria-label={label}
+                aria-current={isActive ? "page" : undefined}
+                className="flex-1 flex flex-col items-center justify-center py-1.5 rounded-2xl transition-all duration-200"
+              >
+                <Icon
+                  className="w-6 h-6 transition-all duration-200"
+                  style={{
+                    color: isActive ? "#10b981" : "#52525b",
+                    filter: isActive
+                      ? "drop-shadow(0 0 6px #10b981aa)"
+                      : "none",
+                    strokeWidth: isActive ? 2.5 : 1.75,
+                  }}
+                />
+              </button>
+            )
+          })}
         </div>
       </nav>
 

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, DM_Sans } from "next/font/google"
+import { Geist, Geist_Mono, DM_Sans, Playfair_Display } from "next/font/google"
 import "./globals.css";
 import IntlProvider from "@/components/IntlProvider";
 import Script from "next/script";
@@ -8,6 +8,13 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["italic"],
+})
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -43,7 +50,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >
       <head>

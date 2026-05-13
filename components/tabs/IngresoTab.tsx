@@ -257,13 +257,16 @@ export default function IngresoTab({
 
     setError(null)
 
-    // Siempre se guarda el total adelantado. La parte propia es solo metadata.
-    const cantidadAGuardar = cantidadRaw
-    // personas para BD: en modo "mi_parte" calculamos aprox para que el badge sea informativo
+    // cantidad guardada = tu parte real. compartido_total = lo que adelantaste.
+    const cantidadAGuardar = esCompartido && cantidadFinalCompartido !== null
+      ? cantidadFinalCompartido
+      : cantidadRaw
     const personasAGuardar = esCompartido
       ? modoCompartido === "dividir"
         ? compartidoPersonas
-        : Math.round(cantidadRaw / cantidadAGuardar)  // aprox
+        : (cantidadRaw > 0 && cantidadFinalCompartido !== null && cantidadFinalCompartido > 0
+            ? Math.round((cantidadRaw / cantidadFinalCompartido) * 10) / 10
+            : 2)
       : null
 
     const notaCaptura = nota.trim()
@@ -686,15 +689,15 @@ export default function IngresoTab({
         <div className="px-4 pt-4 pb-2">
           <div className="flex rounded-xl bg-zinc-900 p-1 border border-zinc-800" role="group" aria-label={t("ingreso.ariaTypeGroup")}>
             {([
-              { id: "gasto", label: t("ingreso.typeGasto"), Icon: TrendingDown, activeClass: "bg-red-500/15 text-red-400 border border-red-500/30" },
-              { id: "ingreso", label: t("ingreso.typeIngreso"), Icon: TrendingUp, activeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" },
-              { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/15 text-blue-400 border border-blue-500/30" },
+              { id: "gasto", label: t("ingreso.typeGasto"), Icon: TrendingDown, activeClass: "bg-red-500/20 text-red-400 border border-red-500/40 shadow-sm shadow-red-500/10" },
+            { id: "ingreso", label: t("ingreso.typeIngreso"), Icon: TrendingUp, activeClass: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-500/10" },
+            { id: "transferencia", label: t("ingreso.typeTransferencia"), Icon: ArrowLeftRight, activeClass: "bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-sm shadow-blue-500/10" },
             ] as const).map(({ id, label, Icon, activeClass }) => (
               <button
                 key={id}
                 onClick={() => { setTipoMovimiento(id); setError(null); setEsCompartido(false) }}
                 aria-pressed={tipoMovimiento === id}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${tipoMovimiento === id ? activeClass : "text-zinc-600 hover:text-zinc-400"
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs rounded-lg transition-all duration-200 ${tipoMovimiento === id ? `${activeClass} font-bold` : "text-zinc-600 hover:text-zinc-400 font-medium"
                   }`}
               >
                 <Icon className="w-3.5 h-3.5" aria-hidden="true" />
@@ -723,12 +726,11 @@ export default function IngresoTab({
               aria-hidden="true"
             >€</span>
             <span
-              className="text-6xl tracking-tight leading-none tabular-nums transition-all duration-300"
+              className="text-7xl tracking-tight leading-none tabular-nums transition-all duration-300 text-zinc-100 dark:text-white"
               style={{
-                fontFamily: "var(--font-dm-sans), sans-serif",
-                fontWeight: 200,
-                WebkitTextStroke: `1px ${tipoMovimiento === "ingreso" ? "#10b981" : tipoMovimiento === "transferencia" ? "#3b82f6" : "#ef4444"}`,
-                color: "transparent",
+                fontFamily: "var(--font-geist-sans), sans-serif",
+                fontWeight: 900,
+                letterSpacing: "-0.04em",
               }}
             >
               {display}
@@ -791,7 +793,7 @@ export default function IngresoTab({
                 ) : (
                   <>
                     <div>
-                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelNota")}</p>
+                      <p className="text-label-section mb-2 px-1">{t("ingreso.labelNota")}</p>
                       <input
                         type="text"
                         value={nota}
@@ -802,7 +804,7 @@ export default function IngresoTab({
                       />
                     </div>
                     <div>
-                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaOrigen")}</p>
+                      <p className="text-label-section mb-2 px-1">{t("ingreso.labelCuentaOrigen")}</p>
                       {(() => {
                         const c = cuentas.find(c => c.id === cuentaId)
                         return (
@@ -817,7 +819,7 @@ export default function IngresoTab({
                       })()}
                     </div>
                     <div>
-                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">{t("ingreso.labelCuentaDestino")}</p>
+                      <p className="text-label-section mb-2 px-1">{t("ingreso.labelCuentaDestino")}</p>
                       {(() => {
                         const c = cuentas.find(c => c.id === cuentaDestinoId)
                         return (
@@ -867,7 +869,7 @@ export default function IngresoTab({
                 {/* ── Fila: Nota + Cuenta inline ─────────────────────────── */}
                 <div className="flex gap-2 items-end">
                   <div className="flex-1 min-w-0">
-                    <label htmlFor="nota-input" className="block text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1">
+                    <label htmlFor="nota-input" className="block text-label-section mb-2 px-1">
                       {t("ingreso.labelNota")}
                     </label>
                     <input
@@ -888,7 +890,7 @@ export default function IngresoTab({
                   {/* Cuenta inline — solo si hay cuentas */}
                   {cuentas.length > 0 && cuentaSeleccionada && (
                     <div className="flex-shrink-0">
-                      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2 px-1 whitespace-nowrap">
+                      <p className="text-label-section mb-2 px-1 whitespace-nowrap">
                         {t("ingreso.labelCuenta")}
                       </p>
                       <div className="flex items-center gap-1.5">
@@ -1039,7 +1041,7 @@ export default function IngresoTab({
                 {/* ── Grid de categorías ─────────────────────────────────── */}
                 <div>
                   <div className="flex items-baseline justify-between mb-3 px-1">
-                    <p className="text-xs text-zinc-600 uppercase tracking-widest">{t("ingreso.labelCategoria")}</p>
+                    <p className="text-label-section">{t("ingreso.labelCategoria")}</p>
                     <p className="text-[10px] text-zinc-700">{t("ingreso.manageInSettings")}</p>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
@@ -1235,15 +1237,15 @@ function CategoryButton({
       aria-label={t("ingreso.ariaCategoria", { label: cat.label })}
       aria-pressed={isSelected}
       className={`h-20 w-full rounded-2xl border transition-all duration-200 flex flex-col items-center justify-center gap-2 select-none p-2 ${isSelected
-        ? `${accentSelected.bg} scale-[0.97]`
-        : "bg-zinc-900 border-zinc-800/80 hover:border-zinc-500 hover:bg-zinc-800/80"
+        ? `${accentSelected.bg} scale-[0.97] shadow-md`
+        : "bg-zinc-900 border-zinc-800/60 hover:border-zinc-600 hover:bg-zinc-800/80 shadow-sm shadow-black/20"
         } disabled:opacity-40`}
     >
       <CatIcon
         className={`w-5 h-5 transition-colors ${isSelected ? accentSelected.icon : "text-zinc-400"}`}
         aria-hidden="true"
       />
-      <span className={`text-[11px] font-medium text-center leading-tight transition-colors ${isSelected ? accentSelected.text : "text-zinc-300"}`}>
+      <span className={`text-[11px] font-semibold text-center leading-tight transition-colors ${isSelected ? accentSelected.text : "text-zinc-400"}`}>
         {cat.label}
       </span>
     </button>

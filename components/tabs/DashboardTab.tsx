@@ -329,7 +329,7 @@ export default function DashboardTab({
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <p className="text-sm font-medium text-zinc-300 capitalize flex-1 text-center">
+        <p className="text-sm font-bold text-zinc-200 capitalize flex-1 text-center tracking-wide">
           {monthLabel}
         </p>
 
@@ -372,7 +372,7 @@ export default function DashboardTab({
         className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-dashed border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400 transition-all"
       >
         <Plus className="w-4 h-4" aria-hidden="true" />
-        <span className="text-sm font-medium">{t("dashboard.customizeDashboard")}</span>
+        <span className="text-sm font-semibold">{t("dashboard.customizeDashboard")}</span>
       </button>
 
       {/* Drill-down categoria */}
@@ -497,7 +497,7 @@ export default function DashboardTab({
           />
           <div className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex items-center justify-between mb-2">
-              <h3 id="widget-picker-title" className="text-lg font-semibold text-zinc-100">
+              <h3 id="widget-picker-title" className="text-lg font-black text-zinc-100">
                 {t("dashboard.customizeTitle")}
               </h3>
               <button

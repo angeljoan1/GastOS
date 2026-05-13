@@ -336,7 +336,7 @@ export default function SettingsModal({
         <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center justify-between mb-5">
-          <h2 id="settings-modal-title" className="text-xl font-semibold text-zinc-100">
+          <h2 id="settings-modal-title" className="text-app-xl font-semibold text-zinc-100">
             {t("settings.title")}
           </h2>
           <button
@@ -355,8 +355,8 @@ export default function SettingsModal({
           <div className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-zinc-800 bg-zinc-800/40">
             <Globe className="w-4 h-4 text-zinc-600 flex-shrink-0" aria-hidden="true" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-300">{t("settings.sectionIdioma")}</p>
-              <p className="text-xs text-zinc-600 mt-0.5">{t("settings.sectionIdiomaDesc")}</p>
+              <p className="text-app-sm font-medium text-zinc-300">{t("settings.sectionIdioma")}</p>
+              <p className="text-app-xs text-zinc-600 mt-0.5">{t("settings.sectionIdiomaDesc")}</p>
             </div>
             <div className="flex gap-1">
               {SUPPORTED_LOCALES.map(loc => (
@@ -364,7 +364,7 @@ export default function SettingsModal({
                   key={loc}
                   onClick={() => handleChangeLocale(loc)}
                   aria-pressed={currentLocale === loc}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${currentLocale === loc
+                  className={`px-2.5 py-1 rounded-lg text-app-xs font-semibold transition-all ${currentLocale === loc
                     ? "bg-emerald-500 text-zinc-950"
                     : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200"
                     }`}
@@ -377,10 +377,10 @@ export default function SettingsModal({
 
           {/* ── Selector de tamaño de fuente ── */}
           <div className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-zinc-800 bg-zinc-800/40">
-            <span className="text-zinc-600 flex-shrink-0 text-sm font-black select-none w-4 text-center" aria-hidden="true">A</span>
+            <span className="text-zinc-600 flex-shrink-0 text-app-sm font-black select-none w-4 text-center" aria-hidden="true">A</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-300">{t("settings.fontSizeLabel")}</p>
-              <p className="text-xs text-zinc-600 mt-0.5">{t("settings.fontSizeDesc")}</p>
+              <p className="text-app-sm font-medium text-zinc-300">{t("settings.fontSizeLabel")}</p>
+              <p className="text-app-xs text-zinc-600 mt-0.5">{t("settings.fontSizeDesc")}</p>
             </div>
             <div className="flex gap-1">
               {([
@@ -392,7 +392,7 @@ export default function SettingsModal({
                   key={value}
                   onClick={() => handleChangeFontSize(value)}
                   aria-pressed={fontSize === value}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${fontSize === value
+                  className={`px-2.5 py-1 rounded-lg text-app-xs font-semibold transition-all ${fontSize === value
                     ? "bg-emerald-500 text-zinc-950"
                     : "bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200"
                     }`}
@@ -419,10 +419,10 @@ export default function SettingsModal({
                 }`}
             >
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${activeTab === id ? "text-zinc-100" : "text-zinc-300"}`}>
+                <p className={`text-app-sm font-medium ${activeTab === id ? "text-zinc-100" : "text-zinc-300"}`}>
                   {label}
                 </p>
-                <p className="text-xs text-zinc-600 mt-0.5">{desc}</p>
+                <p className="text-app-xs text-zinc-600 mt-0.5">{desc}</p>
               </div>
               <Icon className={`w-4 h-4 flex-shrink-0 transition-transform ${activeTab === id ? "text-emerald-400 rotate-90" : "text-zinc-600"}`} />
             </button>
@@ -432,8 +432,8 @@ export default function SettingsModal({
           <div className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-zinc-800 bg-zinc-800/40">
             <GripHorizontal className="w-4 h-4 text-zinc-600 flex-shrink-0" aria-hidden="true" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-300">{t("settings.swipeHintLabel")}</p>
-              <p className="text-xs text-zinc-600 mt-0.5">{t("settings.swipeHintDesc")}</p>
+              <p className="text-app-sm font-medium text-zinc-300">{t("settings.swipeHintLabel")}</p>
+              <p className="text-app-xs text-zinc-600 mt-0.5">{t("settings.swipeHintDesc")}</p>
             </div>
             <button
               type="button"
@@ -453,7 +453,7 @@ export default function SettingsModal({
         </div>
 
         {error && (
-          <div role="alert" className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-sm text-red-400">
+          <div role="alert" className="mb-4 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 text-app-sm text-red-400">
             {error}
           </div>
         )}
@@ -461,7 +461,7 @@ export default function SettingsModal({
         {/* ── Categorías ───────────────────────────────────────────────────── */}
         {activeTab === "categorias" && (
           <div className="space-y-6 mt-2">
-            <p className="text-xs text-zinc-600">
+            <p className="text-app-xs text-zinc-600">
               {t.rich("settings.categoriasHint", { tab: chunks => <strong className="text-zinc-500">{chunks}</strong> })}
             </p>
             {(["gasto", "ingreso", "ambos"] as const).map(tipo => {
@@ -469,7 +469,7 @@ export default function SettingsModal({
               if (cats.length === 0) return null
               return (
                 <div key={tipo} className="mb-5">
-                  <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
+                  <p className="text-app-xs text-zinc-500 uppercase tracking-widest mb-2">
                     {tipo === "gasto" ? t("settings.catTypeGasto") : tipo === "ingreso" ? t("settings.catTypeIngreso") : t("settings.catTypeAmbos")}
                   </p>
                   <div className="space-y-2">
@@ -480,7 +480,7 @@ export default function SettingsModal({
                         <div key={cat.id} className="flex items-center justify-between bg-zinc-800 border border-zinc-700/50 rounded-xl px-3 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <CIcon className="w-4 h-4 text-zinc-400 flex-shrink-0" aria-hidden="true" />
-                            <span className="text-sm text-zinc-200">{cat.label}</span>
+                            <span className="text-app-sm text-zinc-200">{cat.label}</span>
                             {cat.tipo === "ambos" && (
                               <span className="text-[10px] text-zinc-600 bg-zinc-700 px-1.5 py-0.5 rounded">{t("settings.catTagAmbos")}</span>
                             )}
@@ -501,14 +501,14 @@ export default function SettingsModal({
               )
             })}
             <div className="space-y-3 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500 uppercase tracking-widest">{t("settings.catNewSection")}</p>
+              <p className="text-app-xs text-zinc-500 uppercase tracking-widest">{t("settings.catNewSection")}</p>
               <div className="flex rounded-lg bg-zinc-800 p-0.5 border border-zinc-700" role="group" aria-label={t("settings.catAriaTypeGroup")}>
                 {(["gasto", "ingreso", "ambos"] as const).map(tipo => (
                   <button
                     key={tipo}
                     onClick={() => setNewCatTipo(tipo)}
                     aria-pressed={newCatTipo === tipo}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${newCatTipo === tipo ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+                    className={`flex-1 py-1.5 text-app-xs font-medium rounded-md transition-all ${newCatTipo === tipo ? "bg-zinc-600 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
                   >
                     {tipo === "gasto" ? t("settings.catTypeButtonGasto") : tipo === "ingreso" ? t("settings.catTypeButtonIngreso") : t("settings.catTypeButtonAmbos")}
                   </button>
@@ -516,8 +516,8 @@ export default function SettingsModal({
               </div>
               <div className="flex items-center justify-between px-1 py-2">
                 <div>
-                  <p className="text-xs font-medium text-zinc-300">{t("settings.catCanRecurLabel")}</p>
-                  <p className="text-xs text-zinc-600 mt-0.5">{t("settings.catCanRecurDesc")}</p>
+                  <p className="text-app-xs font-medium text-zinc-300">{t("settings.catCanRecurLabel")}</p>
+                  <p className="text-app-xs text-zinc-600 mt-0.5">{t("settings.catCanRecurDesc")}</p>
                 </div>
                 <button
                   type="button"
@@ -539,19 +539,19 @@ export default function SettingsModal({
                   placeholder={t("settings.catPlaceholderName")}
                   aria-label={t("settings.catAriaName")}
                   onKeyDown={e => e.key === "Enter" && handleAddCat()}
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-app-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                 />
                 <button
                   onClick={handleAddCat}
                   disabled={savingCat || !newCatName.trim()}
                   aria-label={t("settings.catAriaCreate")}
-                  className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-medium hover:bg-emerald-400 disabled:opacity-50 transition-all"
+                  className="px-3 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-app-sm font-medium hover:bg-emerald-400 disabled:opacity-50 transition-all"
                 >
                   {savingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </button>
               </div>
               <div>
-                <p className="text-xs text-zinc-600 mb-2" id="icono-cat-label">{t("settings.catSectionIcono")}</p>
+                <p className="text-app-xs text-zinc-600 mb-2" id="icono-cat-label">{t("settings.catSectionIcono")}</p>
                 <div className="grid grid-cols-7 gap-1.5" role="group" aria-labelledby="icono-cat-label">
                   {CATEGORIA_ICON_OPTIONS.map(name => {
                     const Ico = getIcon(name)
@@ -576,14 +576,14 @@ export default function SettingsModal({
         {/* ── Presupuestos ─────────────────────────────────────────────────── */}
         {activeTab === "presupuestos" && (
           <div className="space-y-3 mt-2">
-            <p className="text-xs text-zinc-600 mb-4">
+            <p className="text-app-xs text-zinc-600 mb-4">
               {t.rich("settings.presupuestosHint", {
                 gasto: chunks => <strong className="text-zinc-500">{chunks}</strong>,
                 dashboard: chunks => <strong className="text-zinc-500">{chunks}</strong>,
               })}
             </p>
             {gastoCats.length === 0 ? (
-              <p className="text-sm text-zinc-600 text-center py-8">{t("settings.presupuestosNoCats")}</p>
+              <p className="text-app-sm text-zinc-600 text-center py-8">{t("settings.presupuestosNoCats")}</p>
             ) : (
               gastoCats.map(cat => {
                 const CIcon = getIcon(cat.icono)
@@ -596,18 +596,18 @@ export default function SettingsModal({
                       <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center flex-shrink-0">
                         <CIcon className="w-4 h-4 text-zinc-300" aria-hidden="true" />
                       </div>
-                      <p className="text-sm font-medium text-zinc-200 flex-1">{cat.label}</p>
+                      <p className="text-app-sm font-medium text-zinc-200 flex-1">{cat.label}</p>
                       {pres && !isEditing && (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-emerald-400 tabular-nums">{Number(pres.cantidad).toFixed(2)}€</span>
-                          <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto(pres.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
+                          <span className="text-app-sm font-semibold text-emerald-400 tabular-nums">{Number(pres.cantidad).toFixed(2)}€</span>
+                          <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto(pres.cantidad.toString()) }} className="text-app-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
                           <button onClick={() => handleDeletePresupuesto(pres.id)} disabled={isDeleting} className="text-zinc-600 hover:text-red-400 transition-colors">
                             {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       )}
                       {!pres && !isEditing && (
-                        <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto("") }} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                        <button onClick={() => { setEditingPresupuesto(cat.id); setInputPresupuesto("") }} className="flex items-center gap-1.5 text-app-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
                           <Target className="w-3.5 h-3.5" aria-hidden="true" /> {t("settings.presupuestosAddLimit")}
                         </button>
                       )}
@@ -619,12 +619,12 @@ export default function SettingsModal({
                           onChange={e => setInputPresupuesto(e.target.value)}
                           placeholder={t("settings.presupuestosPlaceholder")} autoFocus
                           onKeyDown={e => { if (e.key === "Enter") handleSavePresupuesto(cat.id); if (e.key === "Escape") setEditingPresupuesto(null) }}
-                          className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                          className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-app-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                         />
-                        <button onClick={() => handleSavePresupuesto(cat.id)} disabled={savingPres} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
+                        <button onClick={() => handleSavePresupuesto(cat.id)} disabled={savingPres} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-app-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
                           {savingPres ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
                         </button>
-                        <button onClick={() => setEditingPresupuesto(null)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
+                        <button onClick={() => setEditingPresupuesto(null)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-app-sm">✕</button>
                       </div>
                     )}
                   </div>
@@ -637,7 +637,7 @@ export default function SettingsModal({
         {/* ── Objetivos ────────────────────────────────────────────────────── */}
         {activeTab === "objetivos" && (
           <div className="space-y-4 mt-2">
-            <p className="text-xs text-zinc-600">
+            <p className="text-app-xs text-zinc-600">
               {t.rich("settings.objetivosHint", {
                 widget: chunks => <strong className="text-zinc-500">{chunks}</strong>,
               })}
@@ -648,18 +648,18 @@ export default function SettingsModal({
                 <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0">
                   <Target className="w-4 h-4 text-red-400" aria-hidden="true" />
                 </div>
-                <p className="text-sm font-medium text-zinc-200 flex-1">{t("settings.objetivoGastoTotal")}</p>
+                <p className="text-app-sm font-medium text-zinc-200 flex-1">{t("settings.objetivoGastoTotal")}</p>
                 {objetivoGastoTotal && !editingGastoTotal && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-red-400 tabular-nums">{objetivoGastoTotal.cantidad.toFixed(2)}€</span>
-                    <button onClick={() => { setEditingGastoTotal(true); setInputGastoTotal(objetivoGastoTotal.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
+                    <span className="text-app-sm font-semibold text-red-400 tabular-nums">{objetivoGastoTotal.cantidad.toFixed(2)}€</span>
+                    <button onClick={() => { setEditingGastoTotal(true); setInputGastoTotal(objetivoGastoTotal.cantidad.toString()) }} className="text-app-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
                     <button onClick={handleDeleteGastoTotal} className="text-zinc-600 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
                 {!objetivoGastoTotal && !editingGastoTotal && (
-                  <button onClick={() => setEditingGastoTotal(true)} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                  <button onClick={() => setEditingGastoTotal(true)} className="flex items-center gap-1.5 text-app-xs text-zinc-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
                     <Target className="w-3.5 h-3.5" aria-hidden="true" /> {t("settings.objetivosAdd")}
                   </button>
                 )}
@@ -671,12 +671,12 @@ export default function SettingsModal({
                     onChange={e => setInputGastoTotal(e.target.value)}
                     placeholder={t("settings.objetivoGastoTotalPlaceholder")} autoFocus
                     onKeyDown={e => { if (e.key === "Enter") handleSaveGastoTotal(); if (e.key === "Escape") setEditingGastoTotal(false) }}
-                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500/50 transition-all"
+                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-app-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500/50 transition-all"
                   />
-                  <button onClick={handleSaveGastoTotal} disabled={savingGastoTotal} className="px-4 py-2 bg-red-500 text-white rounded-xl text-sm font-semibold hover:bg-red-400 disabled:opacity-50 transition-all">
+                  <button onClick={handleSaveGastoTotal} disabled={savingGastoTotal} className="px-4 py-2 bg-red-500 text-white rounded-xl text-app-sm font-semibold hover:bg-red-400 disabled:opacity-50 transition-all">
                     {savingGastoTotal ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
                   </button>
-                  <button onClick={() => setEditingGastoTotal(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
+                  <button onClick={() => setEditingGastoTotal(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-app-sm">✕</button>
                 </div>
               )}
             </div>
@@ -685,18 +685,18 @@ export default function SettingsModal({
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                   <PiggyBank className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                 </div>
-                <p className="text-sm font-medium text-zinc-200 flex-1">{t("settings.objetivoAhorroMensual")}</p>
+                <p className="text-app-sm font-medium text-zinc-200 flex-1">{t("settings.objetivoAhorroMensual")}</p>
                 {objetivoAhorro && !editingObj && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-emerald-400 tabular-nums">{objetivoAhorro.cantidad.toFixed(2)}€</span>
-                    <button onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
+                    <span className="text-app-sm font-semibold text-emerald-400 tabular-nums">{objetivoAhorro.cantidad.toFixed(2)}€</span>
+                    <button onClick={() => { setEditingObj(true); setInputObjetivo(objetivoAhorro.cantidad.toString()) }} className="text-app-xs text-zinc-500 hover:text-zinc-300 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">{t("common.edit")}</button>
                     <button onClick={handleDeleteObjetivo} aria-label={t("settings.ariaDeleteObjetivo")} className="text-zinc-600 hover:text-red-400 transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
                 {!objetivoAhorro && !editingObj && (
-                  <button onClick={() => setEditingObj(true)} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
+                  <button onClick={() => setEditingObj(true)} className="flex items-center gap-1.5 text-app-xs text-zinc-500 hover:text-emerald-400 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-700">
                     <Target className="w-3.5 h-3.5" aria-hidden="true" /> {t("settings.objetivosAdd")}
                   </button>
                 )}
@@ -708,12 +708,12 @@ export default function SettingsModal({
                     onChange={e => setInputObjetivo(e.target.value)}
                     placeholder={t("settings.objetivosPlaceholder")} autoFocus
                     onKeyDown={e => { if (e.key === "Enter") handleSaveObjetivo(); if (e.key === "Escape") setEditingObj(false) }}
-                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                    className="flex-1 bg-zinc-900 border border-zinc-600 rounded-xl px-3 py-2 text-app-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
-                  <button onClick={handleSaveObjetivo} disabled={savingObj} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
+                  <button onClick={handleSaveObjetivo} disabled={savingObj} className="px-4 py-2 bg-emerald-500 text-zinc-950 rounded-xl text-app-sm font-semibold hover:bg-emerald-400 disabled:opacity-50 transition-all">
                     {savingObj ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
                   </button>
-                  <button onClick={() => setEditingObj(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-sm">✕</button>
+                  <button onClick={() => setEditingObj(false)} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 rounded-xl hover:bg-zinc-700 transition-all text-app-sm">✕</button>
                 </div>
               )}
             </div>
@@ -723,13 +723,13 @@ export default function SettingsModal({
         {/* ── Seguridad ────────────────────────────────────────────────────── */}
         {activeTab === "seguridad" && (
           <div className="space-y-4 mt-2">
-            <p className="text-xs text-zinc-600">
+            <p className="text-app-xs text-zinc-600">
               {t("settings.seguridadHint")}
             </p>
             {!bioAvailable ? (
               <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 flex items-center gap-3">
                 <Fingerprint className="w-5 h-5 text-zinc-600 flex-shrink-0" aria-hidden="true" />
-                <p className="text-sm text-zinc-500">{t("settings.bioNotSupported")}</p>
+                <p className="text-app-sm text-zinc-500">{t("settings.bioNotSupported")}</p>
               </div>
             ) : (
               <div className="bg-zinc-800 border border-zinc-700/50 rounded-2xl p-4 space-y-3">
@@ -738,15 +738,15 @@ export default function SettingsModal({
                     <Fingerprint className={`w-4 h-4 ${bioEnabled ? "text-emerald-400" : "text-zinc-500"}`} aria-hidden="true" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-200">{t("settings.bioTitle")}</p>
-                    <p className="text-xs text-zinc-600 mt-0.5">
+                    <p className="text-app-sm font-medium text-zinc-200">{t("settings.bioTitle")}</p>
+                    <p className="text-app-xs text-zinc-600 mt-0.5">
                       {bioEnabled ? t("settings.bioActiveDesc") : t("settings.bioInactiveDesc")}
                     </p>
                   </div>
                   <button
                     onClick={handleToggleBiometric}
                     disabled={bioLoading}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${bioEnabled
+                    className={`px-3 py-1.5 rounded-xl text-app-xs font-semibold transition-all ${bioEnabled
                       ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
                       : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
                       } disabled:opacity-50`}
@@ -755,10 +755,10 @@ export default function SettingsModal({
                   </button>
                 </div>
                 {bioError && (
-                  <p className="text-xs text-red-400 bg-red-500/10 rounded-xl px-3 py-2">{bioError}</p>
+                  <p className="text-app-xs text-red-400 bg-red-500/10 rounded-xl px-3 py-2">{bioError}</p>
                 )}
                 {bioEnabled && (
-                  <p className="text-xs text-zinc-700">
+                  <p className="text-app-xs text-zinc-700">
                     {t("settings.bioReactivateHint")}
                   </p>
                 )}
@@ -769,7 +769,7 @@ export default function SettingsModal({
 
         <button
           onClick={onClose}
-          className="w-full mt-6 py-3 text-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
+          className="w-full mt-6 py-3 text-app-sm text-zinc-400 hover:text-zinc-200 border border-zinc-700 rounded-xl transition-all"
         >
           {t("common.close")}
         </button>
@@ -785,19 +785,19 @@ export default function SettingsModal({
               <h3 id="confirm-lang-title" className="text-zinc-100 font-semibold mb-2">
                 {t("settings.langChangeConfirm")}
               </h3>
-              <p className="text-zinc-500 text-sm mb-6">
+              <p className="text-zinc-500 text-app-sm mb-6">
                 {t("settings.langChangeWarning")}
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setPendingLocale(null)}
-                  className="flex-1 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-all"
+                  className="flex-1 py-2 text-app-sm text-zinc-400 hover:text-zinc-200 transition-all"
                 >
                   {t("common.cancel")}
                 </button>
                 <button
                   onClick={confirmLocaleChange}
-                  className="flex-1 py-2 text-sm bg-emerald-500 text-zinc-950 rounded-xl font-medium hover:bg-emerald-400 transition-all"
+                  className="flex-1 py-2 text-app-sm bg-emerald-500 text-zinc-950 rounded-xl font-medium hover:bg-emerald-400 transition-all"
                 >
                   {t("common.confirm")}
                 </button>

@@ -1134,6 +1134,19 @@ export default function IngresoTab({
                           setGhostCatLabel("")
                         }
 
+                        // NUEVO: Limpiamos todo si el navegador toma el control para hacer scroll nativo
+                        const handlePointerCancel = () => {
+                          if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
+                          dragCatIdRef.current = null
+                          dragOverCatIdRef.current = null
+                          isDraggingCatRef.current = false
+                          pointerCatStartRef.current = null
+                          setDraggingCatId(null)
+                          setDragOverCatId(null)
+                          setGhostCatPos(null)
+                          setGhostCatLabel("")
+                        }
+
                         return (
                           <div
                             key={cat.id}
@@ -1141,7 +1154,9 @@ export default function IngresoTab({
                             onPointerDown={handlePointerDown}
                             onPointerMove={handlePointerMove}
                             onPointerUp={handlePointerUp}
-                            className={`touch-none select-none transition-all duration-150 rounded-2xl ${isDraggingThis ? "opacity-40 scale-95" : ""} ${isOver ? "ring-2 ring-emerald-500/60" : ""}`}
+                            onPointerCancel={handlePointerCancel}
+                            // CORRECCIÓN: Eliminamos la clase 'touch-none' para permitir scroll vertical
+                            className={`select-none transition-all duration-150 rounded-2xl ${isDraggingThis ? "opacity-40 scale-95" : ""} ${isOver ? "ring-2 ring-emerald-500/60" : ""}`}
                           >
                             <CategoryButton
                               cat={cat}

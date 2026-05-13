@@ -513,7 +513,8 @@ export default function DashboardTab({
             </p>
             <div className="space-y-2">
               {/* Widgets activos: reordenables con drag */}
-             {activeWidgets.map(id => {
+             {/* Widgets activos: reordenables con drag */}
+              {activeWidgets.map(id => {
                 const w = WIDGET_CATALOG.find(x => x.id === id)
                 if (!w) return null
                 const WIcon = w.Icon
@@ -527,8 +528,6 @@ export default function DashboardTab({
                   isDraggingRef.current = false
                   dragIdRef.current = w.id
                   pointerStartRef.current = { x: e.clientX, y: e.clientY }
-                  // Iniciem el timer de hold — el drag s'activa només si l'usuari
-                  // manté premut HOLD_MS sense moure's més de 6px
                   holdTimerRef.current = setTimeout(() => {
                     if (!dragIdRef.current) return
                     isDraggingRef.current = true
@@ -538,7 +537,6 @@ export default function DashboardTab({
                     if (pointerStartRef.current) {
                       setGhostPos({ x: pointerStartRef.current.x, y: pointerStartRef.current.y })
                     }
-                    // Ara sí capturem el pointer per rebre tots els events
                     const el = document.querySelector(`[data-widget-id="${dragIdRef.current}"]`)
                     if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
                   }, HOLD_MS)
@@ -547,10 +545,9 @@ export default function DashboardTab({
                 const handlePointerMove = (e: React.PointerEvent) => {
                   if (!dragIdRef.current || !pointerStartRef.current) return
                   const dx = e.clientX - pointerStartRef.current.x
-                  const dy = e.clientY - pointerStartRef.current.y
-                  // Si es mou més de 6px abans del hold, cancel·lem el drag
+                  const dragDy = e.clientY - pointerStartRef.current.y
                   if (!isDraggingRef.current) {
-                    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+                    if (Math.abs(dx) > 6 || Math.abs(dragDy) > 6) {
                       if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
                       dragIdRef.current = null
                       pointerStartRef.current = null
@@ -601,6 +598,20 @@ export default function DashboardTab({
                   setGhostIcon(null)
                 }
 
+                // NUEVO: Cancelamos si el usuario empieza a hacer scroll
+                const handlePointerCancel = () => {
+                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+                  dragIdRef.current = null
+                  dragOverIdRef.current = null
+                  isDraggingRef.current = false
+                  pointerStartRef.current = null
+                  setDragId(null)
+                  setDragOverId(null)
+                  setGhostPos(null)
+                  setGhostLabel("")
+                  setGhostIcon(null)
+                }
+
                 return (
                   <div
                     key={w.id}
@@ -608,7 +619,9 @@ export default function DashboardTab({
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none touch-none ${
+                    onPointerCancel={handlePointerCancel}
+                    // CORRECCIÓN: Eliminamos 'touch-none' para liberar el scroll nativo del modal
+                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none ${
                       isDraggingThis ? "opacity-40 cursor-grabbing" : "cursor-grab"
                     } ${isOver && !isDraggingThis ? "border-emerald-500/60 bg-emerald-500/15" : "border-emerald-500/40 bg-emerald-500/10"}`}
                   >

@@ -1180,8 +1180,9 @@ export default function IngresoTab({
         </div>
 
         <div
-          className={`transition-all duration-300 overflow-hidden ${tecladoVisible ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
-            }`}
+          className={`transition-all duration-300 overflow-hidden shrink-0 ${
+            tecladoVisible ? "max-h-[360px] opacity-100 pb-2" : "max-h-0 opacity-0 pb-0"
+          }`}
         >
           <NumericKeypad onDigit={handleDigit} onBackspace={handleBackspace} />
         </div>

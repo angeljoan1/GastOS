@@ -357,8 +357,10 @@ function MainApp({ session }: { session: Session }) {
         )}
       </main>
 
-      <nav className="border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-zoom">
-        <div className="flex items-center justify-around py-2 gap-2">
+      {/* Añadimos relative, z-30 y shrink-0 al contenedor principal del nav */}
+      <nav className="border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-zoom relative z-30 shrink-0">
+        {/* Cambiamos py-2 por py-3.5 para darle el grosor ideal de App nativa */}
+        <div className="flex items-center justify-around py-3.5 gap-2">
           {([
             { id: "ingreso",   Icon: WalletCards, label: t("nav.register")  },
             { id: "historial", Icon: History,     label: t("nav.historial") },
@@ -371,7 +373,7 @@ function MainApp({ session }: { session: Session }) {
                 onClick={() => setTab(id as "ingreso" | "historial" | "dashboard")}
                 aria-label={label}
                 aria-current={isActive ? "page" : undefined}
-                className="flex-1 flex flex-col items-center justify-center py-1.5 rounded-2xl transition-all duration-200"
+                className="flex-1 flex flex-col items-center justify-center py-1 rounded-2xl transition-all duration-200"
               >
                 <Icon
                   className="w-6 h-6 transition-all duration-200"

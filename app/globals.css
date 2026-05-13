@@ -69,6 +69,8 @@ html,
 body {
   background: var(--color-zinc-950);
   color: var(--foreground);
+  overflow: hidden;
+  height: 100%;
 }
 
 /* Smooth background transition on theme switch */

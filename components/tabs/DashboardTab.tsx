@@ -479,7 +479,7 @@ export default function DashboardTab({
             className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
             onClick={() => setShowWidgetPicker(false)}
           />
-          <div className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+          <div className="relative w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl pt-6 px-6 pb-24 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
             <div className="flex items-center justify-between mb-2">
               <h3 id="widget-picker-title" className="text-app-lg font-black text-zinc-100">
                 {t("dashboard.customizeTitle")}

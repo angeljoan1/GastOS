@@ -1094,18 +1094,20 @@ export default function IngresoTab({
                             return
                           }
                           setGhostCatPos({ x: e.clientX, y: e.clientY })
-                          e.currentTarget.releasePointerCapture(e.pointerId)
+                          
                           const el = document.elementFromPoint(e.clientX, e.clientY)
                           const target = el?.closest("[data-cat-id]")
                           const overId = target?.getAttribute("data-cat-id") ?? null
-                          if (overId && overId !== dragCatIdRef.current) { dragOverCatIdRef.current = overId; setDragOverCatId(overId) }
-                          e.currentTarget.setPointerCapture(e.pointerId)
+                          if (overId && overId !== dragCatIdRef.current) { 
+                            dragOverCatIdRef.current = overId; 
+                            setDragOverCatId(overId) 
+                          }
                         }
 
                         const handlePointerUp = (e: React.PointerEvent) => {
                           if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
                           if (isDraggingCatRef.current) {
-                            e.currentTarget.releasePointerCapture(e.pointerId)
+                            try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
                             const el = document.elementFromPoint(e.clientX, e.clientY)
                             const target = el?.closest("[data-cat-id]")
                             const finalOverId = target?.getAttribute("data-cat-id") ?? dragOverCatIdRef.current
@@ -1134,7 +1136,6 @@ export default function IngresoTab({
                           setGhostCatLabel("")
                         }
 
-                        // NUEVO: Limpiamos todo si el navegador toma el control para hacer scroll nativo
                         const handlePointerCancel = () => {
                           if (holdCatTimerRef.current) clearTimeout(holdCatTimerRef.current)
                           dragCatIdRef.current = null
@@ -1155,7 +1156,10 @@ export default function IngresoTab({
                             onPointerMove={handlePointerMove}
                             onPointerUp={handlePointerUp}
                             onPointerCancel={handlePointerCancel}
-                            // CORRECCIÓN: Eliminamos la clase 'touch-none' para permitir scroll vertical
+                            // CORRECCIÓN: Fuera onTouchMove manual.
+                            onContextMenu={e => e.preventDefault()}
+                            // LA CLAVE: Añadir touchAction: "pan-y"
+                            style={{ WebkitTouchCallout: "none", touchAction: "pan-y" }}
                             className={`select-none transition-all duration-150 rounded-2xl ${isDraggingThis ? "opacity-40 scale-95" : ""} ${isOver ? "ring-2 ring-emerald-500/60" : ""}`}
                           >
                             <CategoryButton

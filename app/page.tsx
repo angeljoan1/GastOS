@@ -238,14 +238,14 @@ function MainApp({ session }: { session: Session }) {
   return (
     <AppDataProvider value={{ categorias, setCategorias, cuentas, setCuentas, presupuestos, setPresupuestos, objetivos, setObjetivos }}>
     <div
-      className="flex flex-col bg-zinc-950 text-zinc-100 mx-auto relative overflow-hidden"
+      className="flex flex-col bg-zinc-950 text-zinc-100 mx-auto relative overflow-hidden h-dvh max-h-dvh"
       style={{
         zoom: `var(--app-font-scale, 1)`,
         width: `calc(min(100vw, 28rem) / var(--app-font-scale, 1))`,
         height: `calc(100dvh / var(--app-font-scale, 1))`,
       } as React.CSSProperties}
     >
-      <header className="flex items-center justify-between px-4 pt-safe-zoom py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
+      <header className="shrink-0 flex items-center justify-between px-4 pt-safe-zoom py-2 border-b border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl relative z-20">
         <div className="flex items-center gap-2.5">
           <img src="/logo.png" alt="GastOS" className="w-8 h-8 rounded-xl" />
           <span className="text-[19px] font-black tracking-[-0.03em] text-zinc-100">GastOS</span>
@@ -339,7 +339,7 @@ function MainApp({ session }: { session: Session }) {
         </div>
       )}
 
-      <main className="flex-1 overflow-hidden flex flex-col min-h-0">
+      <main className="flex-1 overflow-hidden flex flex-col min-h-0 relative">
         {tab === "ingreso" && (
           <ErrorBoundary label="Registro">
             <IngresoTab onEditLast={setEditingMovFromIngreso} />
@@ -358,7 +358,7 @@ function MainApp({ session }: { session: Session }) {
       </main>
 
       {/* Añadimos relative, z-30 y shrink-0 al contenedor principal del nav */}
-      <nav className="border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-zoom relative z-30 shrink-0">
+      <nav className="shrink-0 mt-auto w-full border-t border-zinc-800/40 bg-zinc-950/98 backdrop-blur-xl px-4 pb-safe-zoom relative z-30 shrink-0 z-50">
         {/* Cambiamos py-2 por py-3.5 para darle el grosor ideal de App nativa */}
         <div className="flex items-center justify-around py-3.5 gap-2">
           {([

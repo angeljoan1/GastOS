@@ -17,7 +17,7 @@ import { useDashboardMemos } from "@/components/dashboard/hooks/useDashboardMemo
 import {
   Package, ChevronLeft, ChevronRight, TrendingDown, TrendingUp,
   Wallet, ArrowLeftRight, Plus, X, Check, Flame, Target,
-  PiggyBank, CalendarDays, BarChart2,
+  PiggyBank, CalendarDays, BarChart2, ChevronUp, ChevronDown,
 } from "lucide-react"
 import {
   ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line,
@@ -107,20 +107,12 @@ export default function DashboardTab({
   const locale = useLocale()
   const { categorias, cuentas, presupuestos, objetivos } = useAppData()
   const WIDGET_CATALOG = useMemo(() => getWidgetCatalog(t), [t])
+  
+  // Estados limpios: eliminamos dragId, dragOverId, ghostPos y todas las refs
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showWidgetPicker, setShowWidgetPicker] = useState(false)
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
-  const [dragId, setDragId] = useState<WidgetId | null>(null)
-  const [dragOverId, setDragOverId] = useState<WidgetId | null>(null)
-  const dragIdRef = useRef<WidgetId | null>(null)
-  const dragOverIdRef = useRef<WidgetId | null>(null)
-  const isDraggingRef = useRef(false)
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null)
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null)
-  const [ghostLabel, setGhostLabel] = useState<string>("")
-  const [ghostIcon, setGhostIcon] = useState<React.ElementType | null>(null)
   const [activeWidgets, setActiveWidgets] = useState<WidgetId[]>(() => {
     if (typeof window === "undefined") return DEFAULT_WIDGETS
     try {
@@ -138,6 +130,24 @@ export default function DashboardTab({
   const toggleWidget = (id: WidgetId) => {
     setActiveWidgets(prev => {
       const next = prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id]
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { }
+      return next
+    })
+  }
+
+  // NUEVA FUNCIÓN: Intercambia la posición de un widget hacia arriba o abajo
+  const moveWidget = (index: number, direction: "up" | "down") => {
+    setActiveWidgets(prev => {
+      const next = [...prev]
+      if (direction === "up" && index > 0) {
+        const temp = next[index]
+        next[index] = next[index - 1]
+        next[index - 1] = temp
+      } else if (direction === "down" && index < next.length - 1) {
+        const temp = next[index]
+        next[index] = next[index + 1]
+        next[index + 1] = temp
+      }
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { }
       return next
     })
@@ -457,32 +467,6 @@ export default function DashboardTab({
         )
       })()}
 
-      {/* Fantasma de drag */}
-      {ghostPos && ghostLabel && ghostIcon && (() => {
-        const GhostIcon = ghostIcon as React.ElementType
-        return (
-          <div
-            className="fixed z-[200] pointer-events-none select-none"
-            style={{
-              left: ghostPos.x - 160,
-              top: ghostPos.y - 32,
-              width: "320px",
-              opacity: 0.85,
-            }}
-          >
-            <div className="flex items-center gap-4 px-4 py-4 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 shadow-2xl shadow-black/60">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
-                <GhostIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-app-sm font-medium text-zinc-100">{ghostLabel}</p>
-              </div>
-              <span className="text-zinc-600 text-app-xs">⠿</span>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* Widget picker */}
       {showWidgetPicker && (
         <div
@@ -512,135 +496,55 @@ export default function DashboardTab({
               {t("dashboard.customizeHint")}
             </p>
             <div className="space-y-2">
-              {/* Widgets activos: reordenables con drag */}
-             {/* Widgets activos: reordenables con drag */}
-              {activeWidgets.map(id => {
+              
+             {/* Widgets activos: ordenables mediante flechas */}
+              {activeWidgets.map((id, index) => {
                 const w = WIDGET_CATALOG.find(x => x.id === id)
                 if (!w) return null
                 const WIcon = w.Icon
-                const isDraggingThis = dragId === id
-                const isOver = dragOverId === id
-
-                const HOLD_MS = 350
-
-                const handlePointerDown = (e: React.PointerEvent) => {
-                  if ((e.target as HTMLElement).closest("button")) return
-                  isDraggingRef.current = false
-                  dragIdRef.current = w.id
-                  pointerStartRef.current = { x: e.clientX, y: e.clientY }
-                  holdTimerRef.current = setTimeout(() => {
-                    if (!dragIdRef.current) return
-                    isDraggingRef.current = true
-                    setDragId(dragIdRef.current)
-                    setGhostLabel(w.label)
-                    setGhostIcon(() => WIcon)
-                    if (pointerStartRef.current) {
-                      setGhostPos({ x: pointerStartRef.current.x, y: pointerStartRef.current.y })
-                    }
-                    const el = document.querySelector(`[data-widget-id="${dragIdRef.current}"]`)
-                    if (el) (el as HTMLElement).setPointerCapture(e.pointerId)
-                  }, HOLD_MS)
-                }
-
-                const handlePointerMove = (e: React.PointerEvent) => {
-                  if (!dragIdRef.current || !pointerStartRef.current) return
-                  const dx = e.clientX - pointerStartRef.current.x
-                  const dragDy = e.clientY - pointerStartRef.current.y
-                  if (!isDraggingRef.current) {
-                    if (Math.abs(dx) > 6 || Math.abs(dragDy) > 6) {
-                      if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-                      dragIdRef.current = null
-                      pointerStartRef.current = null
-                    }
-                    return
-                  }
-                  setGhostPos({ x: e.clientX, y: e.clientY })
-                  e.currentTarget.releasePointerCapture(e.pointerId)
-                  const el = document.elementFromPoint(e.clientX, e.clientY)
-                  const target = el?.closest("[data-widget-id]")
-                  const overId = target?.getAttribute("data-widget-id") as WidgetId | null
-                  if (overId && overId !== dragIdRef.current) {
-                    dragOverIdRef.current = overId
-                    setDragOverId(overId)
-                  }
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                }
-
-                const handlePointerUp = (e: React.PointerEvent) => {
-                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-                  if (isDraggingRef.current) {
-                    e.currentTarget.releasePointerCapture(e.pointerId)
-                    const el = document.elementFromPoint(e.clientX, e.clientY)
-                    const target = el?.closest("[data-widget-id]")
-                    const finalOverId = (target?.getAttribute("data-widget-id") ?? dragOverIdRef.current) as WidgetId | null
-                    if (dragIdRef.current && finalOverId && dragIdRef.current !== finalOverId) {
-                      const from = dragIdRef.current
-                      const to = finalOverId
-                      setActiveWidgets(prev => {
-                        const next = [...prev]
-                        const fromIdx = next.indexOf(from)
-                        const toIdx = next.indexOf(to)
-                        next.splice(fromIdx, 1)
-                        next.splice(toIdx, 0, from)
-                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch { }
-                        return next
-                      })
-                    }
-                  }
-                  dragIdRef.current = null
-                  dragOverIdRef.current = null
-                  isDraggingRef.current = false
-                  pointerStartRef.current = null
-                  setDragId(null)
-                  setDragOverId(null)
-                  setGhostPos(null)
-                  setGhostLabel("")
-                  setGhostIcon(null)
-                }
-
-                // NUEVO: Cancelamos si el usuario empieza a hacer scroll
-                const handlePointerCancel = () => {
-                  if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-                  dragIdRef.current = null
-                  dragOverIdRef.current = null
-                  isDraggingRef.current = false
-                  pointerStartRef.current = null
-                  setDragId(null)
-                  setDragOverId(null)
-                  setGhostPos(null)
-                  setGhostLabel("")
-                  setGhostIcon(null)
-                }
 
                 return (
                   <div
                     key={w.id}
-                    data-widget-id={w.id}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerCancel}
-                    // CORRECCIÓN: Eliminamos 'touch-none' para liberar el scroll nativo del modal
-                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl border transition-all text-left select-none ${
-                      isDraggingThis ? "opacity-40 cursor-grabbing" : "cursor-grab"
-                    } ${isOver && !isDraggingThis ? "border-emerald-500/60 bg-emerald-500/15" : "border-emerald-500/40 bg-emerald-500/10"}`}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-left select-none transition-all"
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/20">
                       <WIcon className="w-5 h-5 text-emerald-400" aria-hidden="true" />
                     </div>
-                    <div className="flex-1 min-w-0 pointer-events-none">
+                    
+                    <div className="flex-1 min-w-0">
                       <p className="text-app-sm font-medium text-zinc-100">{w.label}</p>
                       <p className="text-app-xs text-zinc-600 mt-0.5">{w.descripcion}</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-zinc-600 text-app-xs select-none pointer-events-none">⠿</span>
+
+                    {/* Controles de ordenación (Flechas) */}
+                    <div className="flex items-center gap-1 flex-shrink-0 border-r border-zinc-800/80 pr-2.5 mr-0.5">
                       <button
-                        onClick={e => { e.stopPropagation(); toggleWidget(w.id) }}
-                        className="w-6 h-6 rounded-full flex items-center justify-center bg-emerald-500 border-2 border-emerald-500"
+                        onClick={() => moveWidget(index, "up")}
+                        disabled={index === 0}
+                        aria-label="Subir posición"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-800/40 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-20 disabled:pointer-events-none transition-all active:scale-90"
                       >
-                        <Check className="w-3.5 h-3.5 text-zinc-950" strokeWidth={3} />
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveWidget(index, "down")}
+                        disabled={index === activeWidgets.length - 1}
+                        aria-label="Bajar posición"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-800/40 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-20 disabled:pointer-events-none transition-all active:scale-90"
+                      >
+                        <ChevronDown className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {/* Botón para desactivar */}
+                    <button
+                      onClick={() => toggleWidget(w.id)}
+                      aria-label="Desactivar widget"
+                      className="w-6 h-6 rounded-full flex items-center justify-center bg-emerald-500 border-2 border-emerald-500 flex-shrink-0 active:scale-90 transition-transform"
+                    >
+                      <Check className="w-3.5 h-3.5 text-zinc-950" strokeWidth={3} />
+                    </button>
                   </div>
                 )
               })}

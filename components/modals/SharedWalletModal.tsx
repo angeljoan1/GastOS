@@ -92,7 +92,9 @@ export default function SharedWalletModal({ isOpen, onClose, currentUserId, curr
     if (!result) return setError(t("wallet.errorJoin"))
     resetJoinForm()
     await loadWallets()
-    const fresh = wallets.find(w => w.id === result.wallet.id) ?? { ...result.wallet, members: [] }
+    const fresh = wallets.find(w => w.id === result.wallet.id) 
+      ? { ...wallets.find(w => w.id === result.wallet.id)!, members: [...wallets.find(w => w.id === result.wallet.id)!.members.filter(m => m.user_id !== result.member.user_id), result.member] }
+      : { ...result.wallet, members: [result.member] }
     await loadDetail(fresh)
   }
 

@@ -100,7 +100,7 @@ export default function EditMovimientoModal({
       aria-modal="true"
       aria-labelledby="edit-modal-title"
     >
-      <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
+      <div className="w-full bg-zinc-900 border-t border-zinc-800/70 rounded-t-3xl p-6 pb-28 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-8 duration-300">
       <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
       <div className="flex items-center justify-between mb-6">
           <h2 id="edit-modal-title" className="text-xl font-semibold text-zinc-100">

@@ -32,7 +32,10 @@ export async function fetchWalletsForUser(userId: string): Promise<WalletWithMem
 
   return wallets.map(w => ({
     ...w,
-    members: (members ?? []).filter(m => m.wallet_id === w.id),
+    members: (members ?? []).filter(m => m.wallet_id === w.id).map(m => ({
+      ...m,
+      contribucion_mensual: Number(m.contribucion_mensual)
+    })),
   }))
 }
 
@@ -57,7 +60,7 @@ export async function createWallet(
       .select()
       .single()
 
-    return { ...wallet, members: member ? [member] : [] }
+    return { ...wallet, members: member ? [{ ...member, contribucion_mensual: Number(member.contribucion_mensual) }] : [] }
   }
   return null
 }
@@ -83,7 +86,7 @@ export async function joinWallet(
     .single()
 
   if (error) return null
-  return { wallet, member }
+  return { wallet, member: { ...member, contribucion_mensual: Number(member.contribucion_mensual) } }
 }
 
 export async function fetchExpenses(walletId: string, since?: string): Promise<SharedExpense[]> {
@@ -98,6 +101,7 @@ export async function fetchExpenses(walletId: string, since?: string): Promise<S
   const { data } = await q
   return (data ?? []).map(e => ({
     ...e,
+    cantidad: Number(e.cantidad),
     splits: (e.shared_expense_splits ?? []).map((s: { user_id: string }) => s.user_id),
   }))
 }
@@ -125,7 +129,7 @@ export async function insertExpense(
       .insert(splitUserIds.map(uid => ({ expense_id: expense.id, user_id: uid })))
   }
 
-  return { ...expense, splits: splitUserIds }
+  return { ...expense, cantidad: Number(expense.cantidad), splits: splitUserIds }
 }
 
 export function calcularReequilibrio(expenses: SharedExpense[], members: SharedWalletMember[]): Transfer[] {
